@@ -81,10 +81,10 @@
     <h1
       class="mt-8 max-w-6xl text-[clamp(3.4rem,7.2vw,7.25rem)] leading-[0.88] font-semibold tracking-[-0.065em] text-ink"
     >
-      <span class="block overflow-hidden"
+      <span class="mb-[-0.08em] block overflow-hidden pb-[0.08em]"
         ><span data-hero-line class="block">Know what rent fits</span></span
       >
-      <span class="block overflow-hidden"
+      <span class="mb-[-0.08em] block overflow-hidden pb-[0.08em]"
         ><span data-hero-line class="block font-normal">before you move.</span></span
       >
     </h1>
