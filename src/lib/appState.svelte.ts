@@ -12,7 +12,7 @@ import {
 import { appendComparisonLinks, parseComparisonSalaryLink } from '$lib/compare/links';
 import { popText } from '$lib/format';
 import { MAX_SALARY } from '$lib/salary';
-import type { City, CitySuggestion } from '$lib/types';
+import type { City, CitySuggestion, LookupResult } from '$lib/types';
 import { fetchPopulation, lookupRent } from '$lib/api';
 
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
@@ -26,11 +26,6 @@ type PlanSuggestion = CitySuggestion & {
   pop?: number | null;
   comparisonSalary?: number;
 };
-
-interface HydratedLookup {
-  suggestion: PlanSuggestion;
-  select: boolean;
-}
 
 function validCoordinates(lat: number, lng: number): boolean {
   return (
@@ -77,6 +72,18 @@ function parseOffListValue(raw: string): PlanSuggestion | null {
   }
 }
 
+function unavailableLookup(): LookupResult {
+  return {
+    r1: null,
+    r2: null,
+    yoy: null,
+    source: 'none',
+    rentMetric: 'unknown',
+    rentArea: '',
+    rentYear: ''
+  };
+}
+
 export interface RentPlanSnapshot {
   readonly salary: number | null;
   readonly selected: City | null;
@@ -87,6 +94,26 @@ export interface RentPlanSnapshot {
   readonly compareEntries: readonly ComparisonEntry[];
   readonly looking: boolean;
   readonly pendingName: string | null;
+  readonly pendingComparisonNames: readonly string[];
+}
+
+type ResolutionIntent = 'active' | 'comparison';
+
+interface ResolutionOperation {
+  readonly intent: ResolutionIntent;
+  cancelled: boolean;
+  lookupRelease: (() => void) | null;
+}
+
+interface SharedRentLookup {
+  readonly controller: AbortController;
+  promise: Promise<LookupResult>;
+  readonly consumers: Set<ResolutionOperation>;
+}
+
+interface ComparisonTask {
+  readonly operation: ResolutionOperation;
+  promise: Promise<ComparisonResult>;
 }
 
 export type ComparisonResult =
@@ -141,27 +168,19 @@ export class RentPlanWorkspace {
   private salaryValue = $state<number | null>(null);
   private citiesValue = $state<City[]>(cloneSeed());
   private selectedNameValue = $state<string | null>(null);
-  private lookingValue = $state(false);
-  /** City being resolved in the background (rent still loading) — drives the
-   * "loading" affordance on nearby chips while the current view stays put. */
+  /** The active-city lane and comparison lane have independent pending state. */
   private pendingNameValue = $state<string | null>(null);
+  private pendingComparisonNamesValue = $state<string[]>([]);
   private readonly adapters: RentPlanAdapters;
   private readonly comparisonSet: ComparisonSet;
-  private lookupController: AbortController | null = null;
-  private resolutionVersion = 0;
-
-  private beginResolution(): number {
-    this.resolutionVersion += 1;
-    this.lookupController?.abort();
-    this.lookupController = null;
-    this.lookingValue = false;
-    this.pendingNameValue = null;
-    return this.resolutionVersion;
-  }
-
-  private resolutionIsCurrent(version?: number): boolean {
-    return version == null || version === this.resolutionVersion;
-  }
+  private activeOperation: ResolutionOperation | null = null;
+  private readonly comparisonTasks = new Map<string, ComparisonTask>();
+  private readonly comparisonRestoreOperations = new Map<string, ResolutionOperation>();
+  private readonly rentLookups = new Map<string, SharedRentLookup>();
+  private readonly coordinateLookups = new Map<
+    string,
+    Promise<readonly [number, number] | undefined>
+  >();
 
   constructor(adapters: RentPlanAdapters = browserAdapters) {
     this.adapters = adapters;
@@ -193,11 +212,20 @@ export class RentPlanWorkspace {
   }
 
   get looking(): boolean {
-    return this.lookingValue;
+    return this.pendingNameValue != null;
   }
 
   get pendingName(): string | null {
     return this.pendingNameValue;
+  }
+
+  get pendingComparisonNames(): string[] {
+    return [...this.pendingComparisonNamesValue];
+  }
+
+  isComparisonPending(name: string): boolean {
+    const key = name.toLowerCase();
+    return this.pendingComparisonNamesValue.some((pending) => pending.toLowerCase() === key);
   }
 
   get selected(): City | null {
@@ -227,7 +255,8 @@ export class RentPlanWorkspace {
       compareNames: this.compareNames,
       compareEntries: this.compareEntries,
       looking: this.looking,
-      pendingName: this.pendingName
+      pendingName: this.pendingName,
+      pendingComparisonNames: this.pendingComparisonNames
     };
   }
 
@@ -240,10 +269,98 @@ export class RentPlanWorkspace {
     this.persist();
   }
 
+  private createOperation(intent: ResolutionIntent): ResolutionOperation {
+    return { intent, cancelled: false, lookupRelease: null };
+  }
+
+  private cancelOperation(operation: ResolutionOperation): void {
+    if (operation.cancelled) return;
+    operation.cancelled = true;
+    operation.lookupRelease?.();
+    operation.lookupRelease = null;
+  }
+
+  private cancelActiveOperation(): void {
+    if (this.activeOperation) this.cancelOperation(this.activeOperation);
+    this.activeOperation = null;
+    this.pendingNameValue = null;
+  }
+
+  private beginActiveOperation(): ResolutionOperation {
+    this.cancelActiveOperation();
+    const operation = this.createOperation('active');
+    this.activeOperation = operation;
+    return operation;
+  }
+
+  private activeOperationIsCurrent(operation: ResolutionOperation): boolean {
+    return !operation.cancelled && this.activeOperation === operation;
+  }
+
+  private markComparisonPending(name: string): void {
+    const key = name.toLowerCase();
+    if (this.pendingComparisonNamesValue.some((pending) => pending.toLowerCase() === key)) return;
+    this.pendingComparisonNamesValue = [...this.pendingComparisonNamesValue, name];
+  }
+
+  private clearComparisonPending(name: string): void {
+    const key = name.toLowerCase();
+    this.pendingComparisonNamesValue = this.pendingComparisonNamesValue.filter(
+      (pending) => pending.toLowerCase() !== key
+    );
+  }
+
+  private markOperationPending(operation: ResolutionOperation, name: string): void {
+    if (operation.intent === 'active') this.pendingNameValue = name;
+    else this.markComparisonPending(name);
+  }
+
+  private finishActiveOperation(operation: ResolutionOperation): void {
+    if (this.activeOperation === operation) {
+      this.activeOperation = null;
+      this.pendingNameValue = null;
+    }
+    operation.lookupRelease?.();
+    operation.lookupRelease = null;
+  }
+
+  private finishComparisonOperation(key: string, operation: ResolutionOperation): void {
+    if (this.comparisonTasks.get(key)?.operation === operation) {
+      this.comparisonTasks.delete(key);
+      this.clearComparisonPending(key);
+    }
+    operation.lookupRelease?.();
+    operation.lookupRelease = null;
+  }
+
+  private finishComparisonRestore(key: string, operation: ResolutionOperation): void {
+    if (this.comparisonRestoreOperations.get(key) === operation) {
+      this.comparisonRestoreOperations.delete(key);
+      this.clearComparisonPending(key);
+    }
+    operation.lookupRelease?.();
+    operation.lookupRelease = null;
+  }
+
+  private cancelAllResolutions(): void {
+    this.cancelActiveOperation();
+    this.cancelComparisonOperations();
+  }
+
+  private cancelComparisonOperations(): void {
+    for (const task of this.comparisonTasks.values()) this.cancelOperation(task.operation);
+    for (const operation of this.comparisonRestoreOperations.values()) {
+      this.cancelOperation(operation);
+    }
+    this.comparisonTasks.clear();
+    this.comparisonRestoreOperations.clear();
+    this.pendingComparisonNamesValue = [];
+  }
+
   /** Select a city after its rent record is ready (or explicitly unavailable). */
   selectCity(name: string): boolean {
     if (!this.cityByName(name)) return false;
-    this.beginResolution();
+    this.cancelActiveOperation();
     return this.commitSelection(name);
   }
 
@@ -258,26 +375,41 @@ export class RentPlanWorkspace {
 
   /** Explicit city-navigation intent. Comparison additions use addComparison instead. */
   async chooseCity(suggestion: PlanSuggestion): Promise<string> {
-    const version = this.beginResolution();
-    return this.resolveSuggestion(suggestion, { select: true, version });
+    const operation = this.beginActiveOperation();
+    return this.resolveSuggestion(suggestion, { select: true, operation }).finally(() => {
+      this.finishActiveOperation(operation);
+    });
   }
-
-  private coordinateLookups = new Set<string>();
 
   /** Hydrate map coordinates for a bundled rent city that is not in the curated
    * coordinate list. The place dataset is loaded only when this fallback is needed. */
   private async ensureCoordinates(name: string) {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;
-    const key = name.toLowerCase();
-    if (this.coordinateLookups.has(key)) return;
-    this.coordinateLookups.add(key);
+    const coords = await this.coordinatesFor(city.city, city.state);
+    if (coords) this.patchCity(name, { lat: coords[0], lng: coords[1] });
+  }
+
+  private coordinatesFor(
+    city: string,
+    state: string
+  ): Promise<readonly [number, number] | undefined> {
+    const key = `${city.toLowerCase()},${state.toLowerCase()}`;
+    const existing = this.coordinateLookups.get(key);
+    if (existing) return existing;
+    let request: Promise<readonly [number, number] | undefined>;
     try {
-      const coords = await this.adapters.coordinatesForPlace(city.city, city.state);
-      if (coords) this.patchCity(name, { lat: coords[0], lng: coords[1] });
-    } finally {
-      this.coordinateLookups.delete(key);
+      request = Promise.resolve(this.adapters.coordinatesForPlace(city, state));
+    } catch {
+      request = Promise.resolve(undefined);
     }
+    const lookup = request
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.coordinateLookups.get(key) === lookup) this.coordinateLookups.delete(key);
+      });
+    this.coordinateLookups.set(key, lookup);
+    return lookup;
   }
 
   private popLookups = new Set<string>();
@@ -304,7 +436,9 @@ export class RentPlanWorkspace {
   private commitComparison(name: string): ComparisonResult {
     const city = this.cityByName(name);
     if (!city) return { status: 'not-found', name };
-    return this.comparisonSet.add(city, this.salary);
+    const result = this.comparisonSet.add(city, this.salary);
+    this.persist();
+    return result;
   }
 
   /** Add a city to comparison without changing the active plan. */
@@ -312,28 +446,61 @@ export class RentPlanWorkspace {
   addComparison(input: PlanSuggestion): Promise<ComparisonResult>;
   addComparison(input: PlanSuggestion | string): ComparisonResult | Promise<ComparisonResult> {
     const requestedName = typeof input === 'string' ? input : input.label;
-    const known = this.cityByName(requestedName);
+    const canonicalName =
+      typeof input === 'string' ? requestedName : this.canonicalSuggestion(input).label;
+    const key = canonicalName.toLowerCase();
+    const known = this.cityByName(requestedName) ?? this.cityByName(canonicalName);
     if (known && this.isComparing(known.name)) {
       return this.comparisonSet.add(known, this.salary);
+    }
+    if (typeof input !== 'string') {
+      const pending = this.comparisonTasks.get(key);
+      if (pending) return pending.promise;
     }
     if (this.comparisonSet.size >= MAX_COMPARISON_ENTRIES) {
       return { status: 'full', name: known?.name ?? requestedName };
     }
 
-    const version = this.beginResolution();
     if (typeof input === 'string') return this.commitComparison(input);
-    return this.resolveSuggestion(input, { select: false, version }).then((name) =>
-      this.commitComparison(name)
-    );
+    const operation = this.createOperation('comparison');
+    this.markComparisonPending(canonicalName);
+    const task = {
+      operation,
+      promise: Promise.resolve({ status: 'not-found', name: canonicalName } as ComparisonResult)
+    } satisfies ComparisonTask;
+    task.promise = this.resolveSuggestion(input, { select: false, operation })
+      .then((name) =>
+        operation.cancelled ? { status: 'not-found' as const, name } : this.commitComparison(name)
+      )
+      .finally(() => this.finishComparisonOperation(key, operation));
+    this.comparisonTasks.set(key, task);
+    return task.promise;
   }
 
   /** Remove one comparison entry without changing the active plan. */
   removeComparison(name: string): boolean {
-    return this.comparisonSet.remove(name);
+    const key = name.toLowerCase();
+    const task = this.comparisonTasks.get(key);
+    if (task) {
+      this.cancelOperation(task.operation);
+      this.comparisonTasks.delete(key);
+      this.clearComparisonPending(key);
+    }
+    const restore = this.comparisonRestoreOperations.get(key);
+    if (restore) {
+      this.cancelOperation(restore);
+      this.comparisonRestoreOperations.delete(key);
+      this.clearComparisonPending(key);
+    }
+    const removed = this.comparisonSet.remove(name);
+    if (removed) this.persist();
+    return removed;
   }
 
   clearComparison() {
+    this.cancelComparisonOperations();
     this.comparisonSet.clear();
+    this.persist();
   }
 
   setComparisonSalary(name: string, value: number): boolean {
@@ -347,62 +514,117 @@ export class RentPlanWorkspace {
   /** Resolve a city from an autocomplete suggestion: add it if new, then fill rent
    * from the bundled HUD table if it isn't a seed city. Returns the canonical name.
    * Nearby-place picks carry an OSM population — used as an instant prefill. */
+  private canonicalSuggestion(suggestion: PlanSuggestion): PlanSuggestion {
+    const seed = findSeedCity(suggestion.label);
+    return seed
+      ? { ...suggestion, label: seed.name, city: seed.city, state: seed.state }
+      : suggestion;
+  }
+
+  private operationIsCurrent(operation: ResolutionOperation): boolean {
+    return operation.intent === 'active'
+      ? this.activeOperationIsCurrent(operation)
+      : !operation.cancelled;
+  }
+
+  private applyRentLookup(name: string, result: LookupResult): void {
+    if (result.source === 'none') return;
+    this.patchCity(name, {
+      r1: result.r1,
+      r2: result.r2,
+      yoy: result.yoy,
+      source: result.source,
+      rentMetric: result.rentMetric,
+      rentArea: result.rentArea,
+      rentYear: result.rentYear
+    });
+    this.persist();
+  }
+
+  /** Share one cancellable rent lookup between active and comparison intents. */
+  private acquireRentLookup(
+    target: PlanSuggestion,
+    operation: ResolutionOperation
+  ): Promise<LookupResult> {
+    const key = target.label.toLowerCase();
+    let lookup = this.rentLookups.get(key);
+    if (lookup?.controller.signal.aborted) {
+      this.rentLookups.delete(key);
+      lookup = undefined;
+    }
+    if (!lookup) {
+      const controller = new AbortController();
+      lookup = {
+        controller,
+        promise: Promise.resolve(unavailableLookup()),
+        consumers: new Set()
+      };
+      this.rentLookups.set(key, lookup);
+      let request: Promise<LookupResult>;
+      try {
+        request = Promise.resolve(
+          this.adapters.lookupRent(target.lat!, target.lng!, controller.signal)
+        );
+      } catch {
+        request = Promise.resolve(unavailableLookup());
+      }
+      lookup.promise = request
+        .catch(() => unavailableLookup())
+        .then((result) => {
+          if (!controller.signal.aborted) this.applyRentLookup(target.label, result);
+          return result;
+        })
+        .finally(() => {
+          if (this.rentLookups.get(key) === lookup) this.rentLookups.delete(key);
+        });
+    }
+
+    lookup.consumers.add(operation);
+    operation.lookupRelease = () => {
+      if (!lookup?.consumers.delete(operation)) return;
+      if (!lookup.consumers.size && this.rentLookups.get(key) === lookup) {
+        lookup.controller.abort();
+      }
+    };
+    return lookup.promise;
+  }
+
   private async resolveSuggestion(
     sug: PlanSuggestion,
-    options: { select?: boolean; version?: number } = {}
+    options: { select?: boolean; operation: ResolutionOperation }
   ): Promise<string> {
     const selectOnResolve = options.select ?? true;
-    const version = options.version;
+    const operation = options.operation;
     const prefillPop = sug.pop != null && sug.pop > 0 ? popText(sug.pop) : '';
     const seed = findSeedCity(sug.label);
-    const target = seed ? { ...sug, label: seed.name, city: seed.city, state: seed.state } : sug;
-    if (!this.resolutionIsCurrent(version)) return target.label;
+    let target = this.canonicalSuggestion(sug);
+    if (!this.operationIsCurrent(operation)) return target.label;
     if (seed) {
-      this.lookupController?.abort();
-      this.lookupController = null;
-      this.lookingValue = false;
-      this.pendingNameValue = null;
       // Ensure the seed city carries coords for the map.
       if (seed.lat == null && target.lat != null && target.lng != null) {
         this.patchCity(seed.name, { lat: target.lat, lng: target.lng });
       }
       if (!seed.pop && prefillPop) this.patchCity(seed.name, { pop: prefillPop });
       if (seed.r1 != null) {
-        if (selectOnResolve && this.resolutionIsCurrent(version)) this.commitSelection(seed.name);
+        if (selectOnResolve && this.activeOperationIsCurrent(operation)) {
+          this.commitSelection(seed.name);
+        }
         return seed.name;
       }
     }
 
     if (!seed && (target.lat == null || target.lng == null)) {
-      const coords = await this.adapters.coordinatesForPlace(target.city, target.state);
-      if (!this.resolutionIsCurrent(version)) return target.label;
+      this.markOperationPending(operation, target.label);
+      const coords = await this.coordinatesFor(target.city, target.state);
+      if (!this.operationIsCurrent(operation)) return target.label;
       if (coords) {
-        return this.resolveSuggestion({ ...target, lat: coords[0], lng: coords[1] }, options);
+        target = { ...target, lat: coords[0], lng: coords[1] };
       }
     }
 
-    const existing = this.cityByName(target.label);
+    let existing = this.cityByName(target.label);
     if (!existing) {
-      this.citiesValue = [
-        ...this.citiesValue,
-        {
-          name: target.label,
-          city: target.city,
-          state: target.state,
-          r1: null,
-          r2: null,
-          yoy: null,
-          tax: STATE_TAX[target.state] || 'varies',
-          pop: prefillPop,
-          citySnapshot: null,
-          lat: target.lat,
-          lng: target.lng,
-          source: 'none',
-          rentMetric: 'unknown',
-          rentArea: target.label,
-          rentYear: ''
-        }
-      ];
+      existing = this.ensureOffListPlaceholder({ ...target, pop: sug.pop });
     } else if (!existing.pop && prefillPop) {
       this.patchCity(target.label, { pop: prefillPop });
     }
@@ -413,49 +635,35 @@ export class RentPlanWorkspace {
     // rendered until the new one is ready swaps old-full → new-full with no reflow.
     // The clicked place shows a loading affordance via pendingName in the meantime.
     // If the city already has rent (revisited), skip the wait and select now.
-    if (existing?.r1 != null) {
-      if (selectOnResolve && this.resolutionIsCurrent(version)) this.commitSelection(target.label);
+    if (existing.r1 != null) {
+      if (selectOnResolve && this.activeOperationIsCurrent(operation)) {
+        this.commitSelection(target.label);
+      }
       return target.label;
     }
 
     // Local seed suggestions can be useful before their map coordinates are
     // hydrated. They cannot take the coordinate-based HUD lookup path yet.
     if (target.lat == null || target.lng == null) {
-      if (selectOnResolve && this.resolutionIsCurrent(version)) this.commitSelection(target.label);
+      if (selectOnResolve && this.activeOperationIsCurrent(operation)) {
+        this.commitSelection(target.label);
+      }
       return target.label;
     }
 
-    this.lookupController?.abort();
-    const controller = new AbortController();
-    this.lookupController = controller;
-    this.lookingValue = true;
-    this.pendingNameValue = target.label;
+    this.markOperationPending(operation, target.label);
+
+    const lookup = this.acquireRentLookup(target, operation);
     try {
-      const r = await this.adapters.lookupRent(target.lat, target.lng, controller.signal);
-      if (controller.signal.aborted || !this.resolutionIsCurrent(version)) return target.label;
-      if (r.source !== 'none') {
-        this.patchCity(target.label, {
-          r1: r.r1,
-          r2: r.r2,
-          yoy: r.yoy,
-          source: r.source,
-          rentMetric: r.rentMetric,
-          rentArea: r.rentArea,
-          rentYear: r.rentYear
-        });
-      }
+      await lookup;
+      if (!this.operationIsCurrent(operation)) return target.label;
+      if (selectOnResolve) this.commitSelection(target.label); // atomic swap now that rent is in
+      return target.label;
     } finally {
-      if (this.lookupController === controller) {
-        this.lookingValue = false;
-        this.pendingNameValue = null;
-        this.lookupController = null;
-        if (selectOnResolve && this.resolutionIsCurrent(version)) {
-          this.commitSelection(target.label); // atomic swap now that rent is in
-        }
-        this.persist();
-      }
+      operation.lookupRelease?.();
+      operation.lookupRelease = null;
+      this.persist();
     }
-    return target.label;
   }
 
   private patchCity(name: string, patch: Partial<City>) {
@@ -472,7 +680,14 @@ export class RentPlanWorkspace {
       // Off-list cities added via autocomplete aren't in the seed set — store them
       // whole so selection/comparison survives a reload.
       const seedNames = new Set(SEED_CITIES.map((c) => c.name.toLowerCase()));
-      const custom = this.citiesValue.filter((c) => !seedNames.has(c.name.toLowerCase()));
+      const referencedNames = new Set<string>();
+      if (this.selectedNameValue) referencedNames.add(this.selectedNameValue.toLowerCase());
+      for (const entry of this.comparisonSet.entries) {
+        referencedNames.add(entry.city.name.toLowerCase());
+      }
+      const custom = this.citiesValue.filter(
+        (c) => !seedNames.has(c.name.toLowerCase()) && referencedNames.has(c.name.toLowerCase())
+      );
       this.adapters.writeStorage(
         LAST_KEY,
         JSON.stringify({
@@ -511,7 +726,8 @@ export class RentPlanWorkspace {
   }
 
   private ensureOffListPlaceholder(suggestion: PlanSuggestion): City {
-    const existing = this.cityByName(suggestion.label);
+    const canonical = findSeedCity(suggestion.label);
+    const existing = this.cityByName(canonical?.name ?? suggestion.label);
     if (existing) {
       const patch: Partial<City> = {};
       if (existing.lat == null && suggestion.lat != null) patch.lat = suggestion.lat;
@@ -544,44 +760,79 @@ export class RentPlanWorkspace {
     return city;
   }
 
-  private async resolveHydratedLookups(lookups: readonly HydratedLookup[], version: number) {
-    for (const lookup of lookups) {
-      if (!this.resolutionIsCurrent(version)) return;
-      await this.resolveSuggestion(lookup.suggestion, {
-        select: lookup.select,
-        version
-      });
-    }
+  private startComparisonRestore(suggestion: PlanSuggestion): void {
+    const canonical = this.canonicalSuggestion(suggestion);
+    const key = canonical.label.toLowerCase();
+    if (this.comparisonRestoreOperations.has(key) || this.comparisonTasks.has(key)) return;
+    const operation = this.createOperation('comparison');
+    this.comparisonRestoreOperations.set(key, operation);
+    this.markComparisonPending(canonical.label);
+    void this.resolveSuggestion(canonical, { select: false, operation }).finally(() => {
+      this.finishComparisonRestore(key, operation);
+    });
   }
 
-  private scheduleLookup(
-    suggestion: PlanSuggestion,
-    select: boolean,
-    lookups: Map<string, HydratedLookup>
-  ): string {
+  private scheduleLookup(suggestion: PlanSuggestion, select: boolean): string {
     const city = this.ensureOffListPlaceholder(suggestion);
     if (city.source === 'apartment-list' || city.r1 != null) {
       if (select) this.commitSelection(city.name);
       return city.name;
     }
-    const key = city.name.toLowerCase();
-    const existing = lookups.get(key);
-    if (existing) {
-      existing.select ||= select;
-    } else {
-      lookups.set(key, {
-        suggestion: {
-          ...suggestion,
-          label: city.name,
-          city: city.city,
-          state: city.state,
-          lat: city.lat,
-          lng: city.lng
-        },
-        select
+    const hydrated = {
+      ...suggestion,
+      label: city.name,
+      city: city.city,
+      state: city.state,
+      lat: city.lat,
+      lng: city.lng
+    };
+    if (select) {
+      const operation = this.beginActiveOperation();
+      void this.resolveSuggestion(hydrated, { select: true, operation }).finally(() => {
+        this.finishActiveOperation(operation);
       });
+    } else {
+      this.startComparisonRestore(hydrated);
     }
     return city.name;
+  }
+
+  private applySelectedSearch(
+    search: URLSearchParams,
+    scheduleLookup: (suggestion: PlanSuggestion, select: boolean) => string,
+    clearMissing: boolean
+  ): boolean {
+    const cityName = search.get('city');
+    if (cityName && cityName.length <= 100) {
+      const known = this.cityByName(cityName);
+      if (known) {
+        const suggestion =
+          this.offListSuggestionFromSearch(cityName, search) ??
+          (known.source !== 'apartment-list' && known.lat != null && known.lng != null
+            ? {
+                label: known.name,
+                city: known.city,
+                state: known.state,
+                lat: known.lat,
+                lng: known.lng
+              }
+            : null);
+        if (known.r1 != null || !suggestion) this.commitSelection(known.name);
+        else scheduleLookup(suggestion, true);
+        return true;
+      }
+
+      const suggestion = this.offListSuggestionFromSearch(cityName, search);
+      if (suggestion) {
+        const city = this.ensureOffListPlaceholder(suggestion);
+        if (city.r1 != null) this.commitSelection(city.name);
+        else scheduleLookup(suggestion, true);
+        return true;
+      }
+    }
+
+    if (clearMissing) this.selectedNameValue = null;
+    return false;
   }
 
   private linkSalary(search: URLSearchParams): number | null {
@@ -658,31 +909,13 @@ export class RentPlanWorkspace {
 
   /** Seed state from URL query params. URL comparison state is authoritative. */
   hydrateFromSearch(search: URLSearchParams): boolean {
-    const version = this.beginResolution();
+    this.cancelAllResolutions();
     const linkSalary = this.linkSalary(search);
     if (linkSalary != null) this.salaryValue = linkSalary;
 
-    const cityName = search.get('city');
-    let selectedCity = false;
-    const lookups = new Map<string, HydratedLookup>();
     const scheduleLookup = (suggestion: PlanSuggestion, select: boolean) =>
-      this.scheduleLookup(suggestion, select, lookups);
-
-    if (cityName && cityName.length <= 100) {
-      const known = this.cityByName(cityName);
-      if (known) {
-        this.commitSelection(known.name);
-        selectedCity = true;
-      } else {
-        const suggestion = this.offListSuggestionFromSearch(cityName, search);
-        if (suggestion) {
-          const city = this.ensureOffListPlaceholder(suggestion);
-          selectedCity = true;
-          if (city.r1 != null) this.commitSelection(city.name);
-          else scheduleLookup(suggestion, true);
-        }
-      }
-    }
+      this.scheduleLookup(suggestion, select);
+    const selectedCity = this.applySelectedSearch(search, scheduleLookup, false);
 
     const hasComparisonLinkState =
       search.has('compare') || search.has('compare-offlist') || search.has('compare-salary');
@@ -691,7 +924,6 @@ export class RentPlanWorkspace {
       this.applyComparisonSearch(search, linkSalary ?? DEFAULT_COMPARISON_SALARY, scheduleLookup);
     }
     this.persist();
-    void this.resolveHydratedLookups([...lookups.values()], version);
 
     return selectedCity || hasLinkState;
   }
@@ -713,36 +945,16 @@ export class RentPlanWorkspace {
   /** Apply URL params on browser back/forward navigation. URL state is the sole
    * source of truth, including the complete comparison set. */
   applyUrlNavigation(search: URLSearchParams) {
-    const version = this.beginResolution();
+    this.cancelAllResolutions();
     const linkSalary = this.linkSalary(search);
     this.salaryValue = linkSalary;
 
-    const cityName = search.get('city');
-    const lookups = new Map<string, HydratedLookup>();
     const scheduleLookup = (suggestion: PlanSuggestion, select: boolean) =>
-      this.scheduleLookup(suggestion, select, lookups);
-
-    if (cityName && cityName.length <= 100) {
-      const known = this.cityByName(cityName);
-      if (known) {
-        this.commitSelection(known.name);
-      } else {
-        const suggestion = this.offListSuggestionFromSearch(cityName, search);
-        if (suggestion) {
-          const city = this.ensureOffListPlaceholder(suggestion);
-          if (city.r1 != null) this.commitSelection(city.name);
-          else scheduleLookup(suggestion, true);
-        } else {
-          this.selectedNameValue = null;
-        }
-      }
-    } else {
-      this.selectedNameValue = null;
-    }
+      this.scheduleLookup(suggestion, select);
+    this.applySelectedSearch(search, scheduleLookup, true);
 
     this.applyComparisonSearch(search, linkSalary ?? DEFAULT_COMPARISON_SALARY, scheduleLookup);
     this.persist();
-    void this.resolveHydratedLookups([...lookups.values()], version);
   }
 
   restoreSession() {

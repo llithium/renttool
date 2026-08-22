@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RentPlanWorkspace, type RentPlanAdapters } from './appState.svelte';
-import { DEFAULT_COMPARISON_SALARY } from '$lib/compare/comparisonSet.svelte';
+import {
+  COMPARISON_STORAGE_KEY,
+  DEFAULT_COMPARISON_SALARY
+} from '$lib/compare/comparisonSet.svelte';
 import type { CitySuggestion, LookupResult } from '$lib/types';
 
 function adapters(
@@ -19,6 +22,14 @@ function adapters(
 
 function suggestion(label: string, state = 'ZZ'): CitySuggestion {
   return { label, city: label.replace(/,\s*[A-Z]{2}$/, ''), state, lat: 40, lng: -74 };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((finish) => {
+    resolve = finish;
+  });
+  return { promise, resolve };
 }
 
 const unavailableRent: LookupResult = {
@@ -74,6 +85,122 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.compareNames).toEqual(['Nearby, ZZ']);
   });
 
+  it('keeps active-city and comparison resolutions independent with intent-specific pending state', async () => {
+    const activeRent = deferred<LookupResult>();
+    const comparisonRent = deferred<LookupResult>();
+    const lookupRent = vi
+      .fn()
+      .mockReturnValueOnce(activeRent.promise)
+      .mockReturnValueOnce(comparisonRent.promise);
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = lookupRent;
+    const plan = new RentPlanWorkspace(dependency);
+
+    const activePromise = plan.chooseCity(suggestion('Active, ZZ'));
+    const comparisonPromise = plan.addComparison({
+      ...suggestion('Nearby, ZZ'),
+      lat: 41
+    });
+
+    expect(plan.snapshot.looking).toBe(true);
+    expect(plan.snapshot.pendingName).toBe('Active, ZZ');
+    expect(plan.snapshot.pendingComparisonNames).toEqual(['Nearby, ZZ']);
+
+    activeRent.resolve(hudRent);
+    await activePromise;
+
+    expect(plan.snapshot.selectedName).toBe('Active, ZZ');
+    expect(plan.snapshot.pendingName).toBeNull();
+    expect(plan.snapshot.pendingComparisonNames).toEqual(['Nearby, ZZ']);
+
+    comparisonRent.resolve(hudRent);
+    const result = await comparisonPromise;
+
+    expect(result.status).toBe('added');
+    expect(plan.snapshot.compareNames).toEqual(['Nearby, ZZ']);
+    expect(plan.snapshot.pendingComparisonNames).toEqual([]);
+  });
+
+  it('cancels stale active-city work without allowing its completion to replace the newer city', async () => {
+    const firstRent = deferred<LookupResult>();
+    const secondRent = deferred<LookupResult>();
+    const signals: AbortSignal[] = [];
+    const lookupRent = vi.fn((_lat: number, _lng: number, signal?: AbortSignal) => {
+      signals.push(signal!);
+      return signals.length === 1 ? firstRent.promise : secondRent.promise;
+    });
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = lookupRent;
+    const plan = new RentPlanWorkspace(dependency);
+
+    const first = plan.chooseCity(suggestion('First, ZZ'));
+    const second = plan.chooseCity(suggestion('Second, ZZ'));
+
+    expect(signals[0]?.aborted).toBe(true);
+    expect(plan.snapshot.pendingName).toBe('Second, ZZ');
+
+    firstRent.resolve(hudRent);
+    await first;
+    expect(plan.snapshot.selectedName).toBeNull();
+    expect(plan.snapshot.pendingName).toBe('Second, ZZ');
+
+    secondRent.resolve(hudRent);
+    await second;
+
+    expect(plan.snapshot.selectedName).toBe('Second, ZZ');
+    expect(plan.snapshot.selected?.r1).toBe(1_250);
+  });
+
+  it('deduplicates one city lookup shared by active selection and comparison addition', async () => {
+    const rent = deferred<LookupResult>();
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn(() => rent.promise);
+    const plan = new RentPlanWorkspace(dependency);
+    const shared = suggestion('Shared, ZZ');
+
+    const active = plan.chooseCity(shared);
+    const comparison = plan.addComparison({ ...shared, pop: 12_000 });
+
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(1);
+    expect(plan.snapshot.pendingName).toBe('Shared, ZZ');
+    expect(plan.snapshot.pendingComparisonNames).toEqual(['Shared, ZZ']);
+
+    rent.resolve(hudRent);
+    await active;
+    const result = await comparison;
+
+    expect(result.status).toBe('added');
+    expect(plan.snapshot.selectedName).toBe('Shared, ZZ');
+    expect(plan.snapshot.compareNames).toEqual(['Shared, ZZ']);
+    expect(plan.snapshot.selected?.pop).toBe('12,000');
+  });
+
+  it('restarts a same-city lookup after its only consumer is canceled', async () => {
+    const firstRent = deferred<LookupResult>();
+    const secondRent = deferred<LookupResult>();
+    const signals: AbortSignal[] = [];
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn((_lat: number, _lng: number, signal?: AbortSignal) => {
+      signals.push(signal!);
+      return signals.length === 1 ? firstRent.promise : secondRent.promise;
+    });
+    const plan = new RentPlanWorkspace(dependency);
+
+    const first = plan.chooseCity(suggestion('Retry, ZZ'));
+    const second = plan.chooseCity(suggestion('Retry, ZZ'));
+
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(2);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+
+    firstRent.resolve(hudRent);
+    secondRent.resolve(hudRent);
+    await Promise.all([first, second]);
+
+    expect(plan.snapshot.selectedName).toBe('Retry, ZZ');
+    expect(plan.snapshot.selected?.r1).toBe(1_250);
+  });
+
   it('resolves coordinates before looking up a coordinate-less off-list city', async () => {
     const dependency = adapters(hudRent);
     dependency.coordinatesForPlace = vi.fn(async () => [40.7, -74] as const);
@@ -88,6 +215,28 @@ describe('RentPlanWorkspace', () => {
     expect(result.status).toBe('added');
     expect(dependency.coordinatesForPlace).toHaveBeenCalledWith('Off-list', 'ZZ');
     expect(dependency.lookupRent).toHaveBeenCalledWith(40.7, -74, expect.any(AbortSignal));
+  });
+
+  it('identifies an active city while its coordinates are still resolving', async () => {
+    const coordinates = deferred<readonly [number, number]>();
+    const dependency = adapters(hudRent);
+    dependency.coordinatesForPlace = vi.fn(() => coordinates.promise);
+    const plan = new RentPlanWorkspace(dependency);
+
+    const pending = plan.chooseCity({
+      label: 'Waiting, ZZ',
+      city: 'Waiting',
+      state: 'ZZ'
+    });
+
+    expect(plan.snapshot.pendingName).toBe('Waiting, ZZ');
+    expect(plan.snapshot.looking).toBe(true);
+
+    coordinates.resolve([40.7, -74]);
+    await pending;
+
+    expect(plan.snapshot.selectedName).toBe('Waiting, ZZ');
+    expect(plan.snapshot.pendingName).toBeNull();
   });
 
   it('enforces the comparison cap before resolving another city', async () => {
@@ -271,6 +420,133 @@ describe('RentPlanWorkspace', () => {
       r1: 1_250
     });
     expect(plan.snapshot.compareNames).toHaveLength(5);
+  });
+
+  it('canonicalizes shared-link comparison aliases before creating entries', () => {
+    const plan = new RentPlanWorkspace(adapters(unavailableRent));
+    const search = new URLSearchParams({
+      'compare-offlist': JSON.stringify({ name: 'New York City, NY', lat: 40.71, lng: -74 })
+    });
+
+    expect(plan.hydrateFromSearch(search)).toBe(true);
+    expect(plan.snapshot.compareNames).toEqual(['New York, NY']);
+    expect(
+      plan.snapshot.cities.filter((city) => city.name.toLowerCase() === 'new york city, ny')
+    ).toHaveLength(0);
+    expect(plan.cityByName('New York, NY')?.source).toBe('apartment-list');
+  });
+
+  it('restores every valid off-list link entry concurrently and keeps each completion', async () => {
+    const requests = new Map<number, ReturnType<typeof deferred<LookupResult>>>();
+    const signals: AbortSignal[] = [];
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn((lat: number, _lng: number, signal?: AbortSignal) => {
+      const request = deferred<LookupResult>();
+      requests.set(lat, request);
+      signals.push(signal!);
+      return request.promise;
+    });
+    const plan = new RentPlanWorkspace(dependency);
+    const offList = (name: string, lat: number) => JSON.stringify({ name, lat, lng: -74 });
+    const search = new URLSearchParams([
+      ['city', 'Restored active, ZZ'],
+      ['lat', '40'],
+      ['lng', '-74'],
+      ['compare-offlist', offList('Restored one, ZZ', 41)],
+      ['compare-offlist', offList('Restored two, ZZ', 42)],
+      ['compare-offlist', offList('Restored three, ZZ', 43)]
+    ]);
+
+    expect(plan.hydrateFromSearch(search)).toBe(true);
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(4);
+    expect(plan.snapshot.pendingName).toBe('Restored active, ZZ');
+    expect(plan.snapshot.pendingComparisonNames).toEqual([
+      'Restored one, ZZ',
+      'Restored two, ZZ',
+      'Restored three, ZZ'
+    ]);
+    expect(signals.every((signal) => !signal.aborted)).toBe(true);
+
+    requests.get(43)?.resolve(hudRent);
+    requests.get(41)?.resolve(hudRent);
+    requests.get(40)?.resolve(hudRent);
+    requests.get(42)?.resolve(hudRent);
+    await Promise.all([...requests.values()].map((request) => request.promise));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(plan.snapshot.selectedName).toBe('Restored active, ZZ');
+    expect(plan.snapshot.compareNames).toEqual([
+      'Restored one, ZZ',
+      'Restored two, ZZ',
+      'Restored three, ZZ'
+    ]);
+    expect(plan.snapshot.pendingName).toBeNull();
+    expect(plan.snapshot.pendingComparisonNames).toEqual([]);
+    expect(plan.snapshot.compareCities.every((city) => city.r1 === 1_250)).toBe(true);
+  });
+
+  it('persists enriched off-list cities in both the plan and comparison records', async () => {
+    const storage = new Map<string, string>();
+    const rent = deferred<LookupResult>();
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn(() => rent.promise);
+    dependency.readStorage = (key) => storage.get(key) ?? null;
+    dependency.writeStorage = (key, value) => storage.set(key, value);
+    const plan = new RentPlanWorkspace(dependency);
+
+    const pending = plan.addComparison(suggestion('Persisted, ZZ'));
+    rent.resolve(hudRent);
+    await pending;
+
+    const savedPlan = JSON.parse(storage.get('rentToolLast.v3') ?? '{}') as {
+      custom?: Array<{ name: string; r1: number | null; source: string }>;
+    };
+    const savedComparison = JSON.parse(storage.get(COMPARISON_STORAGE_KEY) ?? '{}') as {
+      entries?: Array<{ city: { name: string; r1: number | null; source: string } }>;
+    };
+
+    expect(savedPlan.custom).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Persisted, ZZ',
+          r1: 1_250,
+          source: 'hud-fmr'
+        })
+      ])
+    );
+    expect(savedComparison.entries?.[0]?.city).toMatchObject({
+      name: 'Persisted, ZZ',
+      r1: 1_250,
+      source: 'hud-fmr'
+    });
+  });
+
+  it('cancels a stale comparison addition when URL navigation replaces the workspace state', async () => {
+    const storage = new Map<string, string>();
+    const rent = deferred<LookupResult>();
+    let signal: AbortSignal | undefined;
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn((_lat: number, _lng: number, requestSignal?: AbortSignal) => {
+      signal = requestSignal;
+      return rent.promise;
+    });
+    dependency.readStorage = (key) => storage.get(key) ?? null;
+    dependency.writeStorage = (key, value) => storage.set(key, value);
+    const plan = new RentPlanWorkspace(dependency);
+
+    const pending = plan.addComparison(suggestion('Stale, ZZ'));
+    plan.applyUrlNavigation(new URLSearchParams());
+
+    expect(signal?.aborted).toBe(true);
+    expect(plan.snapshot.compareNames).toEqual([]);
+    expect(plan.snapshot.pendingComparisonNames).toEqual([]);
+
+    rent.resolve(hudRent);
+    await pending;
+
+    expect(plan.snapshot.compareNames).toEqual([]);
+    expect(plan.snapshot.pendingComparisonNames).toEqual([]);
+    expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}').custom).toEqual([]);
   });
 
   it('clears absent salary, city, and comparison state on URL navigation', () => {

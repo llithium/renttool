@@ -19,7 +19,6 @@
   let status = $state('');
   let visiblePlaces = $derived(expanded ? places : places.slice(0, 4));
   let compareFull = $derived(app.compareNames.length >= 5);
-  let comparisonLookupInProgress = $derived(app.pendingName != null);
 
   async function toggleComparison(place: NearbyPlace) {
     const known = app.cityByName(place.label);
@@ -92,7 +91,7 @@
     {:else}
       <ol class="border-y border-line">
         {#each visiblePlaces as p (p.label)}
-          {@const pending = app.pendingName === p.label}
+          {@const pending = app.isComparisonPending(p.label)}
           {@const compared = app.isComparing(p.label)}
           <li
             class="grid gap-3 border-b border-line px-0 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
@@ -105,13 +104,13 @@
               </p>
             </div>
             <button
-              disabled={pending || (!compared && (compareFull || comparisonLookupInProgress))}
+              disabled={pending || (!compared && compareFull)}
               onclick={() => toggleComparison(p)}
               class="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-lg border px-3 py-2 text-sm font-semibold transition duration-200 sm:self-auto {pending
                 ? 'cursor-default border-accent bg-accent-soft text-accent'
                 : compared
                   ? 'cursor-pointer border-line-strong bg-card-2 text-ink hover:border-red hover:text-red'
-                  : compareFull || comparisonLookupInProgress
+                  : compareFull
                     ? 'cursor-not-allowed border-line bg-card-2 text-faint'
                     : 'cursor-pointer border-line-strong text-ink hover:border-accent hover:bg-accent-soft hover:text-accent'}"
             >
@@ -124,8 +123,6 @@
                 Remove comparison
               {:else if compareFull}
                 Comparison full
-              {:else if comparisonLookupInProgress}
-                Checking another place
               {:else}
                 Compare rent
               {/if}
