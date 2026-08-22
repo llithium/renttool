@@ -196,6 +196,10 @@ export class RentPlanPresentation {
   restoreSession(): void {
     this.workspace.restoreSession();
   }
+
+  flushPersistence(): void {
+    this.workspace.flushPersistence();
+  }
 }
 
 export const rentPlanPresentation = new RentPlanPresentation();

@@ -22,6 +22,7 @@ import { fetchPopulation, lookupRent } from '$lib/api';
 
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
 const LEGACY_KEY = LEGACY_PLAN_V2_STORAGE_KEY;
+const PLAN_PERSISTENCE_DELAY_MS = 150;
 
 function cloneSeed(): City[] {
   return SEED_CITIES.map((c) => ({ ...c }));
@@ -154,6 +155,8 @@ export class RentPlanWorkspace {
     string,
     Promise<readonly [number, number] | undefined>
   >();
+  private persistenceTimer: ReturnType<typeof setTimeout> | undefined;
+  private persistencePending = false;
 
   constructor(adapters: RentPlanAdapters = browserAdapters) {
     this.adapters = adapters;
@@ -233,13 +236,13 @@ export class RentPlanWorkspace {
     };
   }
 
-  /** Set the offer salary and persist the new plan. Invalid input clears it. */
+  /** Set the offer salary and queue the new plan for persistence. Invalid input clears it. */
   setSalary(value: number | null) {
     this.salaryValue =
       value != null && Number.isFinite(value) && value > 0 && value <= MAX_SALARY
         ? Math.round(value)
         : null;
-    this.persist();
+    this.schedulePersistence();
   }
 
   private createOperation(intent: ResolutionIntent): ResolutionOperation {
@@ -340,7 +343,7 @@ export class RentPlanWorkspace {
   private commitSelection(name: string): boolean {
     if (!this.cityByName(name)) return false;
     this.selectedNameValue = name;
-    this.persist();
+    this.persistImmediately();
     void this.ensureCoordinates(name);
     void this.ensurePopulation(name);
     return true;
@@ -399,7 +402,7 @@ export class RentPlanWorkspace {
       const pop = await this.adapters.fetchPopulation(city.lat, city.lng);
       if (pop != null) {
         this.patchCity(name, { pop: popText(pop) });
-        this.persist();
+        this.persistImmediately();
       }
     } finally {
       this.popLookups.delete(key);
@@ -410,7 +413,7 @@ export class RentPlanWorkspace {
     const city = this.cityByName(name);
     if (!city) return { status: 'not-found', name };
     const result = this.comparisonSet.add(city, this.salary);
-    this.persist();
+    this.persistImmediately();
     return result;
   }
 
@@ -467,17 +470,18 @@ export class RentPlanWorkspace {
       this.clearComparisonPending(key);
     }
     const removed = this.comparisonSet.remove(name);
-    if (removed) this.persist();
+    if (removed) this.persistImmediately();
     return removed;
   }
 
   clearComparison() {
     this.cancelComparisonOperations();
     this.comparisonSet.clear();
-    this.persist();
+    this.persistImmediately();
   }
 
   setComparisonSalary(name: string, value: number): boolean {
+    this.flushPersistence();
     return this.comparisonSet.setSalary(name, value);
   }
 
@@ -512,7 +516,7 @@ export class RentPlanWorkspace {
       rentArea: result.rentArea,
       rentYear: result.rentYear
     });
-    this.persist();
+    this.persistImmediately();
   }
 
   /** Share one cancellable rent lookup between active and comparison intents. */
@@ -636,7 +640,7 @@ export class RentPlanWorkspace {
     } finally {
       operation.lookupRelease?.();
       operation.lookupRelease = null;
-      this.persist();
+      this.persistImmediately();
     }
   }
 
@@ -649,7 +653,24 @@ export class RentPlanWorkspace {
     if (updated) this.comparisonSet.updateCity(updated);
   }
 
-  private persist() {
+  private schedulePersistence(): void {
+    this.persistencePending = true;
+    if (this.persistenceTimer !== undefined) clearTimeout(this.persistenceTimer);
+    this.persistenceTimer = setTimeout(() => {
+      this.persistenceTimer = undefined;
+      this.flushPersistence();
+    }, PLAN_PERSISTENCE_DELAY_MS);
+  }
+
+  /** Flush the latest pending plan state and cancel any deferred write. */
+  flushPersistence(): void {
+    if (!this.persistencePending) return;
+    this.persistencePending = false;
+    if (this.persistenceTimer !== undefined) {
+      clearTimeout(this.persistenceTimer);
+      this.persistenceTimer = undefined;
+    }
+
     try {
       // Off-list cities added via autocomplete aren't in the seed set — store them
       // whole so selection/comparison survives a reload.
@@ -673,6 +694,11 @@ export class RentPlanWorkspace {
     } catch {
       /* ignore */
     }
+  }
+
+  private persistImmediately(): void {
+    this.persistencePending = true;
+    this.flushPersistence();
   }
 
   private currentPlanRepresentation(
@@ -857,7 +883,7 @@ export class RentPlanWorkspace {
       this.salaryValue = null;
     }
     if (hasLinkState) this.applyComparisonSearch(representation, scheduleLookup);
-    this.persist();
+    this.persistImmediately();
 
     return hasLinkState;
   }
@@ -873,7 +899,7 @@ export class RentPlanWorkspace {
       this.scheduleLookup(suggestion, select);
     this.applySelectedReference(representation.selected, scheduleLookup);
     this.applyComparisonSearch(representation, scheduleLookup);
-    this.persist();
+    this.persistImmediately();
   }
 
   restoreSession() {
@@ -928,7 +954,7 @@ export class RentPlanWorkspace {
         this.citiesValue = [...this.citiesValue, ...restoredCities];
       }
 
-      if (!this.adapters.readStorage(LAST_KEY) && raw) this.persist();
+      if (!this.adapters.readStorage(LAST_KEY) && raw) this.persistImmediately();
     } catch {
       /* ignore */
     }

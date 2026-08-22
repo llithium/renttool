@@ -30,7 +30,13 @@
   let selected = $derived(plan.activeCity);
   let budget = $derived(plan.budget);
 
-  onMount(() => urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary)));
+  onMount(() => {
+    const teardown = urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary));
+    return () => {
+      plan.flushPersistence();
+      teardown();
+    };
+  });
 </script>
 
 <svelte:head>

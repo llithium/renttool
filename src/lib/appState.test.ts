@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RentPlanWorkspace, type RentPlanAdapters } from './appState.svelte';
 import {
   COMPARISON_STORAGE_KEY,
@@ -18,6 +18,17 @@ function adapters(
     readStorage: (key) => storage.get(key) ?? null,
     writeStorage: (key, value) => storage.set(key, value)
   };
+}
+
+function trackedAdapters(result: LookupResult) {
+  const storage = new Map<string, string>();
+  const dependency = adapters(result);
+  const writes = vi.fn((key: string, value: string) => {
+    storage.set(key, value);
+  });
+  dependency.readStorage = (key) => storage.get(key) ?? null;
+  dependency.writeStorage = writes;
+  return { dependency, storage, writes };
 }
 
 function suggestion(label: string, state = 'ZZ'): CitySuggestion {
@@ -53,6 +64,10 @@ const hudRent: LookupResult = {
 };
 
 describe('RentPlanWorkspace', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('exposes plan intent through a snapshot and preserves salary invariants', () => {
     const plan = new RentPlanWorkspace(adapters(unavailableRent));
 
@@ -61,6 +76,103 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.salary).toBe(95_000);
     plan.setSalary(12_000_001);
     expect(plan.snapshot.salary).toBeNull();
+  });
+
+  it('coalesces repeated salary persistence into one write with the latest value', () => {
+    vi.useFakeTimers();
+    const { dependency, storage, writes } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(80_000);
+    plan.setSalary(81_000);
+    plan.setSalary(82_000);
+
+    expect(plan.snapshot.salary).toBe(82_000);
+    expect(writes).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(1);
+    expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}')).toMatchObject({ salary: 82_000 });
+  });
+
+  it('keeps the in-memory salary current before deferred persistence runs', () => {
+    vi.useFakeTimers();
+    const { dependency, writes } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(91_000);
+
+    expect(plan.snapshot.salary).toBe(91_000);
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it('flushes a pending salary before a discrete city selection', () => {
+    vi.useFakeTimers();
+    const { dependency, storage, writes } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(88_000);
+    expect(plan.selectCity('Tampa, FL')).toBe(true);
+
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(1);
+    expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}')).toMatchObject({
+      salary: 88_000,
+      selected: 'Tampa, FL'
+    });
+
+    vi.runAllTimers();
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(1);
+  });
+
+  it('flushes URL navigation state and cancels an older salary timer', () => {
+    vi.useFakeTimers();
+    const { dependency, storage, writes } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(88_000);
+    plan.applyUrlNavigation(new URLSearchParams({ salary: '72000', city: 'Tampa, FL' }));
+
+    const planWrites = writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3');
+    expect(planWrites.length).toBeGreaterThan(0);
+    expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}')).toMatchObject({
+      salary: 72_000,
+      selected: 'Tampa, FL'
+    });
+
+    vi.runAllTimers();
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(
+      planWrites.length
+    );
+  });
+
+  it('flushes the latest state explicitly and cancels the pending timer', () => {
+    vi.useFakeTimers();
+    const { dependency, storage, writes } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(84_000);
+    plan.flushPersistence();
+
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(1);
+    expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}')).toMatchObject({ salary: 84_000 });
+
+    vi.runAllTimers();
+    expect(writes.mock.calls.filter(([key]) => key === 'rentToolLast.v3')).toHaveLength(1);
+  });
+
+  it('keeps in-memory state usable when persistence throws', () => {
+    vi.useFakeTimers();
+    const dependency = adapters(unavailableRent);
+    dependency.writeStorage = vi.fn(() => {
+      throw new Error('storage unavailable');
+    });
+    const plan = new RentPlanWorkspace(dependency);
+
+    plan.setSalary(83_000);
+
+    expect(() => vi.runAllTimers()).not.toThrow();
+    expect(plan.snapshot.salary).toBe(83_000);
   });
 
   it('commits an unresolved city while keeping rent unavailable explicit', async () => {
