@@ -1,20 +1,20 @@
 <script lang="ts">
-  import { app } from '$lib/appState.svelte';
+  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
 
   let { cityName, canShare }: { cityName: string; canShare: boolean } = $props();
 
-  let comparing = $derived(app.isComparing(cityName));
-  let compareFull = $derived(!comparing && app.compareNames.length >= 5);
+  let comparing = $derived(plan.isComparing(cityName));
+  let compareFull = $derived(!comparing && plan.compareNames.length >= 5);
 
   let shareLabel = $state('Copy link');
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function onCompare() {
-    if (app.isComparing(cityName)) {
-      app.removeComparison(cityName);
+    if (plan.isComparing(cityName)) {
+      plan.removeComparison(cityName);
       return;
     }
-    await app.addComparison(cityName);
+    await plan.addComparison(cityName);
   }
 
   async function onShare() {
@@ -76,12 +76,12 @@
   >
     {shareLabel}
   </button>
-  {#if app.compareNames.length}
+  {#if plan.compareNames.length}
     <a
       href="#comparison-section"
       class="rounded-md px-1 py-0.5 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
     >
-      View comparison ({app.compareNames.length})
+      View comparison ({plan.compareNames.length})
     </a>
   {/if}
 </div>

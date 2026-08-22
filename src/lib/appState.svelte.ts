@@ -417,6 +417,7 @@ export class RentPlanWorkspace {
   /** Add a city to comparison without changing the active plan. */
   addComparison(input: string): ComparisonResult;
   addComparison(input: PlanSuggestion): Promise<ComparisonResult>;
+  addComparison(input: string | PlanSuggestion): ComparisonResult | Promise<ComparisonResult>;
   addComparison(input: PlanSuggestion | string): ComparisonResult | Promise<ComparisonResult> {
     const requestedName = typeof input === 'string' ? input : input.label;
     const canonicalName =

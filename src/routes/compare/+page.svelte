@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { app } from '$lib/appState.svelte';
   import { analyzeComparison } from '$lib/compare/decision';
   import { cityHref } from '$lib/compare/links';
   import type { ComparisonCity } from '$lib/compare/decision';
   import { createCompareSalaries } from '$lib/compare/salaries.svelte';
+  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createUrlSync } from '$lib/urlSync.svelte';
   import type { CitySuggestion } from '$lib/types';
   import AppHeader from '$lib/components/ui/AppHeader.svelte';
@@ -14,26 +14,26 @@
   import CompareHighlights from '$lib/components/compare/CompareHighlights.svelte';
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
 
-  const salaries = createCompareSalaries((name, salary) => app.setComparisonSalary(name, salary));
-  const urlSync = createUrlSync();
+  const salaries = createCompareSalaries((name, salary) => plan.setComparisonSalary(name, salary));
+  const urlSync = createUrlSync(plan);
 
   let hydrated = $state(false);
   let cityMessage = $state('');
 
   let cityViewHref = $derived.by(() => {
-    return app.buildHref('/');
+    return plan.buildHref('/');
   });
 
-  let analysis = $derived.by(() => analyzeComparison(app.compareEntries));
+  let analysis = $derived.by(() => analyzeComparison(plan.compareEntries));
 
-  let atCapacity = $derived(app.compareNames.length >= 5);
+  let atCapacity = $derived(plan.compareNames.length >= 5);
 
   function hrefForCity(city: ComparisonCity): string {
-    return cityHref({ city }, { salary: app.salary, comparisons: app.compareEntries });
+    return cityHref({ city }, { salary: plan.salary, comparisons: plan.compareEntries });
   }
 
   async function addCity(suggestion: CitySuggestion) {
-    const result = await app.addComparison(suggestion);
+    const result = await plan.addComparison(suggestion);
     if (result.status === 'already-compared') {
       cityMessage = `${result.name} is already in this comparison.`;
       return;
@@ -46,22 +46,23 @@
       cityMessage = `Could not add ${result.name} to the comparison.`;
       return;
     }
-    salaries.sync(app.compareEntries);
+    salaries.sync(plan.compareEntries);
     cityMessage = result.rentAvailable
       ? `${result.name} added to the comparison.`
       : `${result.name} added; rent data is unavailable.`;
   }
 
   function clearComparison() {
-    app.clearComparison();
-    salaries.sync(app.compareEntries);
+    plan.clearComparison();
+    salaries.sync(plan.compareEntries);
     cityMessage = 'Comparison cleared. Add a city to begin a new plan.';
   }
 
   onMount(() => {
-    const teardown = urlSync.start(page.url.searchParams, () => salaries.sync(app.compareEntries));
-    if (!app.compareCities.length && app.selected) void app.addComparison(app.selected.name);
-    salaries.sync(app.compareEntries);
+    const teardown = urlSync.start(page.url.searchParams, () => salaries.sync(plan.compareEntries));
+    if (!plan.compareCities.length && plan.activeCity)
+      void plan.addComparison(plan.activeCity.name);
+    salaries.sync(plan.compareEntries);
     hydrated = true;
     return teardown;
   });
@@ -106,7 +107,7 @@
         <CitySearch onselect={addCity} />
       {/if}
       <p aria-live="polite" class="mt-2 min-h-5 text-meta text-muted">
-        {cityMessage || `${app.compareNames.length} of 5 cities added`}
+        {cityMessage || `${plan.compareNames.length} of 5 cities added`}
       </p>
     </div>
   </section>
@@ -133,8 +134,8 @@
           {salaries}
           entranceDelay={Math.min(index * 60, 180)}
           onremove={() => {
-            app.removeComparison(entry.city.name);
-            salaries.sync(app.compareEntries);
+            plan.removeComparison(entry.city.name);
+            salaries.sync(plan.compareEntries);
           }}
         />
       {/each}

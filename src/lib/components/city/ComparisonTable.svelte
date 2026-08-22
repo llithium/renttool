@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { City } from '$lib/types';
   import { money, pctTrend } from '$lib/format';
-  import { app } from '$lib/appState.svelte';
+  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
   let {
@@ -26,7 +26,7 @@
     <div class="flex items-baseline gap-3.5">
       <span class="text-xs font-medium text-muted tabular-nums">{cities.length} / 5</span>
       <a
-        href={app.buildHref('/compare')}
+        href={plan.buildHref('/compare')}
         class="text-xs font-semibold text-accent no-underline hover:text-accent-deep"
       >
         Detailed comparison →
@@ -34,7 +34,7 @@
     </div>
   </SectionHeading>
   <p class="-mt-1.5 mb-3.5 max-w-[64ch] text-sm/normal text-muted">
-    {#if app.salary}
+    {#if plan.salary}
       Fit measured against <strong class="font-semibold text-ink">{money(maxRent)}/mo</strong> — the same
       30% budget applies to every city, since the rule uses gross income.
     {/if}
@@ -62,7 +62,7 @@
           {@const cu = cushion(c)}
           <tr
             class="[&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 {c.name ===
-            app.selectedName
+            plan.selectedName
               ? '[&>td]:bg-accent-soft'
               : ''}"
           >
@@ -110,7 +110,7 @@
             <td class="text-right whitespace-nowrap">
               <button
                 aria-label={`Remove ${c.name}`}
-                onclick={() => app.removeComparison(c.name)}
+                onclick={() => plan.removeComparison(c.name)}
                 class="cursor-pointer rounded-md border-0 bg-transparent p-2 text-muted hover:bg-card-2 hover:text-red"
               >
                 <svg class="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">

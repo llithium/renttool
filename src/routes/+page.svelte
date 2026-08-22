@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { app } from '$lib/appState.svelte';
-  import { computeBudget } from '$lib/budget';
+  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createSalaryField } from '$lib/salaryField.svelte';
   import { createUrlSync } from '$lib/urlSync.svelte';
   import type { CitySuggestion } from '$lib/types';
@@ -22,30 +21,26 @@
   import LandingContent from '$lib/components/landing/LandingContent.svelte';
   import AppHeader from '$lib/components/ui/AppHeader.svelte';
 
-  const urlSync = createUrlSync();
+  const urlSync = createUrlSync(plan);
 
   const salary = createSalaryField((value) => {
-    app.setSalary(value);
+    plan.setSalary(value);
     urlSync.scheduleSalary(value);
   });
 
-  let selected = $derived(app.selected);
-  let budget = $derived(
-    app.salary && app.salary > 0 ? computeBudget(app.salary, selected ?? undefined) : null
-  );
-  let mappableCities = $derived(app.cities.filter((c) => c.lat != null && c.lng != null));
-  let mapFocusRequest = $state(0);
+  let selected = $derived(plan.activeCity);
+  let budget = $derived(plan.budget);
+  let mappableCities = $derived(plan.cities.filter((c) => c.lat != null && c.lng != null));
 
   async function onCitySelect(suggestion: CitySuggestion) {
-    await app.chooseCity(suggestion);
+    await plan.chooseCity(suggestion);
   }
 
   function selectComparisonCity(name: string) {
-    app.selectCity(name);
-    mapFocusRequest += 1;
+    plan.selectComparisonCity(name);
   }
 
-  onMount(() => urlSync.start(page.url.searchParams, () => salary.reseed(app.salary)));
+  onMount(() => urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary)));
 </script>
 
 <svelte:head>
@@ -73,8 +68,8 @@
   class="mx-auto w-full max-w-384 overflow-x-hidden px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
-    actionHref={app.buildHref('/compare')}
-    actionLabel={app.compareNames.length ? `Compare (${app.compareNames.length})` : 'Compare'}
+    actionHref={plan.buildHref('/compare')}
+    actionLabel={plan.compareNames.length ? `Compare (${plan.compareNames.length})` : 'Compare'}
   />
 
   <div class="mt-6 grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
@@ -125,7 +120,7 @@
         {/key}
         <CityFacts
           city={selected}
-          looking={app.looking}
+          looking={plan.looking}
           class="animate-rise [animation-delay:100ms] {selected.r1 != null
             ? 'mt-7 border-t border-line pt-7'
             : 'mt-3.5'}"
@@ -156,9 +151,9 @@
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:250ms]"
         />
 
-        {#if app.compareCities.length}
+        {#if plan.compareCities.length}
           <ComparisonTable
-            cities={app.compareCities}
+            cities={plan.compareCities}
             maxRent={budget.maxRent}
             onselect={selectComparisonCity}
             class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
@@ -167,10 +162,10 @@
 
         <RentMap
           cities={mappableCities}
-          maxRent={budget.maxRent}
-          selectedName={app.selectedName}
-          focusRequest={mapFocusRequest}
-          onselect={(name) => app.selectCity(name)}
+          maxRent={plan.rentTarget}
+          selectedName={plan.selectedName}
+          focusRequest={plan.mapFocusRequest}
+          onselect={(name) => plan.selectCity(name)}
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
         />
       {:else}

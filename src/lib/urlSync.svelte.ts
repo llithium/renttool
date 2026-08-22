@@ -1,6 +1,6 @@
 import { pushState, replaceState } from '$app/navigation';
-import { app } from '$lib/appState.svelte';
 import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresentation';
+import { rentPlanPresentation, type RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
 
 /**
  * Two-way sync between the shared app state and the address bar, so any view is
@@ -14,7 +14,7 @@ import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresenta
  * Call this once at component init — it registers an `$effect`, so it must run
  * inside a component's effect context.
  */
-export function createUrlSync() {
+export function createUrlSync(plan: RentPlanPresentation = rentPlanPresentation) {
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
   let salaryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -28,21 +28,21 @@ export function createUrlSync() {
     // Always read the state so deps are tracked, but hold off writing until
     // start() has hydrated from the URL and seeded lastWritten — otherwise this
     // could strip the query string before hydrateFromSearch reads it.
-    const params = app.buildSearch(salaryForUrl);
+    const params = plan.buildSearch(salaryForUrl);
     // URL restoration can resolve an off-list active city asynchronously. Keep
     // the URL authoritative until every pending lane has caught up, otherwise
     // the intermediate placeholder state would write a partial plan back.
     if (
       !hydrated ||
       params === lastWritten ||
-      app.looking ||
-      app.pendingComparisonNames.length > 0
+      plan.looking ||
+      plan.pendingComparisonNames.length > 0
     ) {
       return;
     }
-    const cityChanged = app.selectedName !== lastCity;
+    const cityChanged = plan.selectedName !== lastCity;
     lastWritten = params;
-    lastCity = app.selectedName;
+    lastCity = plan.selectedName;
     const url = params ? `?${params}` : location.pathname;
     // New city → push a history entry so Back/Forward returns here. Salary/compare
     // tweaks replace the current entry so they don't clutter the history stack.
@@ -70,19 +70,19 @@ export function createUrlSync() {
       // A URL with plan state wins. A stateful client-side visit keeps the
       // in-memory plan; otherwise restore the last session and then reapply a
       // salary-only URL value.
-      const hadUrlState = app.hydrateFromSearch(initialSearch);
+      const hadUrlState = plan.hydrateFromSearch(initialSearch);
       if (!hadUrlState) {
-        const urlSalary = app.salary;
-        if (!app.selected && !app.compareCities.length) app.restoreSession();
-        if (urlSalary != null) app.setSalary(urlSalary);
+        const urlSalary = plan.salary;
+        if (!plan.activeCity && !plan.comparisonCities.length) plan.restoreSession();
+        if (urlSalary != null) plan.setSalary(urlSalary);
       }
-      salaryForUrl = app.salary;
+      salaryForUrl = plan.salary;
       if (hadUrlState) {
         lastWritten = canonicalizeRentPlanSearch(initialSearch);
         lastCity = restoreRentPlan(initialSearch).selected?.name ?? null;
       } else {
-        lastWritten = app.buildSearch(salaryForUrl);
-        lastCity = app.selectedName;
+        lastWritten = plan.buildSearch(salaryForUrl);
+        lastCity = plan.selectedName;
       }
       const shouldCanonicalize = lastWritten !== location.search.replace(/^\?/, '');
       hydrated = true;
@@ -108,8 +108,8 @@ export function createUrlSync() {
         if (!hydrated || search === lastWritten) return;
         lastWritten = search;
         lastCity = restoreRentPlan(params).selected?.name ?? null;
-        app.applyUrlNavigation(params);
-        salaryForUrl = app.salary;
+        plan.applyUrlNavigation(params);
+        salaryForUrl = plan.salary;
         onStateApplied();
       };
 

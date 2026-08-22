@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Budget, City, CitySuggestion } from '$lib/types';
   import type { SalaryField } from '$lib/salaryField.svelte';
-  import { app } from '$lib/appState.svelte';
+  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
   import SalaryInput from '$lib/components/ui/SalaryInput.svelte';
   import SalarySlider from './SalarySlider.svelte';
@@ -37,7 +37,7 @@
         Every figure begins with the city and salary you are weighing.
       </p>
     </div>
-    <CitySearch {onselect} selectedName={app.selectedName} pendingName={app.pendingName} />
+    <CitySearch {onselect} selectedName={plan.selectedName} pendingName={plan.pendingName} />
 
     <SalaryInput
       id="salary"
@@ -50,7 +50,7 @@
       class="mt-4 mb-2.5"
     />
     <SalarySlider
-      value={app.salary}
+      value={plan.salary}
       oninput={(event) => onsalary(Number.parseInt((event.target as HTMLInputElement).value, 10))}
     />
 
