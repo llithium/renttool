@@ -318,6 +318,16 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.salary).toBeNull();
   });
 
+  it('clears a malformed salary when the URL otherwise names authoritative plan state', () => {
+    const plan = new RentPlanWorkspace(adapters(unavailableRent));
+    plan.setSalary(80_000);
+
+    expect(
+      plan.hydrateFromSearch(new URLSearchParams({ city: 'Tampa, FL', salary: 'not-a-number' }))
+    ).toBe(true);
+    expect(plan.snapshot.salary).toBeNull();
+  });
+
   it('hydrates a known seed city and five deduplicated seed comparisons', () => {
     const plan = new RentPlanWorkspace(adapters(unavailableRent));
 
@@ -547,6 +557,26 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.compareNames).toEqual([]);
     expect(plan.snapshot.pendingComparisonNames).toEqual([]);
     expect(JSON.parse(storage.get('rentToolLast.v3') ?? '{}').custom).toEqual([]);
+  });
+
+  it('lets URL coordinates replace an existing same-name city during history restoration', async () => {
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn(async (lat) => ({ ...hudRent, r1: lat === 40 ? 1_250 : 1_350 }));
+    const plan = new RentPlanWorkspace(dependency);
+    const first = new URLSearchParams({ city: 'Shared Town, ZZ', lat: '40', lng: '-74' });
+
+    expect(plan.hydrateFromSearch(first)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(plan.cityByName('Shared Town, ZZ')).toMatchObject({ lat: 40, lng: -74, r1: 1_250 });
+
+    plan.applyUrlNavigation(
+      new URLSearchParams({ city: 'Shared Town, ZZ', lat: '41', lng: '-75' })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(plan.snapshot.selectedName).toBe('Shared Town, ZZ');
+    expect(plan.snapshot.selected).toMatchObject({ lat: 41, lng: -75, r1: 1_350 });
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(2);
   });
 
   it('clears absent salary, city, and comparison state on URL navigation', () => {
