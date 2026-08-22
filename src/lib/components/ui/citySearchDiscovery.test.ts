@@ -123,10 +123,6 @@ describe('CitySearchDiscovery', () => {
   it.each([
     ['empty', (response: ReturnType<typeof deferred<CitySuggestion[]>>) => response.resolve([])],
     [
-      'throttled',
-      (response: ReturnType<typeof deferred<CitySuggestion[]>>) => response.resolve([])
-    ],
-    [
       'failed',
       (response: ReturnType<typeof deferred<CitySuggestion[]>>) =>
         response.reject(new Error('upstream unavailable'))
@@ -146,6 +142,29 @@ describe('CitySearchDiscovery', () => {
     finishResponse(response);
     await settleAsyncWork();
 
+    expect(discovery.state.suggestions).toEqual([alpha]);
+    expect(discovery.state.loading).toBe(false);
+    expect(discovery.state.activeIndex).toBe(0);
+  });
+
+  it('keeps local matches when a throttled adapter turns a 429 into no results', async () => {
+    const scheduler = new TestScheduler();
+    const fetchSuggestions = vi.fn(async () => {
+      const upstreamStatus = 429;
+      return upstreamStatus === 429 ? [] : [remote];
+    });
+    const discovery = createCitySearchDiscovery({
+      localMatches: () => [alpha],
+      fetchSuggestions,
+      scheduler,
+      debounceMs: 0
+    });
+
+    discovery.input('alpha');
+    scheduler.advanceBy(0);
+    await settleAsyncWork();
+
+    expect(fetchSuggestions).toHaveBeenCalledOnce();
     expect(discovery.state.suggestions).toEqual([alpha]);
     expect(discovery.state.loading).toBe(false);
     expect(discovery.state.activeIndex).toBe(0);
