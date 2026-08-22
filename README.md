@@ -1,8 +1,9 @@
 # Rent Tool
 
 A SvelteKit web app: pick a city, enter an offered salary, and get your 30%-rule rent
-budget, current rent estimates, city facts, an affordability map, comparison table, take-home
-charts, and pre-filtered apartment searches.
+budget, current rent estimates, city facts, an affordability map, take-home charts, and
+pre-filtered apartment searches. The `/compare` view compares up to five cities with an
+independent salary for each comparison entry.
 
 Your city, salary, and comparison list sync to the URL, so any view is a shareable deep
 link (the **Copy link** button copies it) that restores on reload or on another device.
@@ -13,17 +14,17 @@ app with serverless endpoints for search and location lookups.
 ## Run locally
 
 ```bash
-pnpm install
-pnpm dev        # http://localhost:5173
+bun install
+bun run dev        # http://localhost:5173
 ```
 
-Other scripts: `pnpm build` (production, adapter-vercel), `pnpm preview`,
-`pnpm format` / `pnpm format:check` (Prettier, with the Svelte and Tailwind plugins),
-`pnpm lint` / `pnpm lint:fix` (ESLint flat config), `pnpm check` (type-check),
-`pnpm test` (unit tests), and `pnpm test:e2e` (browser/accessibility tests).
-`pnpm validate` runs the format check, lint, type-check, unit tests, and build in one go.
-`pnpm test:e2e` and `pnpm audit --prod` are optional manual checks; the browser tests need
-a browser download, and the audit needs network access.
+Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
+`bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
+`bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
+`bun run test` (unit tests), and `bun run test:e2e` (browser/accessibility tests).
+`bun run validate` runs the format check, lint, type-check, unit tests, and build in one go.
+`bun run test:e2e` and `bun audit` are optional manual checks; the browser tests need a browser
+download, and the audit needs network access.
 
 ## Styling
 
@@ -120,10 +121,10 @@ generator refuses to overwrite the bundle when fewer than 3,000 counties are par
 prints the final county count and file size. Review the metadata and sample counties, then run:
 
 ```bash
-pnpm check
-pnpm test
-pnpm build
-pnpm test:e2e
+bun run check
+bun run test
+bun run build
+bun run test:e2e
 git add src/lib/data/fmr-county.json
 ```
 
@@ -133,10 +134,11 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
 
 - `src/lib/data/` — bundled rent, ACS, and place data plus coordinates and tax tables
 - `src/lib/` — city-aware estimated tax/budget math, formatting, search links, typed API client,
-  `appState.svelte.ts` (the rent-plan workspace: intent methods plus a read-only snapshot),
-  `urlSync.svelte.ts` (state ⇄ address bar), and `salaryField.svelte.ts` (the salary input's own
-  state). The workspace keeps rent lookup, browser storage, cancellation, canonicalization, and
-  comparison-cap rules behind injected adapters.
+  `appState.svelte.ts` (the rent-plan workspace), `rentPlanPresentation.svelte.ts` (the
+  presentation seam used by both planning routes), `planRepresentation.ts` (canonical shareable
+  URL encoding), `urlSync.svelte.ts` (state ⇄ address bar), and `salaryField.svelte.ts` (the salary
+  input's own state). The workspace keeps rent lookup, browser storage, cancellation,
+  canonicalization, and comparison-cap rules behind injected adapters.
 - `src/lib/compare/` — the compare view's logic: `decision.ts` (comparison entries, metric view
   model, fit status, and decision briefs), `links.ts` (city navigation links), and
   `salaries.svelte.ts` (per-city salaries + persistence)
@@ -148,11 +150,14 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   SourcesFooter
 - `src/lib/components/compare/` — the compare view: ScenarioCard, CompareHighlights,
   CompareMetricsTable
+- `src/routes/` — the rent-plan view (`/`), comparison view (`/compare`), privacy page, and terms
+  page
 - `src/routes/api/` — the five serverless endpoints above
 
-Both route files are orchestration only: they wire state to components and own the section
-rhythm (the hairline between result sections and the staggered entrance), which each
-component receives through a `class` prop rather than a `:global()` selector.
+The planning routes (`/` and `/compare`) are orchestration only: they use the rent-plan
+presentation seam to wire state and intents to components, while owning the section rhythm (the
+hairline between result sections and the staggered entrance). Components receive that rhythm
+through a `class` prop rather than a `:global()` selector.
 
 ## Deploy
 
