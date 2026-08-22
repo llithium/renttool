@@ -123,6 +123,10 @@ describe('CitySearchDiscovery', () => {
   it.each([
     ['empty', (response: ReturnType<typeof deferred<CitySuggestion[]>>) => response.resolve([])],
     [
+      'throttled',
+      (response: ReturnType<typeof deferred<CitySuggestion[]>>) => response.resolve([])
+    ],
+    [
       'failed',
       (response: ReturnType<typeof deferred<CitySuggestion[]>>) =>
         response.reject(new Error('upstream unavailable'))
@@ -140,6 +144,26 @@ describe('CitySearchDiscovery', () => {
     discovery.input('alpha');
     scheduler.advanceBy(0);
     finishResponse(response);
+    await settleAsyncWork();
+
+    expect(discovery.state.suggestions).toEqual([alpha]);
+    expect(discovery.state.loading).toBe(false);
+    expect(discovery.state.activeIndex).toBe(0);
+  });
+
+  it('keeps local matches when the current request reports AbortError', async () => {
+    const scheduler = new TestScheduler();
+    const response = deferred<CitySuggestion[]>();
+    const discovery = createCitySearchDiscovery({
+      localMatches: () => [alpha],
+      fetchSuggestions: () => response.promise,
+      scheduler,
+      debounceMs: 0
+    });
+
+    discovery.input('alpha');
+    scheduler.advanceBy(0);
+    response.reject(new DOMException('Request aborted', 'AbortError'));
     await settleAsyncWork();
 
     expect(discovery.state.suggestions).toEqual([alpha]);
@@ -205,7 +229,7 @@ describe('CitySearchDiscovery', () => {
 
   it('keeps keyboard navigation, escape, reopening, and selection in one state transition seam', () => {
     const scheduler = new TestScheduler();
-    const onKey = (key: string) => {
+    const createDiscoveryAfterInput = (key: string) => {
       const discovery = createCitySearchDiscovery({
         localMatches: () => [alpha, alpine],
         fetchSuggestions: vi.fn(),
@@ -216,7 +240,7 @@ describe('CitySearchDiscovery', () => {
       return { discovery, result: discovery.handleKey(key) };
     };
 
-    const { discovery, result: down } = onKey('ArrowDown');
+    const { discovery, result: down } = createDiscoveryAfterInput('ArrowDown');
     expect(down).toEqual({ handled: true });
     expect(discovery.state.activeIndex).toBe(1);
 
