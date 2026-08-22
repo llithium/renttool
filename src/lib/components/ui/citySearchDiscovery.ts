@@ -109,16 +109,17 @@ export function createCitySearchDiscovery(
     for (const listener of listeners) listener(currentState);
   }
 
+  function clearScheduledHandle(handle: unknown): undefined {
+    if (handle !== undefined) scheduler.clear(handle);
+    return undefined;
+  }
+
   function clearDebounce() {
-    if (debounceHandle === undefined) return;
-    scheduler.clear(debounceHandle);
-    debounceHandle = undefined;
+    debounceHandle = clearScheduledHandle(debounceHandle);
   }
 
   function clearBlur() {
-    if (blurHandle === undefined) return;
-    scheduler.clear(blurHandle);
-    blurHandle = undefined;
+    blurHandle = clearScheduledHandle(blurHandle);
   }
 
   function invalidateRequests() {
