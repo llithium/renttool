@@ -5,13 +5,17 @@ import {
   COMPARISON_SALARY_PARAM,
   comparisonSalaryLink,
   parseComparisonSalaryLink,
-  serializeRentPlan,
+  rentPlanHref,
   type PlanComparisonInput
 } from '$lib/planRepresentation';
 
 export interface CityLinkInput {
   city: Pick<ComparisonCity, 'name' | 'source' | 'lat' | 'lng'>;
-  salary: number;
+}
+
+export interface RentPlanLinkInput {
+  salary: number | null;
+  comparisons: readonly (ComparisonEntry | ComparisonLinkInput)[];
 }
 
 export type ComparisonCityLink = Pick<ComparisonCity, 'name' | 'source' | 'lat' | 'lng'> & {
@@ -46,13 +50,10 @@ export function appendComparisonLinks(
 }
 
 /** Browser navigation stays outside comparison analysis. */
-export function cityHref(
-  entry: CityLinkInput,
-  compareCities: readonly (ComparisonEntry | ComparisonLinkInput)[]
-): string {
-  return `/?${serializeRentPlan({
-    salary: entry.salary,
+export function cityHref(entry: CityLinkInput, plan: RentPlanLinkInput): string {
+  return rentPlanHref('/', {
+    salary: plan.salary,
     selected: entry.city,
-    comparisons: representationEntries(compareCities)
-  })}`;
+    comparisons: representationEntries(plan.comparisons)
+  });
 }

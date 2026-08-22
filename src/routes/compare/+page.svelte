@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { app } from '$lib/appState.svelte';
   import { analyzeComparison } from '$lib/compare/decision';
   import { cityHref } from '$lib/compare/links';
+  import type { ComparisonCity } from '$lib/compare/decision';
   import { createCompareSalaries } from '$lib/compare/salaries.svelte';
+  import { createUrlSync } from '$lib/urlSync.svelte';
   import type { CitySuggestion } from '$lib/types';
   import AppHeader from '$lib/components/ui/AppHeader.svelte';
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
@@ -12,18 +15,22 @@
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
 
   const salaries = createCompareSalaries((name, salary) => app.setComparisonSalary(name, salary));
+  const urlSync = createUrlSync();
 
   let hydrated = $state(false);
   let cityMessage = $state('');
 
   let cityViewHref = $derived.by(() => {
-    const search = app.buildSearch();
-    return search ? `/?${search}` : '/';
+    return app.buildHref('/');
   });
 
   let analysis = $derived.by(() => analyzeComparison(app.compareEntries));
 
   let atCapacity = $derived(app.compareNames.length >= 5);
+
+  function hrefForCity(city: ComparisonCity): string {
+    return cityHref({ city }, { salary: app.salary, comparisons: app.compareEntries });
+  }
 
   async function addCity(suggestion: CitySuggestion) {
     const result = await app.addComparison(suggestion);
@@ -52,13 +59,11 @@
   }
 
   onMount(() => {
-    // A client-side visit from the city page already has the freshest state.
-    // Restoring unconditionally here could replace it with an older localStorage
-    // snapshot and make newly selected compare cities seem to disappear.
-    if (!app.selected && !app.compareCities.length && app.salary == null) app.restoreSession();
+    const teardown = urlSync.start(page.url.searchParams, () => salaries.sync(app.compareEntries));
     if (!app.compareCities.length && app.selected) void app.addComparison(app.selected.name);
     salaries.sync(app.compareEntries);
     hydrated = true;
+    return teardown;
   });
 </script>
 
@@ -124,7 +129,7 @@
       {#each analysis.entries as entry, index (entry.city.name)}
         <ScenarioCard
           {entry}
-          href={cityHref({ city: entry.city, salary: entry.salary }, app.compareEntries)}
+          href={hrefForCity(entry.city)}
           {salaries}
           entranceDelay={Math.min(index * 60, 180)}
           onremove={() => {
@@ -136,7 +141,7 @@
     </section>
 
     {#if analysis.entries.length > 1}
-      <CompareHighlights {analysis} compareCities={app.compareEntries} />
+      <CompareHighlights {analysis} {hrefForCity} />
     {/if}
 
     <section class="mt-8 border-t border-line pt-6">
@@ -146,7 +151,7 @@
           Taxes estimate a single filer taking the standard deduction.
         </p>
       </div>
-      <CompareMetricsTable {analysis} compareCities={app.compareEntries} />
+      <CompareMetricsTable {analysis} {hrefForCity} />
     </section>
   {:else if hydrated}
     <section class="mt-12 border-b border-line py-16 md:py-20" aria-labelledby="empty-heading">

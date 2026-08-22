@@ -10,8 +10,10 @@ import {
 import { popText } from '$lib/format';
 import {
   isValidCoordinates,
+  rentPlanHref,
   restoreRentPlan,
   serializeRentPlan,
+  type RentPlanRepresentationInput,
   type RestoredRentPlan
 } from '$lib/planRepresentation';
 import { MAX_SALARY } from '$lib/salary';
@@ -672,18 +674,30 @@ export class RentPlanWorkspace {
     }
   }
 
+  private currentPlanRepresentation(
+    salary: number | null = this.salary
+  ): RentPlanRepresentationInput {
+    return {
+      salary,
+      selected: this.selected,
+      comparisons: this.compareEntries
+    };
+  }
+
   /** Serialize the shareable state (salary, selected city, compare list) into a
    * canonical query string. Fixed param order so equal state yields an identical
    * string — the write-effect relies on that to short-circuit no-op updates.
    * Coords ride along only for an off-list selected city, so a fresh recipient can
    * re-resolve its rent (see hydrateFromSearch). */
   buildSearch(salaryOverride?: number | null): string {
-    const salary = salaryOverride === undefined ? this.salary : salaryOverride;
-    return serializeRentPlan({
-      salary,
-      selected: this.selected,
-      comparisons: this.compareEntries
-    });
+    return serializeRentPlan(
+      this.currentPlanRepresentation(salaryOverride === undefined ? this.salary : salaryOverride)
+    );
+  }
+
+  /** Build a route that carries the complete current rent plan. */
+  buildHref(pathname: string): string {
+    return rentPlanHref(pathname, this.currentPlanRepresentation());
   }
 
   private ensureOffListPlaceholder(suggestion: PlanSuggestion): City {

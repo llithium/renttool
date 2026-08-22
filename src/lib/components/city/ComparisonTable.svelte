@@ -26,7 +26,7 @@
     <div class="flex items-baseline gap-3.5">
       <span class="text-xs font-medium text-muted tabular-nums">{cities.length} / 5</span>
       <a
-        href="/compare"
+        href={app.buildHref('/compare')}
         class="text-xs font-semibold text-accent no-underline hover:text-accent-deep"
       >
         Detailed comparison →

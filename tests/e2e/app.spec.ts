@@ -284,7 +284,7 @@ test('keeps each selected city with its salary when opening the detailed compari
   await page.getByRole('button', { name: '+ Compare' }).click();
 
   await page.getByRole('link', { name: 'Detailed comparison →' }).click();
-  await expect(page).toHaveURL(/\/compare$/);
+  await expect(page).toHaveURL(/\/compare\?/);
   await expect(page.getByRole('heading', { name: 'Denver, CO' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Nashville, TN' })).toBeVisible();
   await expect(page.getByLabel('Annual salary in Denver, CO')).toHaveValue('60,000');
@@ -316,9 +316,41 @@ test('keeps each selected city with its salary when opening the detailed compari
 
   const denverScenario = page.locator('[data-testid="scenario"]').filter({ hasText: 'Denver, CO' });
   await expect(denverScenario).toHaveCount(1);
+  const planLinks = [
+    denverScenario.getByRole('link', { name: 'Denver, CO', exact: true }),
+    page
+      .getByRole('region', { name: 'Decision brief' })
+      .getByRole('link', { name: /Denver, CO|Nashville, TN/, exact: true }),
+    page.locator('table thead').getByRole('link', { name: 'Denver, CO', exact: true })
+  ];
+  for (const link of planLinks) {
+    await expect(link).toHaveCount(1);
+    const href = await link.getAttribute('href');
+    expect(href).not.toBeNull();
+    const search = new URL(href!, 'http://rent.test').searchParams;
+    expect(search.get('salary')).toBe('90000');
+    expect(search.getAll('compare')).toEqual(['Denver, CO', 'Nashville, TN']);
+    expect(
+      search
+        .getAll('compare-salary')
+        .map((value) => JSON.parse(value) as { name: string; salary: number })
+    ).toEqual([
+      { name: 'Denver, CO', salary: 60_000 },
+      { name: 'Nashville, TN', salary: 90_000 }
+    ]);
+  }
+
   await denverScenario.getByRole('link', { name: 'Denver, CO', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Denver, CO' })).toBeVisible();
-  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('60,000');
+  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('90,000');
+  await expect.poll(() => new URL(page.url()).searchParams.get('salary')).toBe('90000');
+  await page.goBack();
+  await expect(page).toHaveURL(/\/compare\?/);
+  await expect(page.getByLabel('Annual salary in Denver, CO')).toHaveValue('60,000');
+  await expect(page.getByLabel('Annual salary in Nashville, TN')).toHaveValue('90,000');
+  await page.goForward();
+  await expect(page.getByRole('heading', { name: 'Denver, CO' })).toBeVisible();
+  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('90,000');
 });
 
 test('exposes map markers to the keyboard', async ({ page }) => {

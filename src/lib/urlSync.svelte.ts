@@ -1,5 +1,6 @@
 import { pushState, replaceState } from '$app/navigation';
 import { app } from '$lib/appState.svelte';
+import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresentation';
 
 /**
  * Two-way sync between the shared app state and the address bar, so any view is
@@ -28,7 +29,17 @@ export function createUrlSync() {
     // start() has hydrated from the URL and seeded lastWritten — otherwise this
     // could strip the query string before hydrateFromSearch reads it.
     const params = app.buildSearch(salaryForUrl);
-    if (!hydrated || params === lastWritten) return;
+    // URL restoration can resolve an off-list active city asynchronously. Keep
+    // the URL authoritative until every pending lane has caught up, otherwise
+    // the intermediate placeholder state would write a partial plan back.
+    if (
+      !hydrated ||
+      params === lastWritten ||
+      app.looking ||
+      app.pendingComparisonNames.length > 0
+    ) {
+      return;
+    }
     const cityChanged = app.selectedName !== lastCity;
     lastWritten = params;
     lastCity = app.selectedName;
@@ -56,20 +67,35 @@ export function createUrlSync() {
      * salary text field). Returns an onMount-style teardown.
      */
     start(initialSearch: URLSearchParams, onStateApplied: () => void) {
-      // URL wins over localStorage when it names a resolvable city; a bare
-      // ?salary= link still falls back to restore() for the city/compare set but
-      // keeps the URL's salary.
+      // A URL with plan state wins. A stateful client-side visit keeps the
+      // in-memory plan; otherwise restore the last session and then reapply a
+      // salary-only URL value.
       const hadUrlState = app.hydrateFromSearch(initialSearch);
       if (!hadUrlState) {
         const urlSalary = app.salary;
-        app.restoreSession();
+        if (!app.selected && !app.compareCities.length) app.restoreSession();
         if (urlSalary != null) app.setSalary(urlSalary);
       }
       salaryForUrl = app.salary;
-      lastWritten = app.buildSearch(salaryForUrl);
-      lastCity = app.selectedName;
+      if (hadUrlState) {
+        lastWritten = canonicalizeRentPlanSearch(initialSearch);
+        lastCity = restoreRentPlan(initialSearch).selected?.name ?? null;
+      } else {
+        lastWritten = app.buildSearch(salaryForUrl);
+        lastCity = app.selectedName;
+      }
+      const shouldCanonicalize = lastWritten !== location.search.replace(/^\?/, '');
       hydrated = true;
       onStateApplied();
+      if (shouldCanonicalize) {
+        // Normalize the current entry without asking the router to navigate
+        // while the initial page is still hydrating.
+        history.replaceState(
+          history.state ?? {},
+          '',
+          lastWritten ? `?${lastWritten}` : location.pathname
+        );
+      }
 
       // Re-hydrate on browser back/forward. Shallow routing (pushState/replaceState)
       // doesn't update `page.url`, so we read the authoritative live URL instead.
@@ -77,11 +103,12 @@ export function createUrlSync() {
       // push/replace above — so no echo guard beyond the redundant-write
       // short-circuit is needed.
       const onPopState = () => {
-        const search = location.search.replace(/^\?/, '');
+        const params = new URLSearchParams(location.search);
+        const search = canonicalizeRentPlanSearch(params);
         if (!hydrated || search === lastWritten) return;
         lastWritten = search;
-        app.applyUrlNavigation(new URLSearchParams(location.search));
-        lastCity = app.selectedName;
+        lastCity = restoreRentPlan(params).selected?.name ?? null;
+        app.applyUrlNavigation(params);
         salaryForUrl = app.salary;
         onStateApplied();
       };

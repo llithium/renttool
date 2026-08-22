@@ -73,7 +73,7 @@
   class="mx-auto w-full max-w-384 overflow-x-hidden px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
-    actionHref="/compare"
+    actionHref={app.buildHref('/compare')}
     actionLabel={app.compareNames.length ? `Compare (${app.compareNames.length})` : 'Compare'}
   />
 

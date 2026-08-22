@@ -1,7 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { restoreRentPlan, serializeRentPlan } from './planRepresentation';
+import {
+  canonicalizeRentPlanSearch,
+  restoreRentPlan,
+  rentPlanHref,
+  serializeRentPlan
+} from './planRepresentation';
 
 describe('rent-plan representation', () => {
+  it('builds route paths without a dangling query and canonicalizes legacy ordering', () => {
+    const href = rentPlanHref('/compare', {
+      salary: 80_000,
+      selected: { name: 'Tampa, FL', source: 'apartment-list' },
+      comparisons: [{ city: { name: 'Austin, TX', source: 'apartment-list' }, salary: 61_000 }]
+    });
+
+    expect(href).toBe(
+      '/compare?salary=80000&city=Tampa%2C+FL&compare=Austin%2C+TX&compare-salary=%7B%22name%22%3A%22Austin%2C+TX%22%2C%22salary%22%3A61000%7D'
+    );
+    const legacy = new URLSearchParams([
+      ['compare-salary', JSON.stringify({ name: 'Austin, TX', salary: 61_000 })],
+      ['compare', 'Austin, TX'],
+      ['city', 'Tampa, FL'],
+      ['salary', '80000']
+    ]);
+    expect(canonicalizeRentPlanSearch(legacy)).toBe(href.slice(href.indexOf('?') + 1));
+    expect(canonicalizeRentPlanSearch(new URLSearchParams())).toBe('');
+  });
+
   it('round-trips the salary, active off-list city coordinates, and complete comparison entries', () => {
     const search = serializeRentPlan({
       salary: 80_000.6,

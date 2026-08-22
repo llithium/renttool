@@ -153,6 +153,12 @@ export function serializeRentPlan(input: RentPlanRepresentationInput): string {
   return search.toString();
 }
 
+/** Build a path whose query is the canonical shareable rent-plan representation. */
+export function rentPlanHref(pathname: string, input: RentPlanRepresentationInput): string {
+  const search = serializeRentPlan(input);
+  return search ? `${pathname}?${search}` : pathname;
+}
+
 function parseNumeric(raw: string | null): number | null {
   if (raw == null || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw.trim())) return null;
   const value = Number(raw);
@@ -278,4 +284,21 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
     hasComparisonState:
       search.has('compare') || search.has('compare-offlist') || search.has(COMPARISON_SALARY_PARAM)
   };
+}
+
+function restoredCityInput(city: RestoredPlanCity): PlanCityInput | null {
+  if (city.kind === 'bundled') return { name: city.name, source: 'apartment-list' };
+  if (city.kind !== 'off-list' || city.lat == null || city.lng == null) return null;
+  return { name: city.name, source: 'hud-fmr', lat: city.lat, lng: city.lng };
+}
+
+/** Normalize a URL through the same representation used for generated links. */
+export function canonicalizeRentPlanSearch(search: URLSearchParams): string {
+  const restored = restoreRentPlan(search);
+  const selected = restored.selected ? restoredCityInput(restored.selected) : null;
+  const comparisons = restored.comparisons.flatMap((entry) => {
+    const city = restoredCityInput(entry.city);
+    return city ? [{ city, salary: entry.salary }] : [];
+  });
+  return serializeRentPlan({ salary: restored.salary, selected, comparisons });
 }
