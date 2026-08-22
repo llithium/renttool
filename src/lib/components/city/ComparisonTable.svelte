@@ -1,20 +1,19 @@
 <script lang="ts">
   import type { City } from '$lib/types';
   import { money, pctTrend } from '$lib/format';
-  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
   let {
-    cities,
-    maxRent,
-    onselect,
+    presentation,
     class: className = ''
   }: {
-    cities: City[];
-    maxRent: number;
-    onselect: (name: string) => void;
+    presentation: RentPlanPresentation;
     class?: string;
   } = $props();
+
+  let cities = $derived(presentation.comparisonCities);
+  let maxRent = $derived(presentation.rentTarget ?? 0);
 
   function cushion(c: City): number | null {
     return c.r1 != null ? maxRent - c.r1 : null;
@@ -24,9 +23,11 @@
 <section id="comparison-section" class={className}>
   <SectionHeading title="Compare cities">
     <div class="flex items-baseline gap-3.5">
-      <span class="text-xs font-medium text-muted tabular-nums">{cities.length} / 5</span>
+      <span class="text-xs font-medium text-muted tabular-nums"
+        >{cities.length} / {presentation.comparisonLimit}</span
+      >
       <a
-        href={plan.buildHref('/compare')}
+        href={presentation.buildHref('/compare')}
         class="text-xs font-semibold text-accent no-underline hover:text-accent-deep"
       >
         Detailed comparison →
@@ -34,7 +35,7 @@
     </div>
   </SectionHeading>
   <p class="-mt-1.5 mb-3.5 max-w-[64ch] text-sm/normal text-muted">
-    {#if plan.salary}
+    {#if presentation.salary}
       Fit measured against <strong class="font-semibold text-ink">{money(maxRent)}/mo</strong> — the same
       30% budget applies to every city, since the rule uses gross income.
     {/if}
@@ -62,13 +63,13 @@
           {@const cu = cushion(c)}
           <tr
             class="[&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 {c.name ===
-            plan.selectedName
+            presentation.selectedName
               ? '[&>td]:bg-accent-soft'
               : ''}"
           >
             <td class="whitespace-nowrap">
               <button
-                onclick={() => onselect(c.name)}
+                onclick={() => presentation.selectComparisonCity(c.name)}
                 class="cursor-pointer border-0 bg-transparent p-0 text-base font-semibold tracking-tight text-accent"
               >
                 {c.name}
@@ -110,7 +111,7 @@
             <td class="text-right whitespace-nowrap">
               <button
                 aria-label={`Remove ${c.name}`}
-                onclick={() => plan.removeComparison(c.name)}
+                onclick={() => presentation.removeComparison(c.name)}
                 class="cursor-pointer rounded-md border-0 bg-transparent p-2 text-muted hover:bg-card-2 hover:text-red"
               >
                 <svg class="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">

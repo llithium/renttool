@@ -1,7 +1,6 @@
 <script lang="ts">
-  import type { Budget, City, CitySuggestion } from '$lib/types';
   import type { SalaryField } from '$lib/salaryField.svelte';
-  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
   import SalaryInput from '$lib/components/ui/SalaryInput.svelte';
   import SalarySlider from './SalarySlider.svelte';
@@ -9,18 +8,17 @@
   import BudgetCard from './BudgetCard.svelte';
 
   let {
+    presentation,
     salary,
-    selected,
-    budget,
-    onselect,
     onsalary
   }: {
+    presentation: RentPlanPresentation;
     salary: SalaryField;
-    selected: City | null;
-    budget: Budget | null;
-    onselect: (suggestion: CitySuggestion) => void;
     onsalary: (value: number) => void;
   } = $props();
+
+  let activeCity = $derived(presentation.activeCity);
+  let budget = $derived(presentation.budget);
 </script>
 
 <!-- Two-column view: the planning controls stay pinned while the results scroll.
@@ -37,7 +35,11 @@
         Every figure begins with the city and salary you are weighing.
       </p>
     </div>
-    <CitySearch {onselect} selectedName={plan.selectedName} pendingName={plan.pendingName} />
+    <CitySearch
+      onselect={(suggestion) => void presentation.chooseCity(suggestion)}
+      selectedName={presentation.selectedName}
+      pendingName={presentation.pendingName}
+    />
 
     <SalaryInput
       id="salary"
@@ -50,13 +52,13 @@
       class="mt-4 mb-2.5"
     />
     <SalarySlider
-      value={plan.salary}
+      value={presentation.salary}
       oninput={(event) => onsalary(Number.parseInt((event.target as HTMLInputElement).value, 10))}
     />
 
-    {#if selected && budget}
+    {#if activeCity && budget}
       <BudgetCard {budget} />
-      <CityActions cityName={selected.name} canShare={true} />
+      <CityActions {presentation} cityName={activeCity.name} canShare={true} />
     {/if}
   </section>
 </aside>

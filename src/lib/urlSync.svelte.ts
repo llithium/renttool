@@ -1,6 +1,6 @@
 import { pushState, replaceState } from '$app/navigation';
 import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresentation';
-import { rentPlanPresentation, type RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
+import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
 
 /**
  * Two-way sync between the shared app state and the address bar, so any view is
@@ -14,7 +14,7 @@ import { rentPlanPresentation, type RentPlanPresentation } from '$lib/rentPlanPr
  * Call this once at component init — it registers an `$effect`, so it must run
  * inside a component's effect context.
  */
-export function createUrlSync(plan: RentPlanPresentation = rentPlanPresentation) {
+export function createUrlSync(plan: RentPlanPresentation) {
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
   let salaryTimer: ReturnType<typeof setTimeout> | undefined;

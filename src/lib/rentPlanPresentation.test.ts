@@ -92,4 +92,37 @@ describe('RentPlanPresentation', () => {
     expect(plan.snapshot.activeCity?.name).toBe('Current, ZZ');
     expect(plan.snapshot.mapFocusRequest).toBe(1);
   });
+
+  it('exposes canonical comparison state and navigation intents to planning views', async () => {
+    const plan = presentation();
+
+    plan.setSalary(96_000);
+    await plan.chooseCity(suggestion('Current, ZZ'));
+    const added = plan.addComparison('Tampa, FL');
+
+    expect(added).toMatchObject({ status: 'added', name: 'Tampa, FL' });
+    expect(plan.comparisonLimit).toBe(5);
+    expect(plan.comparisonFull).toBe(false);
+    expect(plan.comparisonNames).toEqual(['Tampa, FL']);
+    expect(plan.comparisonCities.map((city) => city.name)).toEqual(['Tampa, FL']);
+    expect(plan.comparisonEntries.map((entry) => entry.city.name)).toEqual(['Tampa, FL']);
+
+    const shareUrl = new URL(plan.buildHref('/compare'), 'https://rent.test');
+    expect(shareUrl.pathname).toBe('/compare');
+    expect(shareUrl.searchParams.get('salary')).toBe('96000');
+    expect(shareUrl.searchParams.get('city')).toBe('Current, ZZ');
+    expect(shareUrl.searchParams.getAll('compare')).toEqual(['Tampa, FL']);
+
+    expect(plan.selectComparisonCity('Tampa, FL')).toBe(true);
+    expect(plan.snapshot.activeCity?.name).toBe('Tampa, FL');
+    expect(plan.mapFocusRequest).toBe(1);
+    expect(plan.removeComparison('Tampa, FL')).toBe(true);
+    expect(plan.comparisonNames).toEqual([]);
+
+    for (const city of ['New York, NY', 'Austin, TX', 'Boston, MA', 'Miami, FL', 'Seattle, WA']) {
+      expect(plan.addComparison(city)).toMatchObject({ status: 'added', name: city });
+    }
+    expect(plan.comparisonFull).toBe(true);
+    expect(plan.buildShareUrl('https://rent.test')).toMatch(/^https:\/\/rent\.test\/?\?/);
+  });
 });

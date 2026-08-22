@@ -24,12 +24,12 @@
     return plan.buildHref('/');
   });
 
-  let analysis = $derived.by(() => analyzeComparison(plan.compareEntries));
+  let analysis = $derived.by(() => analyzeComparison(plan.comparisonEntries));
 
-  let atCapacity = $derived(plan.compareNames.length >= 5);
+  let atCapacity = $derived(plan.comparisonFull);
 
   function hrefForCity(city: ComparisonCity): string {
-    return cityHref({ city }, { salary: plan.salary, comparisons: plan.compareEntries });
+    return cityHref({ city }, { salary: plan.salary, comparisons: plan.comparisonEntries });
   }
 
   async function addCity(suggestion: CitySuggestion) {
@@ -46,7 +46,7 @@
       cityMessage = `Could not add ${result.name} to the comparison.`;
       return;
     }
-    salaries.sync(plan.compareEntries);
+    salaries.sync(plan.comparisonEntries);
     cityMessage = result.rentAvailable
       ? `${result.name} added to the comparison.`
       : `${result.name} added; rent data is unavailable.`;
@@ -54,15 +54,17 @@
 
   function clearComparison() {
     plan.clearComparison();
-    salaries.sync(plan.compareEntries);
+    salaries.sync(plan.comparisonEntries);
     cityMessage = 'Comparison cleared. Add a city to begin a new plan.';
   }
 
   onMount(() => {
-    const teardown = urlSync.start(page.url.searchParams, () => salaries.sync(plan.compareEntries));
-    if (!plan.compareCities.length && plan.activeCity)
+    const teardown = urlSync.start(page.url.searchParams, () =>
+      salaries.sync(plan.comparisonEntries)
+    );
+    if (!plan.comparisonCities.length && plan.activeCity)
       void plan.addComparison(plan.activeCity.name);
-    salaries.sync(plan.compareEntries);
+    salaries.sync(plan.comparisonEntries);
     hydrated = true;
     return teardown;
   });
@@ -107,7 +109,7 @@
         <CitySearch onselect={addCity} />
       {/if}
       <p aria-live="polite" class="mt-2 min-h-5 text-meta text-muted">
-        {cityMessage || `${plan.compareNames.length} of 5 cities added`}
+        {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
       </p>
     </div>
   </section>
@@ -135,7 +137,7 @@
           entranceDelay={Math.min(index * 60, 180)}
           onremove={() => {
             plan.removeComparison(entry.city.name);
-            salaries.sync(plan.compareEntries);
+            salaries.sync(plan.comparisonEntries);
           }}
         />
       {/each}

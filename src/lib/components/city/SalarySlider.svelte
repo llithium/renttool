@@ -2,7 +2,7 @@
   const SLIDER_MIN = 30000;
   const SLIDER_MAX = 200000;
 
-  /** The slider owns its own range; it and the number field share app.salary. */
+  /** The slider owns its own range; it and the number field share the plan salary. */
   let { value, oninput }: { value: number | null; oninput: (event: Event) => void } = $props();
 
   let clamped = $derived(Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, value ?? SLIDER_MIN)));

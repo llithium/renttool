@@ -4,7 +4,6 @@
   import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createSalaryField } from '$lib/salaryField.svelte';
   import { createUrlSync } from '$lib/urlSync.svelte';
-  import type { CitySuggestion } from '$lib/types';
 
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
   import CityHeadline from '$lib/components/city/CityHeadline.svelte';
@@ -30,15 +29,6 @@
 
   let selected = $derived(plan.activeCity);
   let budget = $derived(plan.budget);
-  let mappableCities = $derived(plan.cities.filter((c) => c.lat != null && c.lng != null));
-
-  async function onCitySelect(suggestion: CitySuggestion) {
-    await plan.chooseCity(suggestion);
-  }
-
-  function selectComparisonCity(name: string) {
-    plan.selectComparisonCity(name);
-  }
 
   onMount(() => urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary)));
 </script>
@@ -69,17 +59,13 @@
 >
   <AppHeader
     actionHref={plan.buildHref('/compare')}
-    actionLabel={plan.compareNames.length ? `Compare (${plan.compareNames.length})` : 'Compare'}
+    actionLabel={plan.comparisonNames.length
+      ? `Compare (${plan.comparisonNames.length})`
+      : 'Compare'}
   />
 
   <div class="mt-6 grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
-    <CitySidebar
-      {salary}
-      {selected}
-      {budget}
-      onselect={onCitySelect}
-      onsalary={(value) => salary.set(value)}
-    />
+    <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
 
     <!-- The results column reads as one document: sections are separated by a
          hairline and a small uppercase label, not by nested card boxes, and each
@@ -147,25 +133,20 @@
         />
 
         <NearbySuburbs
+          presentation={plan}
           city={selected}
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:250ms]"
         />
 
-        {#if plan.compareCities.length}
+        {#if plan.comparisonCities.length}
           <ComparisonTable
-            cities={plan.compareCities}
-            maxRent={budget.maxRent}
-            onselect={selectComparisonCity}
+            presentation={plan}
             class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
           />
         {/if}
 
         <RentMap
-          cities={mappableCities}
-          maxRent={plan.rentTarget}
-          selectedName={plan.selectedName}
-          focusRequest={plan.mapFocusRequest}
-          onselect={(name) => plan.selectCity(name)}
+          presentation={plan}
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
         />
       {:else}

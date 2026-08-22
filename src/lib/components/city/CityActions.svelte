@@ -1,25 +1,27 @@
 <script lang="ts">
-  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
 
-  let { cityName, canShare }: { cityName: string; canShare: boolean } = $props();
+  let {
+    presentation,
+    cityName,
+    canShare
+  }: { presentation: RentPlanPresentation; cityName: string; canShare: boolean } = $props();
 
-  let comparing = $derived(plan.isComparing(cityName));
-  let compareFull = $derived(!comparing && plan.compareNames.length >= 5);
+  let comparing = $derived(presentation.isComparing(cityName));
+  let compareFull = $derived(!comparing && presentation.comparisonFull);
 
   let shareLabel = $state('Copy link');
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function onCompare() {
-    if (plan.isComparing(cityName)) {
-      plan.removeComparison(cityName);
+    if (presentation.isComparing(cityName)) {
+      presentation.removeComparison(cityName);
       return;
     }
-    await plan.addComparison(cityName);
+    await presentation.addComparison(cityName);
   }
 
   async function onShare() {
-    // The URL sync keeps location.href in step with the current state, so the
-    // live deep link is exactly the shareable URL for the current view.
     if (!navigator.clipboard?.writeText) {
       shareLabel = 'Copy unavailable';
       clearTimeout(shareTimer);
@@ -27,7 +29,7 @@
       return;
     }
     try {
-      await navigator.clipboard.writeText(location.href);
+      await navigator.clipboard.writeText(presentation.buildShareUrl(location.origin));
       shareLabel = 'Copied link';
     } catch {
       shareLabel = 'Copy unavailable';
@@ -76,12 +78,12 @@
   >
     {shareLabel}
   </button>
-  {#if plan.compareNames.length}
+  {#if presentation.comparisonNames.length}
     <a
       href="#comparison-section"
       class="rounded-md px-1 py-0.5 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
     >
-      View comparison ({plan.compareNames.length})
+      View comparison ({presentation.comparisonNames.length})
     </a>
   {/if}
 </div>

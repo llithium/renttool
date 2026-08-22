@@ -934,5 +934,3 @@ export class RentPlanWorkspace {
     }
   }
 }
-
-export const app = new RentPlanWorkspace();

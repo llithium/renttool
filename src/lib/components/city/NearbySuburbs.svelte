@@ -1,10 +1,14 @@
 <script lang="ts">
   import type { City, NearbyPlace } from '$lib/types';
   import { fetchNearby } from '$lib/api';
-  import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
-  let { city, class: className = '' }: { city: City; class?: string } = $props();
+  let {
+    presentation,
+    city,
+    class: className = ''
+  }: { presentation: RentPlanPresentation; city: City; class?: string } = $props();
 
   /** Compact population label: 1.2M / 15k / 850. */
   function fmtPop(n: number): string {
@@ -18,18 +22,18 @@
   let expanded = $state(false);
   let status = $state('');
   let visiblePlaces = $derived(expanded ? places : places.slice(0, 4));
-  let compareFull = $derived(plan.compareNames.length >= 5);
+  let compareFull = $derived(presentation.comparisonFull);
 
   async function toggleComparison(place: NearbyPlace) {
-    const known = plan.cityByName(place.label);
-    if (known && plan.isComparing(known.name)) {
-      plan.removeComparison(known.name);
+    const known = presentation.cityByName(place.label);
+    if (known && presentation.isComparing(known.name)) {
+      presentation.removeComparison(known.name);
       status = `${known.name} removed from your comparison.`;
       return;
     }
 
     status = `Looking up rent for ${place.label}. Your ${city.name} plan stays open.`;
-    const result = await plan.addComparison(place);
+    const result = await presentation.addComparison(place);
     if (result.status === 'full') {
       status = `Comparison is full. Remove a city before adding ${result.name ?? place.label}.`;
       return;
@@ -91,8 +95,8 @@
     {:else}
       <ol class="border-y border-line">
         {#each visiblePlaces as p (p.label)}
-          {@const pending = plan.isComparisonPending(p.label)}
-          {@const compared = plan.isComparing(p.label)}
+          {@const pending = presentation.isComparisonPending(p.label)}
+          {@const compared = presentation.isComparing(p.label)}
           <li
             class="grid gap-3 border-b border-line px-0 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
           >

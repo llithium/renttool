@@ -4,23 +4,21 @@
   import type { City } from '$lib/types';
   import { money } from '$lib/format';
   import type { Map as LMap, LayerGroup, CircleMarker } from 'leaflet';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
   let {
-    cities,
-    maxRent,
-    selectedName,
-    focusRequest,
-    onselect,
+    presentation,
     class: className = ''
   }: {
-    cities: City[];
-    maxRent: number | null;
-    selectedName: string | null;
-    focusRequest: number;
-    onselect: (name: string) => void;
+    presentation: RentPlanPresentation;
     class?: string;
   } = $props();
+
+  let cities = $derived(presentation.cities);
+  let maxRent = $derived(presentation.rentTarget);
+  let selectedName = $derived(presentation.selectedName);
+  let focusRequest = $derived(presentation.mapFocusRequest);
 
   let el: HTMLDivElement;
   let map: LMap | undefined;
@@ -122,7 +120,7 @@
       tooltip.append(strong, document.createElement('br'));
       tooltip.append(document.createTextNode(`1BR ${money(c.r1)} · ${fit}`));
       marker.bindTooltip(tooltip, { direction: 'top' });
-      marker.on('click', () => onselect(c.name));
+      marker.on('click', () => presentation.selectCity(c.name));
       marker.addTo(group);
       const element = marker.getElement();
       if (element) {
@@ -133,7 +131,7 @@
           const keyboardEvent = event as KeyboardEvent;
           if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
             keyboardEvent.preventDefault();
-            onselect(c.name);
+            presentation.selectCity(c.name);
           }
         });
       }

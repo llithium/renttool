@@ -1,11 +1,10 @@
 import { computeBudget } from '$lib/budget';
 import {
-  app as defaultWorkspace,
   RentPlanWorkspace,
   type ComparisonResult,
   type RentPlanSnapshot
 } from '$lib/appState.svelte';
-import type { ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
+import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
 import type { Budget, City, CitySuggestion } from '$lib/types';
 
 export interface RentPlanPresentationSnapshot {
@@ -36,7 +35,7 @@ export class RentPlanPresentation {
   private readonly workspace: RentPlanWorkspace;
   private mapFocusRequestValue = $state(0);
 
-  constructor(workspace: RentPlanWorkspace = defaultWorkspace) {
+  constructor(workspace: RentPlanWorkspace = new RentPlanWorkspace()) {
     this.workspace = workspace;
   }
 
@@ -60,27 +59,20 @@ export class RentPlanPresentation {
     return this.workspace.compareCities;
   }
 
-  /** Compatibility name for existing city view modules. */
-  get compareCities(): City[] {
-    return this.comparisonCities;
-  }
-
   get comparisonNames(): string[] {
     return this.workspace.compareNames;
-  }
-
-  /** Compatibility name for existing route and view modules. */
-  get compareNames(): string[] {
-    return this.comparisonNames;
   }
 
   get comparisonEntries(): readonly ComparisonEntry[] {
     return this.workspace.compareEntries;
   }
 
-  /** Compatibility name for existing comparison views. */
-  get compareEntries(): readonly ComparisonEntry[] {
-    return this.comparisonEntries;
+  get comparisonLimit(): number {
+    return MAX_COMPARISON_ENTRIES;
+  }
+
+  get comparisonFull(): boolean {
+    return this.comparisonNames.length >= this.comparisonLimit;
   }
 
   get looking(): boolean {
@@ -187,6 +179,10 @@ export class RentPlanPresentation {
 
   buildHref(pathname: string): string {
     return this.workspace.buildHref(pathname);
+  }
+
+  buildShareUrl(origin: string): string {
+    return new URL(this.buildHref('/'), origin).href;
   }
 
   hydrateFromSearch(search: URLSearchParams): boolean {
