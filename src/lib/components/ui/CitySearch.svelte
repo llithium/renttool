@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { fetchSuggestions } from '$lib/api';
+  import { onDestroy } from 'svelte';
   import type { CitySuggestion } from '$lib/types';
-  import { SEED_CITIES, findSeedCity } from '$lib/data/cities';
+  import { findSeedCity } from '$lib/data/cities';
   import { money } from '$lib/format';
+  import { createCitySearchDiscovery } from './citySearchDiscovery';
 
   /** Median 1BR rent for a suggestion, when it maps to a known city. */
   function rentFor(label: string): string {
@@ -20,22 +21,26 @@
     pendingName?: string | null;
   } = $props();
 
-  let query = $state('');
+  const discovery = createCitySearchDiscovery();
+  let discoveryState = $state(discovery.state);
+  const unsubscribe = discovery.subscribe((state) => (discoveryState = state));
+
+  onDestroy(() => {
+    unsubscribe();
+    discovery.dispose();
+  });
 
   // Reflect an externally-driven selection (compare table, map marker, restored
   // state) in the field. This only re-runs when selectedName actually changes, so
   // it never clobbers the query while the user is typing (typing leaves the current
   // selection untouched until they choose a suggestion).
   $effect(() => {
-    if (selectedName != null) query = selectedName;
+    if (selectedName != null) discovery.setExternalQuery(selectedName);
   });
-  let suggestions = $state<CitySuggestion[]>([]);
-  let open = $state(false);
-  let loading = $state(false);
-  let activeIndex = $state(-1);
-  let requestId = 0;
   let awaitingSelection = $derived(
-    selectedName != null && query.trim().length >= 2 && query.trim() !== selectedName
+    selectedName != null &&
+      discoveryState.query.trim().length >= 2 &&
+      discoveryState.query.trim() !== selectedName
   );
   let planStatus = $derived(
     pendingName
@@ -45,106 +50,23 @@
         : ''
   );
 
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let blurTimer: ReturnType<typeof setTimeout> | undefined;
-  let controller: AbortController | undefined;
-
-  /** Instant local hints and fallback matches from the bundled seed cities. */
-  function seedMatches(q: string): CitySuggestion[] {
-    const t = q.toLowerCase();
-    return SEED_CITIES.filter((c) => c.name.toLowerCase().includes(t))
-      .slice(0, 8)
-      .map((c) => ({
-        label: c.name,
-        city: c.city,
-        state: c.state,
-        lat: c.lat,
-        lng: c.lng
-      }));
-  }
-
-  async function runSearch(q: string, id: number) {
-    controller = new AbortController();
-    loading = true;
-    try {
-      const remote = await fetchSuggestions(q, controller.signal);
-      if (id !== requestId) return;
-      suggestions = remote.length ? remote : seedMatches(q);
-    } catch (cause) {
-      if (id !== requestId || (cause instanceof DOMException && cause.name === 'AbortError'))
-        return;
-      suggestions = seedMatches(q);
-    } finally {
-      // Deliberate: a newer keystroke already owns `loading`/`activeIndex`, so a
-      // stale request must leave them alone. Nothing here can throw, so the early
-      // return has no exception to swallow.
-      // eslint-disable-next-line no-unsafe-finally
-      if (id !== requestId) return;
-      loading = false;
-      activeIndex = suggestions.length ? 0 : -1;
-    }
-  }
-
   function onInput(e: Event) {
-    query = (e.target as HTMLInputElement).value;
-    clearTimeout(blurTimer);
-    open = true;
-    requestId += 1;
-    const id = requestId;
-    controller?.abort();
-    clearTimeout(debounceTimer);
-    if (query.trim().length < 2) {
-      suggestions = [];
-      loading = false;
-      activeIndex = -1;
-      return;
-    }
-    // Instant local hints, then debounced API refinement.
-    suggestions = seedMatches(query);
-    activeIndex = suggestions.length ? 0 : -1;
-    debounceTimer = setTimeout(() => runSearch(query.trim(), id), 220);
+    discovery.input((e.target as HTMLInputElement).value);
   }
 
-  function choose(sug: CitySuggestion) {
-    clearTimeout(blurTimer);
-    clearTimeout(debounceTimer);
-    requestId += 1;
-    controller?.abort();
-    loading = false;
-    query = sug.label;
-    open = false;
-    suggestions = [];
-    onselect(sug);
+  function choose(index: number) {
+    const selection = discovery.select(index);
+    if (selection) onselect(selection);
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (!open || !suggestions.length) {
-      if (e.key === 'ArrowDown' && query.trim().length >= 2) {
-        open = true;
-        requestId += 1;
-        controller?.abort();
-        runSearch(query.trim(), requestId);
-      }
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      activeIndex = (activeIndex + 1) % suggestions.length;
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      activeIndex = (activeIndex - 1 + suggestions.length) % suggestions.length;
-    } else if (e.key === 'Enter') {
-      if (activeIndex >= 0 && activeIndex < suggestions.length) {
-        e.preventDefault();
-        choose(suggestions[activeIndex]);
-      }
-    } else if (e.key === 'Escape') {
-      open = false;
-    }
+    const result = discovery.handleKey(e.key);
+    if (result.handled) e.preventDefault();
+    if (result.selection) onselect(result.selection);
   }
 
   function highlight(label: string): { before: string; match: string; after: string } {
-    const q = query.trim();
+    const q = discoveryState.query.trim();
     if (!q) return { before: label, match: '', after: '' };
     const i = label.toLowerCase().indexOf(q.toLowerCase());
     if (i < 0) return { before: label, match: '', after: '' };
@@ -165,11 +87,13 @@
       class="w-full rounded-lg border border-line-strong bg-card-2 py-3 pr-10 pl-3 text-body font-semibold text-ink transition-colors duration-200 placeholder:text-faint hover:border-ink focus:border-transparent focus:outline-2 focus:outline-accent"
       type="search"
       role="combobox"
-      aria-expanded={open}
+      aria-expanded={discoveryState.open}
       aria-controls="city-listbox"
       aria-autocomplete="list"
-      aria-activedescendant={open && activeIndex >= 0 ? `city-option-${activeIndex}` : undefined}
-      aria-busy={loading}
+      aria-activedescendant={discoveryState.open && discoveryState.activeIndex >= 0
+        ? `city-option-${discoveryState.activeIndex}`
+        : undefined}
+      aria-busy={discoveryState.loading}
       aria-describedby={planStatus ? 'city-plan-status' : undefined}
       autocomplete="off"
       data-1p-ignore
@@ -179,18 +103,13 @@
       autocapitalize="off"
       spellcheck="false"
       placeholder="Start typing a city…"
-      value={query}
+      value={discoveryState.query}
       oninput={onInput}
       onkeydown={onKeydown}
-      onfocus={() => {
-        clearTimeout(blurTimer);
-        open = suggestions.length > 0;
-      }}
-      onblur={() => {
-        blurTimer = setTimeout(() => (open = false), 150);
-      }}
+      onfocus={() => discovery.focus()}
+      onblur={() => discovery.blur()}
     />
-    {#if loading}
+    {#if discoveryState.loading}
       <span
         aria-hidden="true"
         class="absolute top-1/2 right-3 h-2 w-6 -translate-y-1/2 animate-pulse rounded-full bg-line-strong"
@@ -198,28 +117,28 @@
     {/if}
   </div>
 
-  {#if open && suggestions.length}
+  {#if discoveryState.open && discoveryState.suggestions.length}
     <ul
       id="city-listbox"
       role="listbox"
       class="absolute inset-x-0 top-[calc(100%+0.3125rem)] z-40 max-h-72 animate-overlay-settle overflow-y-auto rounded-xl border border-line-strong bg-card p-1.5 shadow-pop"
     >
-      {#each suggestions as sug, i (sug.label)}
+      {#each discoveryState.suggestions as sug, i (sug.label)}
         {@const parts = highlight(sug.label)}
         <li
           id={`city-option-${i}`}
           role="option"
-          aria-selected={i === activeIndex}
+          aria-selected={i === discoveryState.activeIndex}
           style:animation-delay={`${Math.min(i * 24, 120)}ms`}
           class="motion-option flex cursor-pointer items-baseline justify-between gap-2.5 rounded-lg px-3 py-2.5 text-body {i ===
-          activeIndex
+          discoveryState.activeIndex
             ? 'bg-accent-soft'
             : ''}"
           onmousedown={(e) => {
             e.preventDefault();
-            choose(sug);
+            choose(i);
           }}
-          onmouseenter={() => (activeIndex = i)}
+          onmouseenter={() => discovery.hover(i)}
         >
           <span>
             {parts.before}{#if parts.match}<mark class="bg-transparent font-bold text-accent"
@@ -236,7 +155,11 @@
     </ul>
   {/if}
   <span class="sr-only" aria-live="polite">
-    {loading ? 'Searching cities' : open ? `${suggestions.length} city suggestions available` : ''}
+    {discoveryState.loading
+      ? 'Searching cities'
+      : discoveryState.open
+        ? `${discoveryState.suggestions.length} city suggestions available`
+        : ''}
   </span>
   {#if planStatus}
     <p id="city-plan-status" aria-live="polite" class="mt-2 text-meta text-muted">
