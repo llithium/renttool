@@ -2,6 +2,7 @@
   "name": "rent-tool",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "bun@1.4.0",
   "type": "module",
   "scripts": {
     "prepare": "svelte-kit sync",
@@ -16,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "validate": "pnpm format:check && pnpm lint && pnpm check && pnpm test && pnpm build"
+    "validate": "bun run format:check && bun run lint && bun run check && bun run test && bun run build"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
