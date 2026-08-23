@@ -2,6 +2,8 @@ import { pushState, replaceState } from '$app/navigation';
 import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresentation';
 import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
 
+type EffectRegistrar = (callback: () => void) => void;
+
 /**
  * Two-way sync between the shared app state and the address bar, so any view is
  * a shareable deep link.
@@ -11,10 +13,11 @@ import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
  * bar. `lastWritten` guards against the read→write echo and against redundant
  * replaceState calls.
  *
- * Call this once at component init — it registers an `$effect`, so it must run
- * inside a component's effect context.
+ * Call this once at component init — production callers omit the optional
+ * registrar so this registers an `$effect` inside the component's effect context.
+ * The registrar is a deterministic test seam for the URL-sync contract.
  */
-export function createUrlSync(plan: RentPlanPresentation) {
+export function createUrlSync(plan: RentPlanPresentation, registerEffect?: EffectRegistrar) {
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
   let salaryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -24,7 +27,7 @@ export function createUrlSync(plan: RentPlanPresentation) {
   // change (→ replaceState). Browser back/forward then steps through cities only.
   let lastCity: string | null = null;
 
-  $effect(() => {
+  const synchronize = () => {
     // Always read the state so deps are tracked, but hold off writing until
     // start() has hydrated from the URL and seeded lastWritten — otherwise this
     // could strip the query string before hydrateFromSearch reads it.
@@ -48,7 +51,10 @@ export function createUrlSync(plan: RentPlanPresentation) {
     // tweaks replace the current entry so they don't clutter the history stack.
     if (cityChanged) pushState(url, history.state ?? {});
     else replaceState(url, history.state ?? {});
-  });
+  };
+
+  if (registerEffect) registerEffect(synchronize);
+  else $effect(synchronize);
 
   return {
     get hydrated() {
