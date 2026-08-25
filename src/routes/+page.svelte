@@ -64,10 +64,10 @@
   class="mx-auto w-full max-w-384 overflow-x-hidden px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
-    actionHref={plan.buildHref('/compare')}
-    actionLabel={plan.comparisonNames.length
-      ? `Compare (${plan.comparisonNames.length})`
-      : 'Compare'}
+    planHref={plan.buildHref('/')}
+    compareHref={plan.buildHref('/compare')}
+    activeView="plan"
+    comparisonCount={plan.comparisonNames.length}
   />
 
   <div class="mt-6 grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
