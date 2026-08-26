@@ -367,6 +367,9 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
   const reference = equivalence.getByLabel('Match spending room from', { exact: true });
   await expect(reference).toHaveValue('Tampa, FL');
   await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
+  const austinArticle = equivalence.locator('article').filter({ hasText: 'Austin, TX' });
+  const austinRequiredSalary = austinArticle.locator('dd').nth(1);
+  const austinRequiredBefore = await austinRequiredSalary.textContent();
   const targetBefore = await equivalence.getByText(/Target spending room:/).textContent();
 
   await reference.selectOption({ label: 'Austin, TX' });
@@ -374,6 +377,7 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
   await expect(equivalence.locator('article').filter({ hasText: 'Austin, TX' })).toContainText(
     'Reference'
   );
+  await expect.poll(() => austinRequiredSalary.textContent()).not.toBe(austinRequiredBefore);
   await expect
     .poll(() => equivalence.getByText(/Target spending room:/).textContent())
     .not.toBe(targetBefore);
@@ -387,6 +391,18 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
   expect(axe.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual(
     []
   );
+});
+
+test('shows salary equivalence only when two comparison entries are present', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(
+    '/compare?salary=80000&city=Tampa%2C+FL&compare=Tampa%2C+FL&compare-salary=%7B%22name%22%3A%22Tampa%2C+FL%22%2C%22salary%22%3A80000%7D'
+  );
+  await waitForHydration(page);
+  await expect(page.getByTestId('salary-equivalence')).toHaveCount(0);
+
+  await selectCity(page, 'Austin', 'Austin, TX');
+  await expect(page.getByTestId('salary-equivalence')).toBeVisible();
 });
 
 test('exposes map markers to the keyboard', async ({ page }) => {
