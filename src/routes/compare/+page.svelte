@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { analyzeComparison } from '$lib/compare/decision';
+  import { analyzeComparison, analyzeSalaryEquivalence } from '$lib/compare/decision';
   import { cityHref } from '$lib/compare/links';
   import type { ComparisonCity } from '$lib/compare/decision';
   import { createCompareSalaries } from '$lib/compare/salaries.svelte';
@@ -12,6 +12,7 @@
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
   import ScenarioCard from '$lib/components/compare/ScenarioCard.svelte';
   import CompareHighlights from '$lib/components/compare/CompareHighlights.svelte';
+  import SalaryEquivalence from '$lib/components/compare/SalaryEquivalence.svelte';
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
 
   const salaries = createCompareSalaries((name, salary) => plan.setComparisonSalary(name, salary));
@@ -25,6 +26,10 @@
   });
 
   let analysis = $derived.by(() => analyzeComparison(plan.comparisonEntries));
+  let equivalenceReference = $state<string | null>(null);
+  let salaryEquivalence = $derived.by(() =>
+    analyzeSalaryEquivalence(plan.comparisonEntries, equivalenceReference)
+  );
 
   let atCapacity = $derived(plan.comparisonFull);
 
@@ -155,6 +160,10 @@
 
         {#if analysis.entries.length > 1}
           <CompareHighlights {analysis} {hrefForCity} />
+          <SalaryEquivalence
+            analysis={salaryEquivalence}
+            onreferencechange={(name) => (equivalenceReference = name)}
+          />
         {/if}
 
         <section class="mt-8 border-t border-line pt-6">

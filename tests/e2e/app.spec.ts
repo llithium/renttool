@@ -353,6 +353,42 @@ test('keeps each selected city with its salary when opening the detailed compari
   await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('90,000');
 });
 
+test('compares equivalent salaries with a selectable reference city', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(
+    '/compare?salary=80000&city=Tampa%2C+FL&compare=Tampa%2C+FL&compare=Austin%2C+TX&compare=New%20York%2C+NY&compare-salary=%7B%22name%22%3A%22Tampa%2C+FL%22%2C%22salary%22%3A80000%7D&compare-salary=%7B%22name%22%3A%22Austin%2C+TX%22%2C%22salary%22%3A90000%7D&compare-salary=%7B%22name%22%3A%22New%20York%2C+NY%22%2C%22salary%22%3A70000%7D'
+  );
+  await waitForHydration(page);
+
+  const equivalence = page.getByTestId('salary-equivalence');
+  await expect(
+    equivalence.getByRole('heading', { name: 'Equivalent salary by city' })
+  ).toBeVisible();
+  const reference = equivalence.getByLabel('Match spending room from', { exact: true });
+  await expect(reference).toHaveValue('Tampa, FL');
+  await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
+  const targetBefore = await equivalence.getByText(/Target spending room:/).textContent();
+
+  await reference.selectOption({ label: 'Austin, TX' });
+  await expect(reference).toHaveValue('Austin, TX');
+  await expect(equivalence.locator('article').filter({ hasText: 'Austin, TX' })).toContainText(
+    'Reference'
+  );
+  await expect
+    .poll(() => equivalence.getByText(/Target spending room:/).textContent())
+    .not.toBe(targetBefore);
+
+  await page.getByRole('button', { name: 'Remove Austin, TX' }).click();
+  await expect(reference).toHaveValue('Tampa, FL');
+  await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
+  await expect(equivalence.locator('article')).toHaveCount(2);
+
+  const axe = await new AxeBuilder({ page }).analyze();
+  expect(axe.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual(
+    []
+  );
+});
+
 test('exposes map markers to the keyboard', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
