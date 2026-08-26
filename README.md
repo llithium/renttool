@@ -51,6 +51,7 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2026 Fair Market Rents for **every US county** |
 | **SimpleMaps places** (bundled)             | `/api/nearby`       | none       | Nearby towns/suburbs around a point              |
 | **SimpleMaps places** (bundled)             | `/api/population`   | none       | Population for a coordinate                      |
+| **SimpleMaps places** (bundled)             | `/api/coordinates`  | none       | Exact city/state coordinate fallback             |
 
 The app **degrades gracefully** and needs **no keys at all**: 651 cities use the bundled
 June 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
@@ -61,6 +62,10 @@ request or API key.
 The UI identifies the statistic it is showing: Apartment List estimated median rent, or
 HUD 40th-percentile Fair Market Rent. See
 [docs/API.md](docs/API.md) for the full endpoint reference (params, responses, examples).
+
+The full SimpleMaps places table stays server-side. Restored cities that lack a curated
+coordinate use `/api/coordinates` for an exact city/state match, avoiding a roughly 1.25 MB
+places-data chunk in the browser build while retaining bundled fallback coverage.
 
 The City snapshot replaces editorial blurbs with consistently sourced Census-place facts:
 population, median household income, mean commute, renter-occupied housing share, and
@@ -138,7 +143,9 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   presentation seam used by both planning routes), `planRepresentation.ts` (canonical shareable
   URL encoding), `urlSync.svelte.ts` (state ⇄ address bar), and `salaryField.svelte.ts` (the salary
   input's own state). The workspace keeps rent lookup, browser storage, cancellation,
-  canonicalization, and comparison-cap rules behind injected adapters.
+  canonicalization, and comparison-cap rules behind injected adapters. URL synchronization uses
+  SvelteKit shallow routing so canonical links and city-level Back/Forward history stay aligned
+  with the client router.
 - `src/lib/compare/` — the compare view's logic: `decision.ts` (comparison entries, metric view
   model, fit status, and decision briefs), `links.ts` (city navigation links), and
   `salaries.svelte.ts` (per-city salaries + persistence)
@@ -152,7 +159,7 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   CompareMetricsTable
 - `src/routes/` — the rent-plan view (`/`), comparison view (`/compare`), privacy page, and terms
   page
-- `src/routes/api/` — the five serverless endpoints above
+- `src/routes/api/` — the six serverless endpoints above
 
 The planning routes (`/` and `/compare`) are orchestration only: they use the rent-plan
 presentation seam to wire state and intents to components, while owning the section rhythm (the

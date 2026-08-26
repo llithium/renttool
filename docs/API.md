@@ -1,6 +1,6 @@
 # API Reference
 
-The app ships five serverless `GET` endpoints under `/api/*` ([src/routes/api/](../src/routes/api/)).
+The app ships six serverless `GET` endpoints under `/api/*` ([src/routes/api/](../src/routes/api/)).
 They provide a stable client contract over keyless and bundled data sources.
 
 **Conventions**
@@ -15,6 +15,8 @@ They provide a stable client contract over keyless and bundled data sources.
 Typical call order for a city outside the bundled Apartment List snapshot:
 `city-suggest` → (pick gives coords) → `geocode` (coords → FIPS) → `fmr`.
 Snapshot cities use their bundled city-level estimates and skip the geocode/FMR calls.
+When a restored snapshot city lacks a curated coordinate, the client calls `coordinates`
+with its exact city/state identity. The complete places dataset remains server-only.
 
 ---
 
@@ -104,6 +106,38 @@ On any upstream failure: `{ "ok": false }`. Cache: `max-age=86400, s-maxage=6048
 
 ```bash
 curl "http://localhost:5173/api/geocode?lat=27.9477&lng=-82.4584"
+```
+
+---
+
+## GET `/api/coordinates`
+
+Returns coordinates for an exact city/state match from the bundled SimpleMaps places
+dataset. This is the fallback for restored rent cities that do not already carry curated
+coordinates; it keeps the full places table out of the browser build.
+
+**Query params**
+
+| Param   | Required | Description                                      |
+| ------- | -------- | ------------------------------------------------ |
+| `city`  | yes      | Exact city name, 1–80 characters                 |
+| `state` | yes      | Two-letter state abbreviation (case-insensitive) |
+
+Missing or malformed identity → **400**.
+
+**Response** `200`
+
+```json
+{ "ok": true, "lat": 42.7142, "lng": -84.5601 }
+```
+
+No exact bundled match returns `{ "ok": false }`.
+Cache: `max-age=86400, s-maxage=2592000` (30d).
+
+**Example**
+
+```bash
+curl "http://localhost:5173/api/coordinates?city=Lansing&state=MI"
 ```
 
 ---

@@ -18,7 +18,7 @@ import {
 } from '$lib/planRepresentation';
 import { MAX_SALARY } from '$lib/salary';
 import type { City, CitySuggestion, LookupResult } from '$lib/types';
-import { fetchPopulation, lookupRent } from '$lib/api';
+import { fetchCoordinates, fetchPopulation, lookupRent } from '$lib/api';
 
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
 const LEGACY_KEY = LEGACY_PLAN_V2_STORAGE_KEY;
@@ -101,7 +101,7 @@ export interface RentPlanAdapters {
   lookupRent: typeof lookupRent;
   /** Production uses the population endpoint; tests can resolve immediately. */
   fetchPopulation: typeof fetchPopulation;
-  /** Lazy place-data lookup keeps the initial bundle small. */
+  /** Production uses the coordinates endpoint; tests can resolve immediately. */
   coordinatesForPlace: (
     city: string,
     state: string
@@ -114,10 +114,7 @@ export interface RentPlanAdapters {
 const browserAdapters: RentPlanAdapters = {
   lookupRent,
   fetchPopulation,
-  coordinatesForPlace: async (city, state) => {
-    const { coordinatesForPlace } = await import('$lib/data/places');
-    return coordinatesForPlace(city, state) ?? undefined;
-  },
+  coordinatesForPlace: fetchCoordinates,
   readStorage: (key) => {
     try {
       return localStorage.getItem(key);
@@ -358,7 +355,7 @@ export class RentPlanWorkspace {
   }
 
   /** Hydrate map coordinates for a bundled rent city that is not in the curated
-   * coordinate list. The place dataset is loaded only when this fallback is needed. */
+   * coordinate list. The endpoint keeps the full place dataset server-side. */
   private async ensureCoordinates(name: string) {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;

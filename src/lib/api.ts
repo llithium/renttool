@@ -25,6 +25,27 @@ export async function fetchPopulation(
   }
 }
 
+/** Coordinates for an exact bundled city/state match. Keeping this lookup on
+ * the server avoids shipping the full US places dataset to the browser when a
+ * restored rent city is missing curated coordinates. */
+export async function fetchCoordinates(
+  city: string,
+  state: string,
+  signal?: AbortSignal
+): Promise<readonly [number, number] | undefined> {
+  try {
+    const params = new URLSearchParams({ city, state });
+    const res = await fetch(`/api/coordinates?${params}`, { signal });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    return data.ok && typeof data.lat === 'number' && typeof data.lng === 'number'
+      ? [data.lat, data.lng]
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Nearby towns & suburbs around a point, from the bundled US places dataset.
  * `city`/`state` identify the origin so it's excluded from its own list.
  * Returns [] on failure. */

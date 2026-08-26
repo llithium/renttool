@@ -21,7 +21,6 @@ interface BrowserShim {
   readonly location: { pathname: string; search: string };
   readonly history: {
     state: { readonly marker: string };
-    replaceState: ReturnType<typeof vi.fn>;
   };
   readonly window: {
     addEventListener: ReturnType<typeof vi.fn>;
@@ -76,12 +75,13 @@ function installBrowserShim(initialSearch: string): BrowserShim {
   const locationShim = { pathname: '/rent', search: initialSearch };
   const listeners = new Set<PopStateListener>();
   const historyShim = {
-    state: { marker: 'history-state' },
-    replaceState: vi.fn((_state: unknown, _title: string, url: string) => {
-      const queryStart = url.indexOf('?');
-      locationShim.search = queryStart >= 0 ? url.slice(queryStart) : '';
-    })
+    state: { marker: 'history-state' }
   };
+  vi.mocked(replaceState).mockImplementation((url) => {
+    const serializedUrl = url.toString();
+    const queryStart = serializedUrl.indexOf('?');
+    locationShim.search = queryStart >= 0 ? serializedUrl.slice(queryStart) : '';
+  });
   const windowShim = {
     addEventListener: vi.fn((type: string, listener: PopStateListener) => {
       if (type === 'popstate') listeners.add(listener);
@@ -268,22 +268,17 @@ describe('createUrlSync', () => {
     );
     expect(pushState).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();
-    expect(harness.browser.history.replaceState).not.toHaveBeenCalled();
   });
 
-  it('canonicalizes a valid non-canonical URL with native history replacement', () => {
+  it('canonicalizes a valid non-canonical URL with SvelteKit history replacement', () => {
     const nonCanonicalSearch = 'city=Tampa%2C+FL&salary=80000';
     const harness = createHarness(createFakePlan(), nonCanonicalSearch);
     harness.start();
+    vi.runAllTimers();
 
-    expect(harness.browser.history.replaceState).toHaveBeenCalledTimes(1);
-    expect(harness.browser.history.replaceState).toHaveBeenCalledWith(
-      harness.browser.history.state,
-      '',
-      `?${INITIAL_SEARCH}`
-    );
+    expect(replaceState).toHaveBeenCalledTimes(1);
+    expect(replaceState).toHaveBeenCalledWith(`?${INITIAL_SEARCH}`, harness.browser.history.state);
     expect(pushState).not.toHaveBeenCalled();
-    expect(replaceState).not.toHaveBeenCalled();
     expect(harness.browser.location.search).toBe(`?${INITIAL_SEARCH}`);
   });
 
@@ -297,18 +292,14 @@ describe('createUrlSync', () => {
     });
     const harness = createHarness(plan, '');
     const { onStateApplied } = harness.start();
+    vi.runAllTimers();
 
     expect(plan.restoreSession).not.toHaveBeenCalled();
     expect(plan.setSalary).toHaveBeenCalledWith(76_000);
     expect(plan.buildSearch).toHaveBeenCalledWith(76_000);
     expect(onStateApplied).toHaveBeenCalledTimes(1);
-    expect(harness.browser.history.replaceState).toHaveBeenCalledWith(
-      harness.browser.history.state,
-      '',
-      `?${sessionSearch}`
-    );
+    expect(replaceState).toHaveBeenCalledWith(`?${sessionSearch}`, harness.browser.history.state);
     expect(pushState).not.toHaveBeenCalled();
-    expect(replaceState).not.toHaveBeenCalled();
   });
 
   it('clears a pending salary timer and removes the exact registered popstate listener on teardown', () => {

@@ -115,6 +115,22 @@ test.beforeEach(async ({ page }) => {
   await waitForHydration(page);
 });
 
+test('canonicalizes a shared URL after the client router is ready', async ({ page }) => {
+  const routerErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('replaceState')) {
+      routerErrors.push(message.text());
+    }
+  });
+
+  await page.goto('/?city=Tampa%2C+FL&salary=80000');
+  await waitForHydration(page);
+
+  await expect(page.getByRole('heading', { name: 'Tampa, FL', exact: true })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).search).toBe('?salary=80000&city=Tampa%2C+FL');
+  expect(routerErrors).toEqual([]);
+});
+
 test('focuses a visible calculator without scrolling the landing page', async ({ page }) => {
   const city = page.getByRole('combobox', { name: 'City' });
   const before = await page.evaluate(() => window.scrollY);

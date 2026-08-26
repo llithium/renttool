@@ -21,6 +21,7 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
   let salaryTimer: ReturnType<typeof setTimeout> | undefined;
+  let canonicalizationTimer: ReturnType<typeof setTimeout> | undefined;
   let lastWritten = '';
   // Tracks the city in the last-written URL so the write effect can tell a city
   // change (→ pushState, a real history entry) from an incidental salary/compare
@@ -94,13 +95,14 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
       hydrated = true;
       onStateApplied();
       if (shouldCanonicalize) {
-        // Normalize the current entry without asking the router to navigate
-        // while the initial page is still hydrating.
-        history.replaceState(
-          history.state ?? {},
-          '',
-          lastWritten ? `?${lastWritten}` : location.pathname
-        );
+        // Normalize the current entry through SvelteKit's shallow-routing API
+        // so its router stays in sync with the address bar. Defer one task: on
+        // an initial load, onMount can run just before the client router marks
+        // itself ready for shallow-routing calls.
+        canonicalizationTimer = setTimeout(() => {
+          replaceState(lastWritten ? `?${lastWritten}` : location.pathname, history.state ?? {});
+          canonicalizationTimer = undefined;
+        });
       }
 
       // Re-hydrate on browser back/forward. Shallow routing (pushState/replaceState)
@@ -122,6 +124,7 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
       window.addEventListener('popstate', onPopState);
       return () => {
         clearTimeout(salaryTimer);
+        clearTimeout(canonicalizationTimer);
         window.removeEventListener('popstate', onPopState);
       };
     }
