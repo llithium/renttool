@@ -16,6 +16,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:install": "playwright install chromium",
     "test:e2e": "playwright test",
     "validate": "bun run format:check && bun run lint && bun run check && bun run test && bun run build"
   },

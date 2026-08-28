@@ -21,10 +21,25 @@ bun run dev        # http://localhost:5173
 Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
 `bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
-`bun run test` (unit tests), and `bun run test:e2e` (browser/accessibility tests).
+`bun run test` (unit tests), `bun run test:e2e:install` (download Chromium), and
+`bun run test:e2e` (browser/accessibility tests).
 `bun run validate` runs the format check, lint, type-check, unit tests, and build in one go.
-`bun run test:e2e` and `bun audit` are optional manual checks; the browser tests need a browser
-download, and the audit needs network access.
+`bun audit` is an optional manual check that needs network access.
+
+### Browser verification
+
+Browser verification is separate from the default unit and build checks. After installing
+dependencies, run this sequence locally:
+
+```bash
+bun install --frozen-lockfile
+bun run test:e2e:install
+bun run test:e2e
+```
+
+On macOS, `bun run test:e2e:install` performs the normal Playwright browser install. Linux CI
+uses `bunx playwright install --with-deps chromium` so Playwright's required system dependencies
+are installed before the browser tests.
 
 ## Styling
 
