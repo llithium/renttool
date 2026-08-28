@@ -10,8 +10,12 @@ function requestEvent(search: string, fetch = vi.fn()): Parameters<typeof GET>[0
 }
 
 describe('GET /api/geocode', () => {
-  it('rejects invalid coordinates', async () => {
+  it('rejects missing, malformed, and out-of-range coordinates', async () => {
     await expect(GET(requestEvent('?lat=91&lng=-74'))).rejects.toMatchObject({ status: 400 });
+    await expect(GET(requestEvent('?lat=27.9477oops&lng=-82.4584'))).rejects.toMatchObject({
+      status: 400
+    });
+    await expect(GET(requestEvent('?lat=&lng=-82.4584'))).rejects.toMatchObject({ status: 400 });
   });
 
   it('maps a valid FCC record to five-digit county FIPS', async () => {

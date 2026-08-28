@@ -9,8 +9,10 @@ function requestEvent(search: string): Parameters<typeof GET>[0] {
 }
 
 describe('GET /api/population', () => {
-  it('rejects invalid coordinates', async () => {
+  it('rejects missing and invalid coordinates', async () => {
     await expect(GET(requestEvent('?lat=35&lng=-181'))).rejects.toMatchObject({ status: 400 });
+    await expect(GET(requestEvent('?lat=35'))).rejects.toMatchObject({ status: 400 });
+    await expect(GET(requestEvent('?lat=35&lng='))).rejects.toMatchObject({ status: 400 });
   });
 
   it('returns the documented bundled population shape and cache headers', async () => {

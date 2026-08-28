@@ -9,10 +9,12 @@ function requestEvent(search: string): Parameters<typeof GET>[0] {
 }
 
 describe('GET /api/nearby', () => {
-  it('rejects invalid coordinates', async () => {
+  it('rejects missing and invalid coordinates', async () => {
     await expect(GET(requestEvent('?lat=not-a-number&lng=-74'))).rejects.toMatchObject({
       status: 400
     });
+    await expect(GET(requestEvent('?lng=-74'))).rejects.toMatchObject({ status: 400 });
+    await expect(GET(requestEvent('?lat=%20&lng=-74'))).rejects.toMatchObject({ status: 400 });
   });
 
   it('returns the documented bundled nearby-place shape and cache headers', async () => {

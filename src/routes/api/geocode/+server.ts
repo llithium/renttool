@@ -1,22 +1,16 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { coordinatesFromSearch } from '$lib/geo';
 
 /** Resolve county/state FIPS from coordinates via the FCC Area API (keyless).
  * The FMR and ACS endpoints need FIPS codes; the client already has coords from the
  * autocomplete pick, so this is a single cheap hop. */
 export const GET: RequestHandler = async ({ url, fetch, setHeaders }) => {
-  const lat = parseFloat(url.searchParams.get('lat') || '');
-  const lng = parseFloat(url.searchParams.get('lng') || '');
-  if (
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng) ||
-    lat < -90 ||
-    lat > 90 ||
-    lng < -180 ||
-    lng > 180
-  ) {
+  const coordinates = coordinatesFromSearch(url.searchParams);
+  if (!coordinates) {
     throw error(400, 'lat and lng are required');
   }
+  const [lat, lng] = coordinates;
 
   const fcc = new URL('https://geo.fcc.gov/api/census/area');
   fcc.searchParams.set('lat', String(lat));
