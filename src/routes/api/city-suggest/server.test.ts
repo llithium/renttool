@@ -79,6 +79,26 @@ describe('GET /api/city-suggest', () => {
                   state: 'Florida'
                 },
                 geometry: { coordinates: [-82.4, 27.9] }
+              },
+              {
+                properties: {
+                  countrycode: 'US',
+                  osm_key: 'place',
+                  osm_value: 'city',
+                  name: 'St. Petersburg',
+                  state: 'Florida'
+                },
+                geometry: { coordinates: [-300, 91] }
+              },
+              {
+                properties: {
+                  countrycode: 'US',
+                  osm_key: 'place',
+                  osm_value: 'city',
+                  name: 'St. Petersburg',
+                  state: 'Florida'
+                },
+                geometry: { coordinates: [-82.68, 27.77] }
               }
             ]
           })
@@ -89,7 +109,16 @@ describe('GET /api/city-suggest', () => {
     const response = await GET(event);
 
     expect(await response.json()).toEqual({
-      suggestions: [{ label: 'Tampa, FL', city: 'Tampa', state: 'FL', lat: 27.9477, lng: -82.4584 }]
+      suggestions: [
+        { label: 'Tampa, FL', city: 'Tampa', state: 'FL', lat: 27.9477, lng: -82.4584 },
+        {
+          label: 'St. Petersburg, FL',
+          city: 'St. Petersburg',
+          state: 'FL',
+          lat: 27.77,
+          lng: -82.68
+        }
+      ]
     });
     expect(event.setHeaders).toHaveBeenCalledWith({
       'Cache-Control': 'public, max-age=60, s-maxage=300'

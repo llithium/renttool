@@ -343,7 +343,13 @@ export class RentPlanWorkspace {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;
     const coords = await this.lookupCoordinator.coordinatesFor(city.city, city.state);
-    if (coords) this.patchCity(name, { lat: coords[0], lng: coords[1] });
+    if (coords) {
+      this.patchCity(name, { lat: coords[0], lng: coords[1] });
+      // A selected city can start without curated coordinates. Its initial
+      // population attempt necessarily ran before this lookup completed, so
+      // retry now that the population endpoint has a usable point.
+      void this.ensurePopulation(name);
+    }
   }
 
   private popLookups = new Set<string>();

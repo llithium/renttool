@@ -38,11 +38,22 @@ export const GET: RequestHandler = async ({ url, fetch, setHeaders }) => {
 
       const label = `${cityName}, ${stateAbbr}`;
       if (seen.has(label)) continue;
-      seen.add(label);
 
       const [lng, lat] = f.geometry?.coordinates ?? [];
-      if (typeof lat !== 'number' || typeof lng !== 'number') continue;
+      if (
+        typeof lat !== 'number' ||
+        typeof lng !== 'number' ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180
+      ) {
+        continue;
+      }
 
+      seen.add(label);
       suggestions.push({ label, city: cityName, state: stateAbbr, lat, lng });
       if (suggestions.length >= 8) break;
     }

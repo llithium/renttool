@@ -351,6 +351,22 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.pendingName).toBeNull();
   });
 
+  it("retries population hydration after resolving a selected city's coordinates", async () => {
+    const dependency = adapters(hudRent);
+    dependency.coordinatesForPlace = vi.fn(async () => [27.95, -82.46] as const);
+    dependency.fetchPopulation = vi.fn(async () => 403_000);
+    const plan = new RentPlanWorkspace(dependency);
+    const tampa = plan.cityByName('Tampa, FL');
+    expect(tampa).not.toBeNull();
+    Object.assign(tampa!, { lat: undefined, lng: undefined, pop: '' });
+
+    expect(plan.selectCity('Tampa, FL')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dependency.fetchPopulation).toHaveBeenCalledWith(27.95, -82.46);
+    expect(plan.snapshot.selected?.pop).toBe('403,000');
+  });
+
   it('enforces the comparison cap before resolving another city', async () => {
     const dependency = adapters(hudRent);
     const plan = new RentPlanWorkspace(dependency);
