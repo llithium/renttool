@@ -1,10 +1,10 @@
 <script lang="ts">
   import {
     DECISION_CRITERIA,
-    type ComparisonCity,
     type ComparisonView,
     type DecisionCriterion
   } from '$lib/compare/decision';
+  import type { ComparisonCity } from '$lib/compare/comparisonModel';
 
   let {
     analysis,

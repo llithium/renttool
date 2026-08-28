@@ -147,8 +147,9 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   rules behind injected adapters; lookup coordination stays behind the same public workspace seam.
   URL synchronization uses SvelteKit shallow routing so canonical links and city-level Back/Forward
   history stay aligned with the client router.
-- `src/lib/compare/` — the compare view's logic: `decision.ts` (comparison entries, metric view
-  model, fit status, and decision briefs), `links.ts` (city navigation links), and
+- `src/lib/compare/` — the compare view's logic: `comparisonModel.ts` (shared comparison input and
+  view types), `decision.ts` (metric view model, fit status, and decision briefs),
+  `salaryEquivalence.ts` (equivalent-salary analysis), `links.ts` (city navigation links), and
   `salaries.svelte.ts` (per-city salaries + persistence)
 - `src/lib/components/ui/` — shared: Brand, CitySearch (autocomplete combobox), SalaryInput,
   SectionHeading, StatGrid, ThemeToggle

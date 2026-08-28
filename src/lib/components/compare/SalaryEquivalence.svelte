@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SalaryEquivalenceView } from '$lib/compare/decision';
+  import type { SalaryEquivalenceView } from '$lib/compare/salaryEquivalence';
 
   let {
     analysis,

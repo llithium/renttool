@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { analyzeComparison, analyzeSalaryEquivalence } from '$lib/compare/decision';
+  import { analyzeComparison } from '$lib/compare/decision';
+  import { analyzeSalaryEquivalence } from '$lib/compare/salaryEquivalence';
   import { cityHref } from '$lib/compare/links';
-  import type { ComparisonCity } from '$lib/compare/decision';
+  import type { ComparisonCity } from '$lib/compare/comparisonModel';
   import { createCompareSalaries } from '$lib/compare/salaries.svelte';
   import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createUrlSync } from '$lib/urlSync.svelte';

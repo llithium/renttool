@@ -1,4 +1,4 @@
-import type { ComparisonCity } from './decision';
+import type { ComparisonCity } from './comparisonModel';
 import type { ComparisonEntry } from './comparisonSet.svelte';
 import {
   appendComparisonParameters,

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { ComparisonCity, ComparisonView } from '$lib/compare/decision';
+  import type { ComparisonView } from '$lib/compare/decision';
+  import type { ComparisonCity } from '$lib/compare/comparisonModel';
 
   let {
     analysis,
