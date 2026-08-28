@@ -343,7 +343,7 @@ export class RentPlanWorkspace {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;
     const coords = await this.lookupCoordinator.coordinatesFor(city.city, city.state);
-    if (coords) {
+    if (coords && this.cityByName(name) === city) {
       this.patchCity(name, { lat: coords[0], lng: coords[1] });
       // A selected city can start without curated coordinates. Its initial
       // population attempt necessarily ran before this lookup completed, so
@@ -352,24 +352,30 @@ export class RentPlanWorkspace {
     }
   }
 
-  private popLookups = new Set<string>();
+  private popLookups = new WeakMap<City, Set<string>>();
 
   /** Fill in a missing population figure for a city (fire-and-forget).
    * Curated seed blurbs like "2.8M metro" are kept as-is. */
   private async ensurePopulation(name: string) {
     const city = this.cityByName(name);
     if (!city || city.pop || city.lat == null || city.lng == null) return;
-    const key = name.toLowerCase();
-    if (this.popLookups.has(key)) return;
-    this.popLookups.add(key);
+    const lat = city.lat;
+    const lng = city.lng;
+    const key = `${lat},${lng}`;
+    const cityLookups = this.popLookups.get(city) ?? new Set<string>();
+    if (cityLookups.has(key)) return;
+    cityLookups.add(key);
+    this.popLookups.set(city, cityLookups);
     try {
-      const pop = await this.adapters.fetchPopulation(city.lat, city.lng);
-      if (pop != null) {
+      const pop = await this.adapters.fetchPopulation(lat, lng);
+      if (pop != null && this.cityByName(name) === city && city.lat === lat && city.lng === lng) {
         this.patchCity(name, { pop: popText(pop) });
         this.persistImmediately();
       }
     } finally {
-      this.popLookups.delete(key);
+      const currentLookups = this.popLookups.get(city);
+      currentLookups?.delete(key);
+      if (currentLookups?.size === 0) this.popLookups.delete(city);
     }
   }
 

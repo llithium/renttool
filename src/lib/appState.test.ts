@@ -367,6 +367,51 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.selected?.pop).toBe('403,000');
   });
 
+  it('does not apply population from an obsolete same-name coordinate pair', async () => {
+    const populationA = deferred<number | null>();
+    const populationB = deferred<number | null>();
+    const storage = new Map<string, string>();
+    const dependency = adapters(unavailableRent);
+    dependency.lookupRent = vi.fn(async () => unavailableRent);
+    dependency.fetchPopulation = vi.fn((lat: number) =>
+      lat === 40 ? populationA.promise : populationB.promise
+    );
+    dependency.readStorage = (key) => storage.get(key) ?? null;
+    dependency.writeStorage = (key, value) => storage.set(key, value);
+    const plan = new RentPlanWorkspace(dependency);
+
+    expect(
+      plan.hydrateFromSearch(
+        new URLSearchParams({ city: 'Shared Town, ZZ', lat: '40', lng: '-74' })
+      )
+    ).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(dependency.fetchPopulation).toHaveBeenCalledWith(40, -74);
+
+    plan.applyUrlNavigation(
+      new URLSearchParams({ city: 'Shared Town, ZZ', lat: '41', lng: '-75' })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    populationA.resolve(111_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(plan.snapshot.selected?.pop).toBe('');
+    expect(
+      (JSON.parse(storage.get('rentToolLast.v3') ?? '{}') as { custom?: Array<{ pop: string }> })
+        .custom?.[0]?.pop
+    ).toBe('');
+
+    populationB.resolve(222_000);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(plan.snapshot.selected?.pop).toBe('222,000');
+    expect(
+      (JSON.parse(storage.get('rentToolLast.v3') ?? '{}') as { custom?: Array<{ pop: string }> })
+        .custom?.[0]?.pop
+    ).toBe('222,000');
+  });
+
   it('enforces the comparison cap before resolving another city', async () => {
     const dependency = adapters(hudRent);
     const plan = new RentPlanWorkspace(dependency);
@@ -705,6 +750,48 @@ describe('RentPlanWorkspace', () => {
     expect(plan.snapshot.selectedName).toBe('Shared Town, ZZ');
     expect(plan.snapshot.selected).toMatchObject({ lat: 41, lng: -75, r1: 1_350 });
     expect(dependency.lookupRent).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not apply stale coordinates to a replaced same-name city', async () => {
+    const coordinates = deferred<readonly [number, number]>();
+    const dependency = adapters(unavailableRent);
+    dependency.coordinatesForPlace = vi.fn(() => coordinates.promise);
+    const plan = new RentPlanWorkspace(dependency);
+    const bundled = plan.cityByName('Addison, TX');
+    expect(bundled).not.toBeNull();
+    Object.assign(bundled!, {
+      lat: undefined,
+      lng: undefined,
+      r1: null,
+      r2: null,
+      yoy: null,
+      source: 'none',
+      rentMetric: 'unknown',
+      rentArea: 'Addison, TX',
+      rentYear: ''
+    });
+
+    expect(plan.selectCity('Addison, TX')).toBe(true);
+    expect(dependency.coordinatesForPlace).toHaveBeenCalledWith('Addison', 'TX');
+
+    plan.applyUrlNavigation(new URLSearchParams({ city: 'Addison, TX', lat: '41', lng: '-75' }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    coordinates.resolve([30, -80]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(plan.snapshot.selected).toMatchObject({
+      name: 'Addison, TX',
+      lat: 41,
+      lng: -75,
+      r1: null,
+      r2: null,
+      yoy: null,
+      source: 'none',
+      rentMetric: 'unknown',
+      rentArea: 'Addison, TX',
+      rentYear: ''
+    });
   });
 
   it('clears absent salary, city, and comparison state on URL navigation', () => {
