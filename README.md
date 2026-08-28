@@ -139,13 +139,14 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
 
 - `src/lib/data/` — bundled rent, ACS, and place data plus coordinates and tax tables
 - `src/lib/` — city-aware estimated tax/budget math, formatting, search links, typed API client,
-  `appState.svelte.ts` (the rent-plan workspace), `rentPlanPresentation.svelte.ts` (the
-  presentation seam used by both planning routes), `planRepresentation.ts` (canonical shareable
-  URL encoding), `urlSync.svelte.ts` (state ⇄ address bar), and `salaryField.svelte.ts` (the salary
-  input's own state). The workspace keeps rent lookup, browser storage, cancellation,
-  canonicalization, and comparison-cap rules behind injected adapters. URL synchronization uses
-  SvelteKit shallow routing so canonical links and city-level Back/Forward history stay aligned
-  with the client router.
+  `appState.svelte.ts` (the rent-plan workspace), `rentLookupCoordinator.ts` (shared coordinate
+  and rent-request cancellation), `rentPlanPresentation.svelte.ts` (the presentation seam used by
+  both planning routes), `planRepresentation.ts` (canonical shareable URL encoding),
+  `urlSync.svelte.ts` (state ⇄ address bar), and `salaryField.svelte.ts` (the salary input's own
+  state). The workspace keeps plan state, browser storage, canonicalization, and comparison-cap
+  rules behind injected adapters; lookup coordination stays behind the same public workspace seam.
+  URL synchronization uses SvelteKit shallow routing so canonical links and city-level Back/Forward
+  history stay aligned with the client router.
 - `src/lib/compare/` — the compare view's logic: `decision.ts` (comparison entries, metric view
   model, fit status, and decision briefs), `links.ts` (city navigation links), and
   `salaries.svelte.ts` (per-city salaries + persistence)

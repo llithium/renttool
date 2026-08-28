@@ -17,6 +17,11 @@ import {
   type RestoredRentPlan
 } from '$lib/planRepresentation';
 import { MAX_SALARY } from '$lib/salary';
+import {
+  createRentLookupCoordinator,
+  type RentLookupAdapters,
+  type RentLookupCoordinator
+} from '$lib/rentLookupCoordinator';
 import type { City, CitySuggestion, LookupResult } from '$lib/types';
 import { fetchCoordinates, fetchPopulation, lookupRent } from '$lib/api';
 
@@ -46,18 +51,6 @@ function offListSuggestion(name: string, lat: number, lng: number): PlanSuggesti
   return { label: name, city: cityOf(name), state, lat, lng };
 }
 
-function unavailableLookup(): LookupResult {
-  return {
-    r1: null,
-    r2: null,
-    yoy: null,
-    source: 'none',
-    rentMetric: 'unknown',
-    rentArea: '',
-    rentYear: ''
-  };
-}
-
 export interface RentPlanSnapshot {
   readonly salary: number | null;
   readonly selected: City | null;
@@ -79,12 +72,6 @@ interface ResolutionOperation {
   lookupRelease: (() => void) | null;
 }
 
-interface SharedRentLookup {
-  readonly controller: AbortController;
-  promise: Promise<LookupResult>;
-  readonly consumers: Set<ResolutionOperation>;
-}
-
 interface ComparisonTask {
   readonly operation: ResolutionOperation;
   promise: Promise<ComparisonResult>;
@@ -96,16 +83,9 @@ export type ComparisonResult =
   | { status: 'full'; name: string | null }
   | { status: 'not-found'; name: string };
 
-export interface RentPlanAdapters {
-  /** Production uses the typed server endpoint; tests can return a local result. */
-  lookupRent: typeof lookupRent;
+export interface RentPlanAdapters extends RentLookupAdapters {
   /** Production uses the population endpoint; tests can resolve immediately. */
   fetchPopulation: typeof fetchPopulation;
-  /** Production uses the coordinates endpoint; tests can resolve immediately. */
-  coordinatesForPlace: (
-    city: string,
-    state: string
-  ) => Promise<readonly [number, number] | undefined>;
   /** Browser persistence is an adapter so the workflow is testable without a browser. */
   readStorage: (key: string) => string | null;
   writeStorage: (key: string, value: string) => void;
@@ -144,14 +124,10 @@ export class RentPlanWorkspace {
   private pendingComparisonNamesValue = $state<string[]>([]);
   private readonly adapters: RentPlanAdapters;
   private readonly comparisonSet: ComparisonSet;
+  private readonly lookupCoordinator: RentLookupCoordinator;
   private activeOperation: ResolutionOperation | null = null;
   private readonly comparisonTasks = new Map<string, ComparisonTask>();
   private readonly comparisonRestoreOperations = new Map<string, ResolutionOperation>();
-  private readonly rentLookups = new Map<string, SharedRentLookup>();
-  private readonly coordinateLookups = new Map<
-    string,
-    Promise<readonly [number, number] | undefined>
-  >();
   private persistenceTimer: ReturnType<typeof setTimeout> | undefined;
   private persistencePending = false;
 
@@ -166,6 +142,13 @@ export class RentPlanWorkspace {
         }
       }
     });
+    this.lookupCoordinator = createRentLookupCoordinator(
+      {
+        lookupRent: adapters.lookupRent,
+        coordinatesForPlace: adapters.coordinatesForPlace
+      },
+      (name, result) => this.applyRentLookup(name, result)
+    );
   }
 
   get salary(): number | null {
@@ -359,30 +342,8 @@ export class RentPlanWorkspace {
   private async ensureCoordinates(name: string) {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;
-    const coords = await this.coordinatesFor(city.city, city.state);
+    const coords = await this.lookupCoordinator.coordinatesFor(city.city, city.state);
     if (coords) this.patchCity(name, { lat: coords[0], lng: coords[1] });
-  }
-
-  private coordinatesFor(
-    city: string,
-    state: string
-  ): Promise<readonly [number, number] | undefined> {
-    const key = `${city.toLowerCase()},${state.toLowerCase()}`;
-    const existing = this.coordinateLookups.get(key);
-    if (existing) return existing;
-    let request: Promise<readonly [number, number] | undefined>;
-    try {
-      request = Promise.resolve(this.adapters.coordinatesForPlace(city, state));
-    } catch {
-      request = Promise.resolve(undefined);
-    }
-    const lookup = request
-      .catch(() => undefined)
-      .finally(() => {
-        if (this.coordinateLookups.get(key) === lookup) this.coordinateLookups.delete(key);
-      });
-    this.coordinateLookups.set(key, lookup);
-    return lookup;
   }
 
   private popLookups = new Set<string>();
@@ -516,52 +477,18 @@ export class RentPlanWorkspace {
     this.persistImmediately();
   }
 
-  /** Share one cancellable rent lookup between active and comparison intents. */
+  /** Hold one cancellable rent lookup between active and comparison intents. */
   private acquireRentLookup(
     target: PlanSuggestion,
     operation: ResolutionOperation
   ): Promise<LookupResult> {
-    const key = target.label.toLowerCase();
-    let lookup = this.rentLookups.get(key);
-    if (lookup?.controller.signal.aborted) {
-      this.rentLookups.delete(key);
-      lookup = undefined;
-    }
-    if (!lookup) {
-      const controller = new AbortController();
-      lookup = {
-        controller,
-        promise: Promise.resolve(unavailableLookup()),
-        consumers: new Set()
-      };
-      this.rentLookups.set(key, lookup);
-      let request: Promise<LookupResult>;
-      try {
-        request = Promise.resolve(
-          this.adapters.lookupRent(target.lat!, target.lng!, controller.signal)
-        );
-      } catch {
-        request = Promise.resolve(unavailableLookup());
-      }
-      lookup.promise = request
-        .catch(() => unavailableLookup())
-        .then((result) => {
-          if (!controller.signal.aborted) this.applyRentLookup(target.label, result);
-          return result;
-        })
-        .finally(() => {
-          if (this.rentLookups.get(key) === lookup) this.rentLookups.delete(key);
-        });
-    }
-
-    lookup.consumers.add(operation);
-    operation.lookupRelease = () => {
-      if (!lookup?.consumers.delete(operation)) return;
-      if (!lookup.consumers.size && this.rentLookups.get(key) === lookup) {
-        lookup.controller.abort();
-      }
-    };
-    return lookup.promise;
+    const lease = this.lookupCoordinator.acquireRent({
+      name: target.label,
+      lat: target.lat!,
+      lng: target.lng!
+    });
+    operation.lookupRelease = lease.release;
+    return lease.promise;
   }
 
   private async resolveSuggestion(
@@ -590,7 +517,7 @@ export class RentPlanWorkspace {
 
     if (!seed && (target.lat == null || target.lng == null)) {
       this.markOperationPending(operation, target.label);
-      const coords = await this.coordinatesFor(target.city, target.state);
+      const coords = await this.lookupCoordinator.coordinatesFor(target.city, target.state);
       if (!this.operationIsCurrent(operation)) return target.label;
       if (coords) {
         target = { ...target, lat: coords[0], lng: coords[1] };
