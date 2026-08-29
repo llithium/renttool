@@ -20,33 +20,42 @@ type EffectRegistrar = (callback: () => void) => void;
 export function createUrlSync(plan: RentPlanPresentation, registerEffect?: EffectRegistrar) {
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
+  let salaryWritePending = $state(false);
   let salaryTimer: ReturnType<typeof setTimeout> | undefined;
   let canonicalizationTimer: ReturnType<typeof setTimeout> | undefined;
   let lastWritten = '';
+  let stopped = false;
   // Tracks the city in the last-written URL so the write effect can tell a city
   // change (→ pushState, a real history entry) from an incidental salary/compare
   // change (→ replaceState). Browser back/forward then steps through cities only.
   let lastCity: string | null = null;
+  let lastComparisonKey = '';
+
+  const comparisonKey = () => plan.comparisonNames.join('\u001f');
 
   const synchronize = () => {
+    if (stopped) return;
     // Always read the state so deps are tracked, but hold off writing until
     // start() has hydrated from the URL and seeded lastWritten — otherwise this
     // could strip the query string before hydrateFromSearch reads it.
     const params = plan.buildSearch(salaryForUrl);
+    const cityChanged = plan.selectedName !== lastCity;
+    const comparisonsChanged = comparisonKey() !== lastComparisonKey;
     // URL restoration can resolve an off-list active city asynchronously. Keep
     // the URL authoritative until every pending lane has caught up, otherwise
     // the intermediate placeholder state would write a partial plan back.
     if (
       !hydrated ||
+      (salaryWritePending && !cityChanged && !comparisonsChanged) ||
       params === lastWritten ||
       plan.looking ||
       plan.pendingComparisonNames.length > 0
     ) {
       return;
     }
-    const cityChanged = plan.selectedName !== lastCity;
     lastWritten = params;
     lastCity = plan.selectedName;
+    lastComparisonKey = comparisonKey();
     const url = params ? `?${params}` : location.pathname;
     // New city → push a history entry so Back/Forward returns here. Salary/compare
     // tweaks replace the current entry so they don't clutter the history stack.
@@ -62,10 +71,15 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
       return hydrated;
     },
 
-    /** Queue the salary that should appear in the URL once typing settles. */
+    /** Queue the salary URL write without hiding it from a discrete navigation. */
     scheduleSalary(value: number | null) {
       clearTimeout(salaryTimer);
-      salaryTimer = setTimeout(() => (salaryForUrl = value), 350);
+      salaryWritePending = true;
+      salaryForUrl = value;
+      salaryTimer = setTimeout(() => {
+        salaryTimer = undefined;
+        salaryWritePending = false;
+      }, 350);
     },
 
     /**
@@ -74,6 +88,7 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
      * salary text field). Returns an onMount-style teardown.
      */
     start(initialSearch: URLSearchParams, onStateApplied: () => void) {
+      stopped = false;
       // A URL with plan state wins. A stateful client-side visit keeps the
       // in-memory plan; otherwise restore the last session and then reapply a
       // salary-only URL value.
@@ -91,6 +106,7 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
         lastWritten = plan.buildSearch(salaryForUrl);
         lastCity = plan.selectedName;
       }
+      lastComparisonKey = comparisonKey();
       const shouldCanonicalize = lastWritten !== location.search.replace(/^\?/, '');
       hydrated = true;
       onStateApplied();
@@ -111,6 +127,9 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
       // push/replace above — so no echo guard beyond the redundant-write
       // short-circuit is needed.
       const onPopState = () => {
+        clearTimeout(salaryTimer);
+        salaryTimer = undefined;
+        salaryWritePending = false;
         const params = new URLSearchParams(location.search);
         const search = canonicalizeRentPlanSearch(params);
         if (!hydrated || search === lastWritten) return;
@@ -118,12 +137,16 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
         lastCity = restoreRentPlan(params).selected?.name ?? null;
         plan.applyUrlNavigation(params);
         salaryForUrl = plan.salary;
+        lastComparisonKey = comparisonKey();
         onStateApplied();
       };
 
       window.addEventListener('popstate', onPopState);
       return () => {
+        stopped = true;
         clearTimeout(salaryTimer);
+        salaryTimer = undefined;
+        salaryWritePending = false;
         clearTimeout(canonicalizationTimer);
         window.removeEventListener('popstate', onPopState);
       };

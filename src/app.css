@@ -23,6 +23,7 @@
   --red: #b7352d;
   --red-soft: #f7e4e1;
   --amber: #ad7d22;
+  --amber-ink: #151515;
 
   --canvas: #f4f4f4;
   --card: #ffffff;
@@ -49,6 +50,7 @@
   --red: #e37a68;
   --red-soft: #3b2522;
   --amber: #d7ad63;
+  --amber-ink: #111111;
 
   --canvas: #0d0d0d;
   --card: #151515;
@@ -115,6 +117,7 @@
   --color-red: var(--red);
   --color-red-soft: var(--red-soft);
   --color-amber: var(--amber);
+  --color-amber-ink: var(--amber-ink);
 
   --color-canvas: var(--canvas);
   --color-card: var(--card);

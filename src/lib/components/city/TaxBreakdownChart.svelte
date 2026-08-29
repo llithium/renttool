@@ -60,17 +60,22 @@
     class="mb-2 flex h-8 w-full origin-left animate-grow-x overflow-hidden rounded-lg"
   >
     {#if budget.federalMonthly > 0}
-      {@render segment(fedPct, `Federal ${money(budget.federalMonthly)}`, 13, 'bg-red text-white')}
+      {@render segment(
+        fedPct,
+        `Federal ${money(budget.federalMonthly)}`,
+        13,
+        'bg-red text-accent-ink'
+      )}
     {/if}
     {#if budget.ficaMonthly > 0}
-      {@render segment(ficaPct, `FICA ${money(budget.ficaMonthly)}`, 13, 'bg-amber text-white')}
+      {@render segment(ficaPct, `FICA ${money(budget.ficaMonthly)}`, 13, 'bg-amber text-amber-ink')}
     {/if}
     {#if budget.stateMonthly > 0}
       {@render segment(
         statePct,
         `State ${money(budget.stateMonthly)}`,
         13,
-        'bg-tax-state text-white'
+        'bg-tax-state text-accent-ink'
       )}
     {/if}
     {#if budget.localMonthly > 0}
@@ -78,14 +83,14 @@
         localPct,
         `Local ${money(budget.localMonthly)}`,
         13,
-        'bg-tax-local text-white'
+        'bg-tax-local text-accent-ink'
       )}
     {/if}
     {@render segment(
       takePct,
       `Take-home ${money(budget.takeHomeMonthly)}`,
       0,
-      'bg-green text-white'
+      'bg-green text-accent-ink'
     )}
   </div>
   <div class="mb-4 flex flex-wrap gap-x-3.5 gap-y-1 text-meta text-muted">
@@ -114,7 +119,7 @@
         rentPct,
         rentPct >= 30 ? `Rent ${money(rent)}` : money(rent),
         14,
-        `${rentShare > 100 ? 'bg-red' : 'bg-accent'} text-white`
+        `${rentShare > 100 ? 'bg-red' : 'bg-accent'} text-accent-ink`
       )}
       {#if remaining > 0}
         {@render segment(leftPct, `Left ${money(remaining)}`, 16, 'bg-surplus text-ink')}

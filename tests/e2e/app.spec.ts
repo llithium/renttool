@@ -19,6 +19,42 @@ async function waitForHydration(page: Page) {
   await page.waitForFunction(() => document.querySelector('main')?.dataset.hydrated === 'true');
 }
 
+async function chartContrastRatios(page: Page): Promise<number[]> {
+  return page
+    .locator('[role="img"]')
+    .first()
+    .locator(':scope > div')
+    .evaluateAll((elements) => {
+      function parseColor(value: string): [number, number, number] {
+        const channels = value.match(/\d*\.?\d+/g)?.map(Number) ?? [];
+        const scale = value.startsWith('color(') ? 255 : 1;
+        return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0].map(
+          (channel) => channel * scale
+        ) as [number, number, number];
+      }
+
+      function luminance(value: string): number {
+        return parseColor(value)
+          .map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          })
+          .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+      }
+
+      return elements.map((element) => {
+        const style = getComputedStyle(element);
+        const foreground = luminance(style.color);
+        const background = luminance(style.backgroundColor);
+        const lighter = Math.max(foreground, background);
+        const darker = Math.min(foreground, background);
+        return (lighter + 0.05) / (darker + 0.05);
+      });
+    });
+}
+
 test('serves bundled HUD rents without an upstream API', async ({ request }) => {
   const response = await request.get('/api/fmr?state=12&county=057');
   expect(response.ok()).toBe(true);
@@ -131,6 +167,20 @@ test('canonicalizes a shared URL after the client router is ready', async ({ pag
   expect(routerErrors).toEqual([]);
 });
 
+test('keeps the latest salary when city navigation pushes history', async ({ page }) => {
+  await page.goto('/?salary=80000&city=Tampa%2C+FL');
+  await waitForHydration(page);
+
+  const city = page.getByRole('combobox', { name: 'City' });
+  await city.fill('Austin');
+  const option = page.getByRole('option', { name: 'Austin, TX' });
+  await expect(option).toBeVisible();
+  await page.getByLabel('Annual salary', { exact: true }).fill('90000');
+  await option.dispatchEvent('mousedown');
+
+  expect(new URL(page.url()).search).toBe('?salary=90000&city=Austin%2C+TX');
+});
+
 test('focuses a visible calculator without scrolling the landing page', async ({ page }) => {
   const city = page.getByRole('combobox', { name: 'City' });
   const before = await page.evaluate(() => window.scrollY);
@@ -231,6 +281,22 @@ test('has no serious accessibility violations in populated state', async ({ page
   expect(
     results.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))
   ).toEqual([]);
+});
+
+test('keeps tax breakdown labels readable in both themes', async ({ page }) => {
+  await selectCity(page, 'New York', 'New York, NY');
+  await page.getByLabel('Annual salary', { exact: true }).fill('100000');
+  await expect(page.getByRole('heading', { name: 'New York, NY' })).toBeVisible();
+
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    }
+    const ratios = await chartContrastRatios(page);
+    expect(ratios).toHaveLength(5);
+    expect(ratios.every((ratio) => ratio >= 4.5)).toBe(true);
+  }
 });
 
 test('does not overflow a mobile viewport', async ({ page }) => {

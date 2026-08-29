@@ -12,6 +12,7 @@ vi.mock('$app/navigation', () => ({
 const INITIAL_SEARCH = 'salary=80000&city=Tampa%2C+FL';
 const UPDATED_SALARY_SEARCH = 'salary=81000&city=Tampa%2C+FL';
 const ACTIVE_CITY_SEARCH = 'salary=81000&city=Austin%2C+TX';
+const ACTIVE_CITY_UPDATED_SALARY_SEARCH = 'salary=90000&city=Austin%2C+TX';
 const COMPARISON_SEARCH =
   'salary=80000&city=Tampa%2C+FL&compare=Austin%2C+TX&compare-salary=%7B%22name%22%3A%22Austin%2C+TX%22%2C%22salary%22%3A80000%7D';
 
@@ -33,6 +34,7 @@ interface FakePlan {
   salary: number | null;
   activeCity: object | null;
   comparisonCities: object[];
+  comparisonNames: string[];
   selectedName: string | null;
   looking: boolean;
   pendingComparisonNames: string[];
@@ -109,6 +111,7 @@ function createFakePlan(options: Partial<FakePlan> = {}): FakePlan {
     ['salary', 80_000],
     ['activeCity', {}],
     ['comparisonCities', []],
+    ['comparisonNames', []],
     ['selectedName', 'Tampa, FL'],
     ['looking', false],
     ['pendingComparisonNames', []],
@@ -137,6 +140,12 @@ function createFakePlan(options: Partial<FakePlan> = {}): FakePlan {
     },
     set comparisonCities(value: object[]) {
       state.set('comparisonCities', value);
+    },
+    get comparisonNames() {
+      return state.get('comparisonNames') as string[];
+    },
+    set comparisonNames(value: string[]) {
+      state.set('comparisonNames', value);
     },
     get selectedName() {
       return state.get('selectedName') as string | null;
@@ -383,6 +392,26 @@ describe('createUrlSync', () => {
 
     expect(pushState).toHaveBeenCalledTimes(1);
     expect(pushState).toHaveBeenCalledWith(`?${ACTIVE_CITY_SEARCH}`, harness.browser.history.state);
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it('uses the latest salary when a city changes during salary debounce', () => {
+    const plan = createFakePlan();
+    const staleSearch = 'salary=80000&city=Austin%2C+TX';
+    setSearchForSalary(plan, 90_000, ACTIVE_CITY_UPDATED_SALARY_SEARCH);
+    const harness = createHarness(plan, INITIAL_SEARCH);
+    harness.start();
+
+    harness.urlSync.scheduleSalary(90_000);
+    plan.selectedName = 'Austin, TX';
+    plan.currentSearch = staleSearch;
+    flushSync();
+
+    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(pushState).toHaveBeenCalledWith(
+      `?${ACTIVE_CITY_UPDATED_SALARY_SEARCH}`,
+      harness.browser.history.state
+    );
     expect(replaceState).not.toHaveBeenCalled();
   });
 
