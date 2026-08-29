@@ -21,44 +21,44 @@
   let budget = $derived(presentation.budget);
 </script>
 
-<!-- Two-column view: the planning controls stay pinned while the results scroll.
-     Below the large breakpoint they return to normal document flow. -->
-<aside data-testid="sidebar" class="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6">
-  <!-- One control surface: inputs lead directly to the resulting budget. -->
-  <section
-    id="plan-controls"
-    class="scroll-mt-6 rounded-2xl border border-line-strong bg-card p-6 shadow-card md:p-7"
-  >
-    <div class="mb-6 border-b border-line-strong pb-5">
-      <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">Your inputs</p>
-      <p class="mt-2 text-sm/relaxed text-muted">
-        Every figure begins with the city and salary you are weighing.
-      </p>
+<!-- The controls use the same flat, ruled language as the comparison entries.
+     Inputs and their answer sit in one responsive ledger rather than a dashboard sidebar. -->
+<aside data-testid="sidebar" class="@container min-w-0">
+  <section id="plan-controls" class="scroll-mt-6 border-y border-line-strong py-6 md:py-8">
+    <div class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-10 @4xl:grid-cols-[1fr_1fr_1.1fr]">
+      <div>
+        <p class="mb-5 text-meta font-semibold tracking-[0.14em] text-accent uppercase">
+          Your inputs
+        </p>
+        <CitySearch
+          onselect={(suggestion) => void presentation.chooseCity(suggestion)}
+          selectedName={presentation.selectedName}
+          pendingName={presentation.pendingName}
+        />
+      </div>
+      <div class="@2xl:border-l @2xl:border-line @2xl:pl-10">
+        <SalaryInput
+          id="salary"
+          label="Annual salary"
+          value={salary.text}
+          error={salary.error}
+          oninput={salary.oninput}
+          onblur={salary.onblur}
+          onkeydown={salary.onkeydown}
+          class="mb-2.5 @2xl:mt-8"
+        />
+        <SalarySlider
+          value={presentation.salary}
+          oninput={(event) =>
+            onsalary(Number.parseInt((event.target as HTMLInputElement).value, 10))}
+        />
+      </div>
+      {#if activeCity && budget}
+        <div class="border-line @max-4xl:border-t @max-4xl:pt-7 @4xl:border-l @4xl:pl-10">
+          <BudgetCard {budget} />
+          <CityActions {presentation} cityName={activeCity.name} canShare={true} />
+        </div>
+      {/if}
     </div>
-    <CitySearch
-      onselect={(suggestion) => void presentation.chooseCity(suggestion)}
-      selectedName={presentation.selectedName}
-      pendingName={presentation.pendingName}
-    />
-
-    <SalaryInput
-      id="salary"
-      label="Annual salary"
-      value={salary.text}
-      error={salary.error}
-      oninput={salary.oninput}
-      onblur={salary.onblur}
-      onkeydown={salary.onkeydown}
-      class="mt-4 mb-2.5"
-    />
-    <SalarySlider
-      value={presentation.salary}
-      oninput={(event) => onsalary(Number.parseInt((event.target as HTMLInputElement).value, 10))}
-    />
-
-    {#if activeCity && budget}
-      <BudgetCard {budget} />
-      <CityActions {presentation} cityName={activeCity.name} canShare={true} />
-    {/if}
   </section>
 </aside>

@@ -6,9 +6,11 @@
 </script>
 
 <!-- Lives inside the planning surface, below one dividing line — not its own card. -->
-<section class="mt-5 animate-rise border-t border-line pt-4.5">
+<section class="animate-rise">
   <h2 class="text-label text-muted">Rent budget</h2>
-  <div class="text-display text-accent tabular-nums">
+  <div
+    class="mt-1 text-[clamp(2.25rem,4vw,3.75rem)] leading-none font-semibold tracking-[-0.045em] text-accent tabular-nums"
+  >
     {#key budget.maxRent}
       <span class="motion-value">
         {money(budget.maxRent)}<span class="text-title text-muted">/mo</span>

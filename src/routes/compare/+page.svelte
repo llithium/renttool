@@ -96,10 +96,21 @@
     comparisonCount={plan.comparisonNames.length}
   />
 
-  <div class="mt-6 grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
-    <aside class="flex min-w-0 flex-col lg:sticky lg:top-6">
-      <section class="rounded-2xl border border-line-strong bg-card p-6 shadow-card md:p-7">
-        <div class="mb-6 border-b border-line-strong pb-5">
+  <div class="mt-6 flex min-w-0 flex-col">
+    <section>
+      <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">Offer planner</p>
+      <h1 class="mt-3 max-w-4xl text-display text-ink">Compare cities and salaries</h1>
+      <p class="mt-4 max-w-2xl text-body text-muted">
+        See what each city leaves after a typical one-bedroom rent, then weigh the trade-offs that
+        matter to you.
+      </p>
+    </section>
+
+    <aside class="mt-7 min-w-0 border-t border-line-strong pt-6 md:pt-8">
+      <section
+        class="grid gap-6 md:grid-cols-[minmax(14rem,0.75fr)_minmax(18rem,1fr)_minmax(12rem,0.65fr)] md:gap-8"
+      >
+        <div>
           <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">
             Your comparison
           </p>
@@ -107,42 +118,37 @@
             Add up to five cities. Set a different salary for each offer in the results.
           </p>
         </div>
-        {#if atCapacity}
-          <div class="rounded-xl bg-card-2 px-4 py-3">
-            <p class="text-label text-ink">Five cities are ready.</p>
-            <p class="mt-1 text-meta text-muted">Remove one from the results to add another.</p>
-          </div>
-        {:else}
-          <CitySearch onselect={addCity} />
-        {/if}
-        <p aria-live="polite" class="mt-3 min-h-5 text-meta text-muted">
-          {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
-        </p>
-        {#if analysis.entries.length}
-          <button
-            type="button"
-            onclick={clearComparison}
-            class="mt-5 cursor-pointer text-sm font-semibold text-accent underline-offset-4 hover:text-accent-deep hover:underline"
-          >
-            Clear comparison
-          </button>
-        {/if}
+        <div class="md:border-l md:border-line md:pl-8">
+          {#if atCapacity}
+            <div class="bg-card-2 px-4 py-3">
+              <p class="text-label text-ink">Five cities are ready.</p>
+              <p class="mt-1 text-meta text-muted">Remove one from the results to add another.</p>
+            </div>
+          {:else}
+            <CitySearch onselect={addCity} />
+          {/if}
+        </div>
+        <div class="md:border-l md:border-line md:pl-8">
+          <p aria-live="polite" class="min-h-5 text-meta text-muted">
+            {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
+          </p>
+          {#if analysis.entries.length}
+            <button
+              type="button"
+              onclick={clearComparison}
+              class="mt-5 cursor-pointer text-sm font-semibold text-accent underline-offset-4 hover:text-accent-deep hover:underline"
+            >
+              Clear comparison
+            </button>
+          {/if}
+        </div>
       </section>
     </aside>
 
     <div class="flex min-w-0 flex-col">
-      <section class="border-b border-line-strong pb-6 md:pb-8">
-        <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">Offer planner</p>
-        <h1 class="mt-3 text-display text-ink">Compare cities and salaries</h1>
-        <p class="mt-4 max-w-2xl text-body text-muted">
-          See what each city leaves after a typical one-bedroom rent, then weigh the trade-offs that
-          matter to you.
-        </p>
-      </section>
-
       {#if analysis.entries.length}
         <section
-          class="mt-7 grid grid-flow-dense grid-cols-1 border-t border-l border-line-strong md:grid-cols-2 2xl:grid-cols-3"
+          class="mt-7 grid grid-flow-dense grid-cols-1 border-t border-l border-line-strong md:grid-cols-2"
           aria-label="Comparison entries"
         >
           {#each analysis.entries as entry, index (entry.city.name)}

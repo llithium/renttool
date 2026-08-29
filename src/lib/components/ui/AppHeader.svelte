@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Brand from './Brand.svelte';
   import ThemeToggle from './ThemeToggle.svelte';
 
   let {
@@ -17,10 +16,7 @@
   } = $props();
 </script>
 
-<header
-  class="flex items-center justify-between gap-4 border-b border-line-strong py-4 {className}"
->
-  <Brand href={planHref} />
+<header class="flex items-center justify-end gap-4 border-b border-line-strong py-3 {className}">
   <nav aria-label="Primary" class="flex items-center gap-1">
     <a
       href={planHref}

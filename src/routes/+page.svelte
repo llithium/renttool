@@ -70,9 +70,7 @@
     comparisonCount={plan.comparisonNames.length}
   />
 
-  <div class="mt-6 grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
-    <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
-
+  <div class="mt-6 flex flex-col gap-8">
     <!-- The results column reads as one document: sections are separated by a
          hairline and a small uppercase label, not by nested card boxes, and each
          one carries its own rhythm and entrance delay. Because Svelte keeps these
@@ -96,7 +94,13 @@
                identity band makes a completed city choice explicit while the
                larger results document stays stable and readable. -->
           <div class="animate-ledger-refresh">
-            <CityHeadline city={selected} />
+            <div class="border-b border-line-strong pb-6 md:pb-8">
+              <p class="mb-3 text-meta font-semibold tracking-[0.14em] text-accent uppercase">
+                Offer planner
+              </p>
+              <CityHeadline city={selected} />
+            </div>
+            <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
             <a
               href="#plan-controls"
               class="mt-3 inline-flex self-start rounded-lg px-2 py-1 text-label text-accent no-underline hover:bg-accent-soft hover:text-accent-deep lg:hidden"
@@ -105,7 +109,7 @@
             </a>
 
             {#if selected.r1 != null}
-              <Verdict {budget} city={selected} class="mt-3.5" />
+              <Verdict {budget} city={selected} class="mt-7" />
             {/if}
             <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
           </div>
@@ -156,7 +160,10 @@
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
         />
       {:else}
-        <LandingContent />
+        <div class="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
+          <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
+          <LandingContent />
+        </div>
       {/if}
 
       {#if urlSync.hydrated && selected && budget}
