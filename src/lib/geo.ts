@@ -10,6 +10,22 @@ export function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: n
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+export function isValidCoordinates(
+  lat: number | null | undefined,
+  lng: number | null | undefined
+): boolean {
+  return (
+    typeof lat === 'number' &&
+    Number.isFinite(lat) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    typeof lng === 'number' &&
+    Number.isFinite(lng) &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
 /**
  * Read a complete, in-range latitude/longitude pair from a request query.
  *

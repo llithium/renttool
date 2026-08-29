@@ -1,6 +1,8 @@
-import { STATE_TAX } from '$lib/data/cities';
+import { restoreCity } from '$lib/cityCatalog.svelte';
 import { MAX_SALARY } from '$lib/salary';
-import type { City, CitySnapshot } from '$lib/types';
+import type { City } from '$lib/types';
+
+export { restoreCity } from '$lib/cityCatalog.svelte';
 
 export const DEFAULT_COMPARISON_SALARY = 80_000;
 export const MAX_COMPARISON_ENTRIES = 5;
@@ -49,89 +51,6 @@ export function isValidCommittedSalary(value: unknown): value is number {
 
 function committedSalary(value: number | null | undefined): number {
   return isValidCommittedSalary(value) ? Math.round(value) : DEFAULT_COMPARISON_SALARY;
-}
-
-function restoredSnapshot(value: unknown): CitySnapshot | null {
-  if (!value || typeof value !== 'object') return null;
-  const f = value as Partial<CitySnapshot>;
-  if (
-    typeof f.population !== 'number' ||
-    f.population <= 0 ||
-    typeof f.householdIncome !== 'number' ||
-    f.householdIncome <= 0 ||
-    typeof f.commuteMinutes !== 'number' ||
-    f.commuteMinutes < 0 ||
-    f.commuteMinutes > 300 ||
-    typeof f.renterShare !== 'number' ||
-    f.renterShare < 0 ||
-    f.renterShare > 100 ||
-    typeof f.rentalVacancy !== 'number' ||
-    f.rentalVacancy < 0 ||
-    f.rentalVacancy > 100
-  ) {
-    return null;
-  }
-  return {
-    population: f.population,
-    householdIncome: f.householdIncome,
-    commuteMinutes: f.commuteMinutes,
-    renterShare: f.renterShare,
-    rentalVacancy: f.rentalVacancy
-  };
-}
-
-/** Validate and rehydrate a city stored by the comparison set. */
-export function restoreCity(value: unknown): City | null {
-  if (!value || typeof value !== 'object') return null;
-  const c = value as Partial<City>;
-  if (
-    typeof c.name !== 'string' ||
-    c.name.length > 100 ||
-    typeof c.city !== 'string' ||
-    typeof c.state !== 'string' ||
-    !/^[A-Z]{2}$/.test(c.state) ||
-    !['apartment-list', 'hud-fmr', 'none'].includes(c.source ?? '')
-  ) {
-    return null;
-  }
-  const numberOrNull = (n: unknown) => n == null || (typeof n === 'number' && Number.isFinite(n));
-  if (!numberOrNull(c.r1) || !numberOrNull(c.r2) || !numberOrNull(c.yoy)) return null;
-  if (
-    c.lat != null &&
-    (typeof c.lat !== 'number' || !Number.isFinite(c.lat) || c.lat < -90 || c.lat > 90)
-  ) {
-    return null;
-  }
-  if (
-    c.lng != null &&
-    (typeof c.lng !== 'number' || !Number.isFinite(c.lng) || c.lng < -180 || c.lng > 180)
-  ) {
-    return null;
-  }
-  const source = c.source as City['source'];
-  return {
-    name: c.name,
-    city: c.city,
-    state: c.state,
-    r1: c.r1 ?? null,
-    r2: c.r2 ?? null,
-    yoy: c.yoy ?? null,
-    tax: typeof c.tax === 'string' ? c.tax.slice(0, 200) : STATE_TAX[c.state] || 'varies',
-    pop: typeof c.pop === 'string' ? c.pop.slice(0, 200) : '',
-    citySnapshot: restoredSnapshot(c.citySnapshot),
-    lat: c.lat,
-    lng: c.lng,
-    source,
-    rentMetric: ['estimated-median', 'fair-market-rent', 'unknown'].includes(c.rentMetric ?? '')
-      ? (c.rentMetric as City['rentMetric'])
-      : source === 'apartment-list'
-        ? 'estimated-median'
-        : source === 'hud-fmr'
-          ? 'fair-market-rent'
-          : 'unknown',
-    rentArea: typeof c.rentArea === 'string' ? c.rentArea.slice(0, 150) : c.name,
-    rentYear: typeof c.rentYear === 'string' ? c.rentYear.slice(0, 40) : ''
-  };
 }
 
 export const browserComparisonStorage: ComparisonStorage = {

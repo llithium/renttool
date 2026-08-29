@@ -2,6 +2,7 @@ import {
   DEFAULT_COMPARISON_SALARY,
   MAX_COMPARISON_ENTRIES
 } from '$lib/compare/comparisonSet.svelte';
+import { isValidCoordinates } from '$lib/geo';
 import { MAX_SALARY } from '$lib/salary';
 import type { RentSource } from '$lib/types';
 
@@ -75,12 +76,7 @@ function validCoordinate(value: unknown, minimum: number, maximum: number): valu
   );
 }
 
-export function isValidCoordinates(
-  lat: number | null | undefined,
-  lng: number | null | undefined
-): boolean {
-  return validCoordinate(lat, -90, 90) && validCoordinate(lng, -180, 180);
-}
+export { isValidCoordinates } from '$lib/geo';
 
 function normalizedSalary(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_SALARY) {
