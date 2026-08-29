@@ -2,10 +2,10 @@
   import 'leaflet/dist/leaflet.css';
   import { onMount, onDestroy } from 'svelte';
   import type { City } from '$lib/types';
-  import { money } from '$lib/format';
   import type { Map as LMap, LayerGroup, CircleMarker } from 'leaflet';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import { markerPresentation, reconcileMarkerKeys, type MarkerPalette } from './rentMapMarkers';
 
   let {
     presentation,
@@ -29,14 +29,7 @@
   let handledFocusRequest = 0;
 
   const markers = new Map<string, CircleMarker>();
-
-  type MarkerPalette = {
-    neutral: string;
-    fits: string;
-    over: string;
-    accent: string;
-    card: string;
-  };
+  const tooltipParts = new Map<string, { title: HTMLElement; detail: Text }>();
 
   function themeColor(name: string, fallback: string): string {
     if (typeof document === 'undefined') return fallback;
@@ -51,11 +44,6 @@
       accent: themeColor('--accent', '#151515'),
       card: themeColor('--card', '#ffffff')
     };
-  }
-
-  function colorFor(c: City, palette: MarkerPalette): string {
-    if (c.r1 == null || maxRent == null) return palette.neutral;
-    return c.r1 <= maxRent ? palette.fits : palette.over;
   }
 
   function recenterOnSelectedCity(force = false) {
@@ -75,11 +63,83 @@
     centeredName = selectedCity.name;
   }
 
-  function draw() {
+  type LocatedCity = City & { lat: number; lng: number };
+
+  function hasCoordinates(city: City): city is LocatedCity {
+    return city.lat != null && city.lng != null;
+  }
+
+  function createMarker(city: LocatedCity, palette: MarkerPalette, targetGroup: LayerGroup) {
+    const initial = markerPresentation(city, null, null, palette);
+    const marker = L.circleMarker([city.lat, city.lng], {
+      radius: initial.radius,
+      weight: initial.weight,
+      color: initial.color,
+      fillColor: initial.fillColor,
+      fillOpacity: initial.fillOpacity
+    });
+    const tooltip = document.createElement('div');
+    const title = document.createElement('strong');
+    const detail = document.createTextNode(initial.tooltipDetail);
+    title.textContent = city.name;
+    tooltip.append(title, document.createElement('br'), detail);
+    marker.bindTooltip(tooltip, { direction: 'top' });
+    marker.on('click', () => presentation.selectCity(city.name));
+    marker.addTo(targetGroup);
+    const element = marker.getElement();
+    if (element) {
+      element.setAttribute('tabindex', '0');
+      element.setAttribute('role', 'button');
+      element.setAttribute('aria-label', initial.ariaLabel);
+      element.addEventListener('keydown', (event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+          keyboardEvent.preventDefault();
+          presentation.selectCity(city.name);
+        }
+      });
+    }
+    tooltipParts.set(city.name, { title, detail });
+    return marker;
+  }
+
+  function applyMarkerPresentation(city: City, marker: CircleMarker, palette: MarkerPalette) {
+    const next = markerPresentation(city, maxRent, selectedName, palette);
+    marker.setRadius(next.radius);
+    marker.setStyle({
+      weight: next.weight,
+      color: next.color,
+      fillColor: next.fillColor,
+      fillOpacity: next.fillOpacity
+    });
+    const parts = tooltipParts.get(city.name);
+    if (parts) {
+      parts.title.textContent = city.name;
+      parts.detail.data = next.tooltipDetail;
+    }
+    const element = marker.getElement();
+    element?.setAttribute('aria-label', next.ariaLabel);
+  }
+
+  function reconcileMarkers() {
     if (!ready || !group || !L) return;
-    // Every redraw replaces the marker elements. If focus was inside the map
-    // (wheel zoom is focus-gated), remember which marker held it so it can be
-    // restored afterwards — otherwise focus falls to <body> and the wheel detaches.
+
+    const locatedCities = cities.filter(hasCoordinates);
+    const citiesByName = new Map(locatedCities.map((city) => [city.name, city]));
+    const changes = reconcileMarkerKeys(markers.keys(), cities);
+    const coordinatesChanged = changes.retained.some((name) => {
+      const city = citiesByName.get(name);
+      const marker = markers.get(name);
+      if (!city || !marker) return false;
+      const point = marker.getLatLng();
+      return point.lat !== city.lat || point.lng !== city.lng;
+    });
+    const hasStructuralChange =
+      changes.added.length > 0 || changes.removed.length > 0 || coordinatesChanged;
+    if (!hasStructuralChange) return;
+
+    // Reconciliation retains marker elements and their listeners. If a focused
+    // marker is removed, restore focus to the selected marker or map container.
     const active = document.activeElement;
     const hadFocus = el.contains(active);
     let focusName: string | null = null;
@@ -91,62 +151,48 @@
         }
       }
     }
-    // Cancel any in-flight pan/zoom animation: re-adding vector markers while one
-    // runs (or interrupting it afterwards) leaves them offset from the tiles.
-    map?.stop();
-    group.clearLayers();
-    markers.clear();
-    const palette = markerPalette();
 
-    for (const c of cities) {
-      if (c.lat == null || c.lng == null) continue;
-      const selected = c.name === selectedName;
-      const marker = L.circleMarker([c.lat, c.lng], {
-        radius: selected ? 9 : 5.5,
-        weight: selected ? 3 : 1.5,
-        color: selected ? palette.accent : palette.card,
-        fillColor: colorFor(c, palette),
-        fillOpacity: 0.9
-      });
-      const fit =
-        maxRent != null && c.r1 != null
-          ? c.r1 <= maxRent
-            ? 'fits budget'
-            : 'over budget'
-          : 'rent data unavailable';
-      const tooltip = document.createElement('div');
-      const strong = document.createElement('strong');
-      strong.textContent = c.name;
-      tooltip.append(strong, document.createElement('br'));
-      tooltip.append(document.createTextNode(`1BR ${money(c.r1)} · ${fit}`));
-      marker.bindTooltip(tooltip, { direction: 'top' });
-      marker.on('click', () => presentation.selectCity(c.name));
-      marker.addTo(group);
-      const element = marker.getElement();
-      if (element) {
-        element.setAttribute('tabindex', '0');
-        element.setAttribute('role', 'button');
-        element.setAttribute('aria-label', `${c.name}, 1 bedroom ${money(c.r1)}, ${fit}`);
-        element.addEventListener('keydown', (event) => {
-          const keyboardEvent = event as KeyboardEvent;
-          if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
-            keyboardEvent.preventDefault();
-            presentation.selectCity(c.name);
-          }
-        });
-      }
-      markers.set(c.name, marker);
+    // Cancel any in-flight pan/zoom animation before changing marker geometry.
+    map?.stop();
+    for (const name of changes.removed) {
+      const marker = markers.get(name);
+      if (!marker) continue;
+      group.removeLayer(marker);
+      markers.delete(name);
+      tooltipParts.delete(name);
     }
 
-    if (hadFocus) {
-      // Same marker if it still exists, else the selected one, else the container.
-      // preventScroll, or the focus call scrolls the overflow-hidden container
-      // and shifts every marker off its coordinates.
+    for (const name of changes.retained) {
+      const city = citiesByName.get(name);
+      const marker = markers.get(name);
+      if (!city || !marker) continue;
+      const point = marker.getLatLng();
+      if (point.lat !== city.lat || point.lng !== city.lng) {
+        marker.setLatLng([city.lat, city.lng]);
+      }
+    }
+
+    const palette = markerPalette();
+    for (const name of changes.added) {
+      const city = citiesByName.get(name);
+      if (!city) continue;
+      markers.set(name, createMarker(city, palette, group));
+    }
+
+    if (hadFocus && focusName && !markers.has(focusName)) {
       const target =
-        (focusName && markers.get(focusName)?.getElement()) ||
-        (selectedName && markers.get(selectedName)?.getElement()) ||
-        map?.getContainer();
+        (selectedName && markers.get(selectedName)?.getElement()) || map?.getContainer();
       (target as HTMLElement | undefined)?.focus({ preventScroll: true });
+    }
+  }
+
+  function updateMarkerPresentation() {
+    if (!ready || !group) return;
+    const palette = markerPalette();
+    for (const city of cities) {
+      if (!hasCoordinates(city)) continue;
+      const marker = markers.get(city.name);
+      if (marker) applyMarkerPresentation(city, marker, palette);
     }
   }
 
@@ -181,22 +227,30 @@
     }).addTo(map);
     group = L.layerGroup().addTo(map);
     ready = true;
-    draw();
+    reconcileMarkers();
+    updateMarkerPresentation();
   });
 
   onDestroy(() => {
     map?.remove();
   });
 
-  // Redraw markers when data, budget, or selection changes. Recentring is
-  // deliberately separate so clicking a comparison row cannot be swallowed by
-  // a marker redraw.
+  // Reconcile marker identities only when the located city collection changes.
   $effect(() => {
-    // touch reactive deps
+    void ready;
+    void cities;
+    reconcileMarkers();
+  });
+
+  // Salary and selection changes update retained markers in place. Recentring is
+  // deliberately separate so clicking a comparison row cannot be swallowed by
+  // a marker presentation update.
+  $effect(() => {
+    void ready;
     void cities;
     void maxRent;
     void selectedName;
-    draw();
+    updateMarkerPresentation();
   });
 
   // A newly selected comparison city is a navigation action, so move the map
