@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="s"><v>0</v></c>
+      <c r="B1" t="s"><v>1</v></c>
+      <c r="C1" t="s"><v>2</v></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="s"><v>3</v></c>
+      <c r="B2"><v>1000</v></c>
+      <c r="C2"><v>1200</v></c>
+    </row>
+    <row r="3">
+      <c r="A3" t="s"><v>4</v></c>
+      <c r="B3"><v>1100</v></c>
+      <c r="C3"><v>1300</v></c>
+    </row>
+    <row r="4">
+      <c r="A4" t="s"><v>5</v></c>
+      <c r="B4"><v>1200</v></c>
+      <c r="C4"><v>1400</v></c>
+    </row>
+    <row r="5">
+      <c r="A5" t="s"><v>6</v></c>
+      <c r="B5"><v>900</v></c>
+      <c r="C5"><v>1000</v></c>
+    </row>
+    <row r="6">
+      <c r="A6" t="s"><v>7</v></c>
+      <c r="B6" t="s"><v>11</v></c>
+      <c r="C6"><v>1100</v></c>
+    </row>
+    <row r="7">
+      <c r="A7" t="s"><v>8</v></c>
+      <c r="B7"><v>0</v></c>
+      <c r="C7"><v>1000</v></c>
+    </row>
+    <row r="8">
+      <c r="A8" t="s"><v>9</v></c>
+      <c r="B8"><v>100</v></c>
+    </row>
+    <row r="9">
+      <c r="A9" t="s"><v>10</v></c>
+      <c r="B9"><v>200</v></c>
+      <c r="C9"><v>300</v></c>
+    </row>
+  </sheetData>
+</worksheet>

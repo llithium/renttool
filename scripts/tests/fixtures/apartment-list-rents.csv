@@ -1,0 +1,14 @@
+location_type,location_name,bed_size,population,2024_06,2024_07,2025_06,2025_07
+City,"New York City, NY",1br,100000,2000,2100,2200,2300
+City,"New York City, NY",2br,,2600,2700,2900,3000
+City,"St. Louis, MO",1br,300000,1000,1100,1200,1300
+City,"St. Louis, MO",2br,,1400,1500,1600,1700
+City,"St. Petersburg, FL",1br,250000,1500,1600,1700,1800
+City,"St. Petersburg, FL",2br,,2000,2100,2200,2300
+City,"Winston-Salem, NC",1br,250000,900,950,1000,1050
+City,"Winston-Salem, NC",2br,,1200,1250,1300,1350
+City,"Alpha, ZZ",1br,50000,800,800,880,960
+City,"Alpha, ZZ",2br,,1000,1000,1100,1200
+Metro,"New York City, NY",1br,100000,999,999,999,999
+City,"Only One, ZZ",1br,40000,700,700,750,800
+City,"Missing Bed, ZZ",,40000,700,700,750,800

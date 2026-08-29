@@ -37,6 +37,7 @@ TABLES = {
 }
 
 MIN_MATCHES = 600
+MIN_PLACES = 25_000
 PLACE_GEO_PREFIX = "1600000US"
 SUFFIX_RE = re.compile(
     r"\s+(?:city(?: \(balance\))?|town|village|borough|municipality|CDP|city and borough|"
@@ -117,7 +118,7 @@ def source_files(year: int, directory: Path) -> tuple[dict[str, Path], Path]:
     return tables, gazetteer
 
 
-def read_places(path: Path) -> dict[str, tuple[str, str]]:
+def read_places(path: Path, minimum_places: int = MIN_PLACES) -> dict[str, tuple[str, str]]:
     places: dict[str, tuple[str, str]] = {}
     with path.open(encoding="utf-8-sig", newline="") as source:
         reader = csv.DictReader(source, delimiter="\t")
@@ -127,7 +128,7 @@ def read_places(path: Path) -> dict[str, tuple[str, str]]:
             state = (row.get("USPS") or "").strip()
             if geoid and name and state:
                 places[geoid] = (name, state)
-    if len(places) < 25_000:
+    if len(places) < minimum_places:
         raise ValueError(f"Gazetteer contained only {len(places)} places")
     return places
 
@@ -145,7 +146,7 @@ def read_table(path: Path, columns: tuple[str, ...]) -> dict[str, dict[str, int]
                 raw = row.get(column, "")
                 try:
                     value = int(raw)
-                except ValueError:
+                except (TypeError, ValueError):
                     value = -1
                 values[column] = value if value >= 0 else 0
             rows[geo_id.removeprefix(PLACE_GEO_PREFIX)] = values
@@ -187,8 +188,11 @@ def build(
     targets: dict[str, str],
     table_paths: dict[str, Path],
     gazetteer_path: Path,
+    *,
+    minimum_matches: int = MIN_MATCHES,
+    minimum_places: int = MIN_PLACES,
 ) -> dict[str, object]:
-    places = read_places(gazetteer_path)
+    places = read_places(gazetteer_path, minimum_places)
     data = {table: read_table(table_paths[table], columns) for table, columns in TABLES.items()}
 
     cities: dict[str, dict[str, int | float]] = {}
@@ -226,7 +230,7 @@ def build(
             "rentalVacancy": vacancy_rate or 0,
         }
 
-    if len(cities) < MIN_MATCHES:
+    if len(cities) < minimum_matches:
         missing = sorted(set(targets.values()) - set(cities))
         raise ValueError(
             f"Refusing to write incomplete data: matched {len(cities)} of {len(targets)} cities; "

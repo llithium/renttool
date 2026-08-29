@@ -22,6 +22,7 @@ import json
 import re
 import urllib.request
 import zipfile
+from collections.abc import Iterable
 from collections import defaultdict
 from pathlib import Path
 from xml.etree import ElementTree
@@ -94,15 +95,8 @@ def read_rows(xlsx: Path):
         yield cells
 
 
-def main() -> None:
-    args = parse_args()
-    if not re.fullmatch(r"FY\d{4}", args.year):
-        raise ValueError("--year must use the FY#### format, for example FY2027")
-    if args.input is not None and not args.input.is_file():
-        raise FileNotFoundError(f"Input workbook not found: {args.input}")
-    xlsx = args.input if args.input is not None else download(args.url or DEFAULT_URL)
-    rows = read_rows(xlsx)
-
+def aggregate_rows(rows: Iterable[dict[int, str]]) -> dict[str, list[int]]:
+    rows = iter(rows)
     header = next(rows)
     col = {name: i for i, name in header.items()}
     fips_i, r1_i, r2_i = col["fips"], col["fmr_1"], col["fmr_2"]
@@ -126,20 +120,36 @@ def main() -> None:
         fips: [round(s[0] / s[2]), round(s[1] / s[2])]
         for fips, s in sorted(sums.items())
     }
-    if len(counties) < MIN_COUNTIES:
+
+    return counties
+
+
+def build_payload(
+    rows: Iterable[dict[int, str]],
+    year: str,
+    minimum_counties: int = MIN_COUNTIES,
+) -> dict[str, object]:
+    counties = aggregate_rows(rows)
+    if len(counties) < minimum_counties:
         raise ValueError(
             f"Refusing to write incomplete data: found {len(counties)} counties, "
-            f"expected at least {MIN_COUNTIES}"
+            f"expected at least {minimum_counties}"
         )
 
-    OUT.write_text(
-        json.dumps(
-            {"meta": {"year": args.year, "source": "HUD Fair Market Rents"}, "counties": counties},
-            separators=(",", ":"),
-        )
-        + "\n"
-    )
-    print(f"Wrote {OUT} — {len(counties)} counties ({OUT.stat().st_size / 1024:.0f} KB)")
+    return {"meta": {"year": year, "source": "HUD Fair Market Rents"}, "counties": counties}
+
+
+def main() -> None:
+    args = parse_args()
+    if not re.fullmatch(r"FY\d{4}", args.year):
+        raise ValueError("--year must use the FY#### format, for example FY2027")
+    if args.input is not None and not args.input.is_file():
+        raise FileNotFoundError(f"Input workbook not found: {args.input}")
+    xlsx = args.input if args.input is not None else download(args.url or DEFAULT_URL)
+    payload = build_payload(read_rows(xlsx), args.year)
+
+    OUT.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
+    print(f"Wrote {OUT} — {len(payload['counties'])} counties ({OUT.stat().st_size / 1024:.0f} KB)")
 
 
 if __name__ == "__main__":

@@ -15,10 +15,11 @@
     "lint:fix": "eslint . --fix",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "test:data": "python3 -m unittest discover -s scripts/tests -p 'test_*.py'",
     "test:watch": "vitest",
     "test:e2e:install": "playwright install chromium",
     "test:e2e": "playwright test",
-    "validate": "bun run format:check && bun run lint && bun run check && bun run test && bun run build"
+    "validate": "bun run format:check && bun run lint && bun run check && bun run test && bun run test:data && bun run build"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

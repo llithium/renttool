@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import re
+from collections.abc import Iterable
 from collections import defaultdict
 from pathlib import Path
 
@@ -56,31 +57,37 @@ def month_label(period: str) -> str:
     return f"{names[int(month) - 1]} {year}"
 
 
-def main() -> None:
-    args = parse_args()
-    if not args.input.is_file():
-        raise FileNotFoundError(f"Input CSV not found: {args.input}")
+def select_period(fieldnames: list[str], requested: str | None = None) -> tuple[str, str]:
+    periods = sorted(name for name in fieldnames if PERIOD_RE.fullmatch(name))
+    if not periods:
+        raise ValueError("CSV contains no YYYY_MM rent columns")
+    period = requested or periods[-1]
+    if period not in periods:
+        raise ValueError(f"Period {period!r} is not present in the CSV")
+    prior = f"{int(period[:4]) - 1}{period[4:]}"
+    if prior not in periods:
+        raise ValueError(f"Prior-year period {prior!r} is required to calculate YoY")
+    return period, prior
 
-    with args.input.open(newline="", encoding="utf-8-sig") as source:
-        reader = csv.DictReader(source)
-        if reader.fieldnames is None:
-            raise ValueError("CSV has no header")
-        periods = sorted(name for name in reader.fieldnames if PERIOD_RE.fullmatch(name))
-        if not periods:
-            raise ValueError("CSV contains no YYYY_MM rent columns")
-        period = args.period or periods[-1]
-        if period not in periods:
-            raise ValueError(f"Period {period!r} is not present in the CSV")
-        prior = f"{int(period[:4]) - 1}{period[4:]}"
-        if prior not in periods:
-            raise ValueError(f"Prior-year period {prior!r} is required to calculate YoY")
 
-        grouped: dict[str, dict[str, dict[str, str]]] = defaultdict(dict)
-        for row in reader:
-            if row.get("location_type") != "City":
-                continue
-            name = NAME_ALIASES.get(row["location_name"], row["location_name"])
-            grouped[name][row["bed_size"]] = row
+def build_payload(
+    fieldnames: list[str],
+    rows: Iterable[dict[str, str]],
+    period: str | None = None,
+    minimum_cities: int = MIN_CITIES,
+) -> dict[str, object]:
+    period, prior = select_period(fieldnames, period)
+
+    grouped: dict[str, dict[str, dict[str, str]]] = defaultdict(dict)
+    for row in rows:
+        if row.get("location_type") != "City":
+            continue
+        location_name = row.get("location_name")
+        bed_size = row.get("bed_size")
+        if not location_name or not bed_size:
+            continue
+        name = NAME_ALIASES.get(location_name, location_name)
+        grouped[name][bed_size] = row
 
     cities: dict[str, dict[str, int | float]] = {}
     for name, beds in sorted(grouped.items()):
@@ -99,13 +106,13 @@ def main() -> None:
             "population": population,
         }
 
-    if len(cities) < MIN_CITIES:
+    if len(cities) < minimum_cities:
         raise ValueError(
             f"Refusing to write incomplete data: found {len(cities)} cities, "
-            f"expected at least {MIN_CITIES}"
+            f"expected at least {minimum_cities}"
         )
 
-    payload = {
+    return {
         "meta": {
             "source": "Apartment List Rent Estimates",
             "period": period,
@@ -115,8 +122,24 @@ def main() -> None:
         },
         "cities": cities,
     }
+
+
+def main() -> None:
+    args = parse_args()
+    if not args.input.is_file():
+        raise FileNotFoundError(f"Input CSV not found: {args.input}")
+
+    with args.input.open(newline="", encoding="utf-8-sig") as source:
+        reader = csv.DictReader(source)
+        if reader.fieldnames is None:
+            raise ValueError("CSV has no header")
+        payload = build_payload(reader.fieldnames, reader, args.period)
+
     OUT.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
-    print(f"Wrote {OUT} — {len(cities)} cities ({OUT.stat().st_size / 1024:.0f} KB), {period}")
+    print(
+        f"Wrote {OUT} — {len(payload['cities'])} cities "
+        f"({OUT.stat().st_size / 1024:.0f} KB), {payload['meta']['period']}"
+    )
 
 
 if __name__ == "__main__":

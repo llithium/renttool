@@ -1,0 +1,4 @@
+USPS	GEOID	NAME
+GA	0000001	Athens-Clarke County unified government (balance)
+MA	0000002	Watertown town
+MO	0000003	St. Louis city

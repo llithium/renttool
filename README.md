@@ -21,10 +21,21 @@ bun run dev        # http://localhost:5173
 Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
 `bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
-`bun run test` (unit tests), `bun run test:e2e:install` (download Chromium), and
+`bun run test` (unit tests), `bun run test:data` (network-free Python data-builder tests),
+`bun run test:e2e:install` (download Chromium), and
 `bun run test:e2e` (browser/accessibility tests).
-`bun run validate` runs the format check, lint, type-check, unit tests, and build in one go.
+`bun run validate` runs the format check, lint, type-check, unit tests, data-builder tests,
+and build in one go.
 `bun audit` is an optional manual check that needs network access.
+
+### Data-builder tests
+
+The data-builder regression suite is network-free: `bun run test:data` uses only the small
+fixtures checked into `scripts/tests/fixtures/` and Python's standard-library `unittest`.
+It exercises the Apartment List, Census ACS, and HUD transformations without downloading or
+rewriting bundled snapshots. The refresh commands below are explicit maintainer operations;
+they read manually downloaded source files or download upstream files when no local source is
+provided, and are not part of data tests.
 
 ### Browser verification
 
