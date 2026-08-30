@@ -146,6 +146,12 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ suggestions: [] })
     })
   );
+  await page.route('https://images.unsplash.com/**', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><rect width="4" height="2" fill="black"/></svg>'
+    })
+  );
   await page.route('https://*.basemaps.cartocdn.com/**', (route) => route.abort());
   await page.goto('/');
   await waitForHydration(page);
@@ -206,6 +212,21 @@ test('supports keyboard city selection and salary results', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'City snapshot' })).toBeVisible();
   await expect(page.getByText('Median household income', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '2020–2024 ACS 5-year estimates ↗' })).toBeVisible();
+});
+
+test('shows a static credited city image when the city has a manifest entry', async ({ page }) => {
+  await selectCity(page, 'Tampa', 'Tampa, FL');
+  await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+
+  const image = page.getByTestId('city-image');
+  await expect(image).toBeVisible();
+  await expect(image.locator('img')).toHaveAttribute('alt', 'Buildings near body of water');
+  await expect(image).toContainText('Kody Cheyne');
+  await expect(image).toContainText('Unsplash');
+  await expect(image.getByRole('link', { name: 'Kody Cheyne' })).toHaveAttribute(
+    'href',
+    'https://unsplash.com/@kodycheyne?utm_source=rent_tool&utm_medium=referral'
+  );
 });
 
 test('shows bundled city suggestions before a slow API response', async ({ page }) => {

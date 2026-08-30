@@ -51,6 +51,18 @@ export interface CitySuggestion {
   lng?: number;
 }
 
+/** A credited Unsplash image from the checked-in city-image manifest. */
+export interface CityImage {
+  id: string;
+  url: string;
+  alt: string;
+  photoUrl: string;
+  photographerName: string;
+  photographerUrl: string;
+  source: 'unsplash';
+  sourceUrl: string;
+}
+
 /** A nearby place returned by /api/nearby (OpenStreetMap via Overpass). */
 export interface NearbyPlace {
   label: string; // "City, ST"

@@ -7,6 +7,7 @@
 
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
   import CityHeadline from '$lib/components/city/CityHeadline.svelte';
+  import CityImage from '$lib/components/city/CityImage.svelte';
   import Verdict from '$lib/components/city/Verdict.svelte';
   import CityFacts from '$lib/components/city/CityFacts.svelte';
   import EstimateNote from '$lib/components/city/EstimateNote.svelte';
@@ -99,6 +100,7 @@
                 Offer planner
               </p>
               <CityHeadline city={selected} />
+              <CityImage city={selected} class="mt-7" />
             </div>
             <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
             <a

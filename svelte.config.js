@@ -14,7 +14,12 @@ const config = {
         'default-src': ['self'],
         'script-src': ['self', ...__impeccableLiveDev],
         'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
-        'img-src': ['self', 'data:', 'https://*.basemaps.cartocdn.com'],
+        'img-src': [
+          'self',
+          'data:',
+          'https://*.basemaps.cartocdn.com',
+          'https://images.unsplash.com'
+        ],
         'connect-src': ['self', 'ws:', 'wss:', ...__impeccableLiveDev],
         'font-src': ['self', 'https://fonts.gstatic.com'],
         'object-src': ['none'],
