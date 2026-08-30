@@ -1,5 +1,8 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { onMount } from 'svelte';
+
+  let { children }: { children?: Snippet } = $props();
 
   let root: HTMLElement;
 
@@ -69,7 +72,7 @@
   });
 </script>
 
-<article bind:this={root} aria-label="Start a rent plan" class="min-w-0 overflow-hidden">
+<article bind:this={root} aria-label="Start a rent plan" class="min-w-0">
   <section
     data-editorial-hero
     class="relative min-h-136 overflow-hidden rounded-2xl border border-line-strong p-7 shadow-card md:p-10"
@@ -104,6 +107,10 @@
       >
     </button>
   </section>
+
+  <div class="mt-8 md:mt-10">
+    {@render children?.()}
+  </div>
 
   <section class="py-28 md:py-40" aria-labelledby="decision-heading">
     <h2

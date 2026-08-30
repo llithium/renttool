@@ -206,14 +206,39 @@ test('keeps the latest salary when city navigation pushes history', async ({ pag
   expect(new URL(page.url()).search).toBe('?salary=90000&city=Austin%2C+TX');
 });
 
-test('focuses a visible calculator without scrolling the landing page', async ({ page }) => {
+test('focuses the calculator and brings it into view from the landing hero', async ({ page }) => {
   const city = page.getByRole('combobox', { name: 'City' });
   const before = await page.evaluate(() => window.scrollY);
 
   await page.getByRole('button', { name: 'Build my rent plan' }).click();
 
   await expect(city).toBeFocused();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before);
+  await expect(city).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+
+  const clippingAncestor = await city.evaluate((input) => {
+    const inputStyle = getComputedStyle(input);
+    const outlineExtent =
+      Number.parseFloat(inputStyle.outlineWidth) + Number.parseFloat(inputStyle.outlineOffset);
+    const inputBounds = input.getBoundingClientRect();
+
+    for (let ancestor = input.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      const ancestorStyle = getComputedStyle(ancestor);
+      if (!['hidden', 'clip'].includes(ancestorStyle.overflowX)) continue;
+
+      const ancestorBounds = ancestor.getBoundingClientRect();
+      if (
+        inputBounds.left - outlineExtent < ancestorBounds.left ||
+        inputBounds.right + outlineExtent > ancestorBounds.right
+      ) {
+        return ancestor.tagName.toLowerCase();
+      }
+    }
+
+    return null;
+  });
+
+  expect(clippingAncestor).toBeNull();
 });
 
 test('supports keyboard city selection and salary results', async ({ page }) => {

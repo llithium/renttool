@@ -396,4 +396,10 @@
     width: 58%;
     height: 25%;
   }
+
+  [data-halftone-orbit] {
+    right: -12rem;
+    bottom: -12rem;
+    opacity: 0.25;
+  }
 }

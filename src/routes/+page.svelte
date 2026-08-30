@@ -162,10 +162,9 @@
           class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
         />
       {:else}
-        <div class="grid items-start gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
+        <LandingContent>
           <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
-          <LandingContent />
-        </div>
+        </LandingContent>
       {/if}
 
       {#if urlSync.hydrated && selected && budget}
