@@ -1,5 +1,24 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import rentData from '../../src/lib/data/apartment-list-rents.json' with { type: 'json' };
+
+const BUNDLED_RENTS = rentData.cities as Record<string, { r1: number }>;
+
+function oneBedroomRent(city: string): number {
+  const rent = BUNDLED_RENTS[city]?.r1;
+  if (!rent) throw new Error(`Missing bundled rent for ${city}`);
+  return rent;
+}
+
+function dollars(value: number): string {
+  return `$${value.toLocaleString('en-US')}`;
+}
+
+function markerName(city: string, annualSalary: number): string {
+  const rent = oneBedroomRent(city);
+  const budgetStatus = rent <= annualSalary / 40 ? 'fits budget' : 'over budget';
+  return `${city}, 1 bedroom ${dollars(rent)}, ${budgetStatus}`;
+}
 
 async function selectCity(page: Page, query: string, label: string) {
   const city = page.getByRole('combobox', { name: 'City' });
@@ -392,14 +411,19 @@ test('keeps each selected city with its salary when opening the detailed compari
   await expect(page.getByRole('heading', { name: 'Nashville, TN' })).toBeVisible();
   await expect(page.getByLabel('Annual salary in Denver, CO')).toHaveValue('60,000');
   await expect(page.getByLabel('Annual salary in Nashville, TN')).toHaveValue('90,000');
-  await expect(page.getByText('$78 under budget', { exact: true })).toHaveCSS(
-    'color',
-    'rgb(20, 123, 59)'
-  );
+  const denverRent = oneBedroomRent('Denver, CO');
+  const nashvilleRent = oneBedroomRent('Nashville, TN');
+  await expect(
+    page.getByText(`${dollars(60_000 / 40 - denverRent)} under budget`, { exact: true })
+  ).toHaveCSS('color', 'rgb(20, 123, 59)');
   const oneBedroomRow = page.getByRole('row').filter({ hasText: /^1BR rent/ });
   await expect(oneBedroomRow).toHaveCount(1);
-  await expect(oneBedroomRow.locator('td[data-tone="best"]')).toContainText('$1,216/mo');
-  await expect(oneBedroomRow.locator('td[data-tone="worst"]')).toContainText('$1,422/mo');
+  await expect(oneBedroomRow.locator('td[data-tone="best"]')).toContainText(
+    `${dollars(Math.min(denverRent, nashvilleRent))}/mo`
+  );
+  await expect(oneBedroomRow.locator('td[data-tone="worst"]')).toContainText(
+    `${dollars(Math.max(denverRent, nashvilleRent))}/mo`
+  );
 
   await page.setViewportSize({ width: 734, height: 969 });
   const criterion = page.getByLabel('Decision criterion');
@@ -490,6 +514,14 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
   await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
   await expect(equivalence.locator('article')).toHaveCount(2);
 
+  // Axe samples computed colors, so wait until entrance opacity has settled.
+  await page.locator('[data-testid="scenario"]').evaluateAll(async (scenarios) => {
+    await Promise.all(
+      scenarios
+        .flatMap((scenario) => scenario.getAnimations())
+        .map((animation) => animation.finished)
+    );
+  });
   const axe = await new AxeBuilder({ page }).analyze();
   expect(axe.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual(
     []
@@ -513,7 +545,7 @@ test('exposes map markers to the keyboard', async ({ page }) => {
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   await expect(page.getByText('Current city: Tampa, FL', { exact: true })).toBeVisible();
   const marker = page.getByRole('button', {
-    name: 'New York, NY, 1 bedroom $2,443, over budget'
+    name: markerName('New York, NY', 80_000)
   });
   // Selecting a city recenters the map on it, so a far-away marker like New York
   // starts off-screen (Leaflet culls off-viewport markers). Zoom out until it's
@@ -558,7 +590,7 @@ test('recenters the map when a comparison city is selected from the table', asyn
   await expect(page.getByRole('heading', { name: 'Gastonia, NC' })).toBeVisible();
 
   const selectedMarker = page.getByRole('button', {
-    name: 'Gastonia, NC, 1 bedroom $983, fits budget'
+    name: markerName('Gastonia, NC', 69_000)
   });
   await expect(selectedMarker).toBeVisible();
   const position = await selectedMarker.evaluate((marker) => {

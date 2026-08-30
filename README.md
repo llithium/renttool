@@ -22,6 +22,8 @@ Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
 `bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
 `bun run test` (unit tests), `bun run test:data` (network-free Python data-builder tests),
+`bun run data:update` (refresh rents and realign dependent city facts),
+`bun run data:check` (report whether those bundles are current and aligned),
 `bun run test:e2e:install` (download Chromium), and
 `bun run test:e2e` (browser/accessibility tests), and `bun run images:refresh` (maintainer-only
 Unsplash manifest refresh).
@@ -35,8 +37,8 @@ The data-builder regression suite is network-free: `bun run test:data` uses only
 fixtures checked into `scripts/tests/fixtures/` and Python's standard-library `unittest`.
 It exercises the Apartment List, Census ACS, and HUD transformations without downloading or
 rewriting bundled snapshots. The refresh commands below are explicit maintainer operations;
-they read manually downloaded source files or download upstream files when no local source is
-provided, and are not part of data tests.
+they read local source files or download upstream files when no local source is provided, and
+are not part of data tests.
 
 ### Browser verification
 
@@ -73,7 +75,7 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | ------------------------------------------- | ------------------- | ---------- | ------------------------------------------------ |
 | **Photon** (OSM)                            | `/api/city-suggest` | none       | City autocomplete + coordinates                  |
 | **Apartment List Rent Estimates** (bundled) | none                | none       | Monthly city 1BR/2BR estimates                   |
-| **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 651 Census places           |
+| **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 632 Census places           |
 | **Unsplash**                                | bundled             | none       | Curated credited city header image               |
 | **FCC Area API**                            | `/api/geocode`      | none       | Coords → county FIPS                             |
 | **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2026 Fair Market Rents for **every US county** |
@@ -84,8 +86,8 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 - `UNSPLASH_ACCESS_KEY` is only needed by maintainers running `bun run images:refresh`; it is not
   needed by the deployed app.
 
-The app **degrades gracefully** and needs **no keys at all**: 651 cities use the bundled
-June 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
+The app **degrades gracefully** and needs **no keys at all**: 632 cities use the bundled
+August 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
 bundled county-level HUD Fair Market Rents table
 (`src/lib/data/fmr-county.json`, ~3,200 counties). HUD lookups require no runtime network
 request or API key.
@@ -117,20 +119,30 @@ rental vacancy rate. Each snapshot shows its ACS vintage and geography in the UI
 
 ### Apartment List data refresh and attribution
 
-Download the current Rent Estimates CSV manually from the
-[Apartment List data page](https://www.apartmentlist.com/research/category/data-rent-estimates),
-then regenerate the bundled city snapshot:
+Refresh the bundled city snapshot from the current historic Rent Estimates CSV linked by the
+[Apartment List data page](https://www.apartmentlist.com/research/category/data-rent-estimates):
+
+```bash
+bun run data:update
+# CI/maintenance check: exits non-zero if a newer snapshot is available
+bun run data:check
+```
+
+The updater discovers the official CSV, permits only the expected Apartment List CDN and filename,
+checks the source period against the CSV, refuses incomplete snapshots, and replaces the bundle
+atomically. If the source adds or retires cities, the update command rebuilds the existing ACS
+vintage so every bundled rent city keeps its matching city facts. A downloaded file can still be
+used for a reproducible or offline refresh:
 
 ```bash
 python3 scripts/build-apartment-list-data.py /path/to/Apartment_List_Rent_Estimates_YYYY_MM.csv
-# optionally select a particular month present in the file
+# optionally select a particular month already present in that file
 python3 scripts/build-apartment-list-data.py /path/to/file.csv --period YYYY_MM
 ```
 
 The generator keeps city-level 1BR/2BR estimates, calculates 1BR year-over-year change,
-and refuses to write a snapshot with fewer than 600 cities. Do not commit the downloaded
-source CSV; commit only `src/lib/data/apartment-list-rents.json` after running the test
-commands below.
+and refuses to write a snapshot with fewer than 600 cities. The downloaded source is temporary;
+commit only `src/lib/data/apartment-list-rents.json` after running the test commands below.
 
 Data from Apartment List Rent Estimates, © Apartment List, Inc. Use of the data is subject
 to the [Apartment List Terms of Service](https://www.apartmentlist.com/about/terms). This

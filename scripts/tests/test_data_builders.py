@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import importlib.util
+import json
 import tempfile
 import unittest
 import zipfile
@@ -88,6 +89,36 @@ class ApartmentListBuilderTests(unittest.TestCase):
     def test_default_city_guard_remains_fail_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "expected at least 600"):
             apartment.build_payload(self.fieldnames, self.rows)
+
+    def test_discovers_the_historic_csv_from_next_data(self) -> None:
+        payload = {
+            "props": {
+                "pageProps": {
+                    "downloadableAssets": [
+                        {
+                            "label": "Current Month Summary",
+                            "url": "//assets.ctfassets.net/example/Apartment_List_Rent_Estimates_Summary_2026_08.csv",
+                        },
+                        {
+                            "label": "Historic Rent Estimates (Jan 2017 - Present)",
+                            "url": "//assets.ctfassets.net/example/Apartment_List_Rent_Estimates_2026_08.csv",
+                        },
+                    ]
+                }
+            }
+        }
+        page = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script>'
+
+        self.assertEqual(
+            apartment.discover_source_url(page),
+            "https://assets.ctfassets.net/example/Apartment_List_Rent_Estimates_2026_08.csv",
+        )
+
+    def test_rejects_an_unexpected_download_host(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unexpected Apartment List source URL"):
+            apartment.validate_source_url(
+                "https://example.com/Apartment_List_Rent_Estimates_2026_08.csv"
+            )
 
 
 class AcsBuilderTests(unittest.TestCase):
