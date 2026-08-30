@@ -1,26 +1,36 @@
 #!/usr/bin/env python3
-"""Build the app's compact city rent snapshot from a manually downloaded
-Apartment List Rent Estimates CSV.
+"""Build the app's compact city rent snapshot from Apartment List estimates.
 
 Usage:
+  python3 scripts/build-apartment-list-data.py
+  python3 scripts/build-apartment-list-data.py --check
   python3 scripts/build-apartment-list-data.py /path/to/Apartment_List_Rent_Estimates_YYYY_MM.csv
   python3 scripts/build-apartment-list-data.py /path/to/file.csv --period 2026_06
 
-The source CSV must be downloaded manually from Apartment List. This script never
-accesses apartmentlist.com. It keeps only the selected month's city-level 1BR/2BR
-estimates and calculates 1BR year-over-year change from the same source file.
+Without a local input, the script discovers and downloads the current historic Rent
+Estimates CSV from Apartment List's public data page. It keeps only the selected
+month's city-level 1BR/2BR estimates and calculates 1BR year-over-year change from
+the same source file.
 """
 
 import argparse
 import csv
 import json
+import os
 import re
-from collections.abc import Iterable
+import tempfile
+import urllib.request
 from collections import defaultdict
+from collections.abc import Iterable
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 OUT = Path(__file__).resolve().parent.parent / "src" / "lib" / "data" / "apartment-list-rents.json"
+DATA_PAGE_URL = "https://www.apartmentlist.com/research/category/data-rent-estimates"
+ASSET_HOST = "assets.ctfassets.net"
 PERIOD_RE = re.compile(r"^\d{4}_\d{2}$")
+SOURCE_NAME_RE = re.compile(r"^Apartment_List_Rent_Estimates_(\d{4}_\d{2})\.csv$")
 MIN_CITIES = 600
 
 NAME_ALIASES = {
@@ -33,12 +43,104 @@ NAME_ALIASES = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path, help="manually downloaded Apartment List CSV")
+    parser.add_argument(
+        "input",
+        type=Path,
+        nargs="?",
+        help="local Apartment List CSV (default: discover and download the latest official file)",
+    )
     parser.add_argument(
         "--period",
         help="month column to bundle in YYYY_MM format (default: latest available)",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="exit non-zero instead of writing when the bundled snapshot is stale",
+    )
     return parser.parse_args()
+
+
+class NextDataParser(HTMLParser):
+    """Extract Next.js's JSON payload without depending on its surrounding markup."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.capturing = False
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script" and dict(attrs).get("id") == "__NEXT_DATA__":
+            self.capturing = True
+
+    def handle_data(self, data: str) -> None:
+        if self.capturing:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self.capturing:
+            self.capturing = False
+
+
+def validate_source_url(url: str) -> tuple[str, str]:
+    parsed = urlparse(url)
+    filename = Path(parsed.path).name
+    match = SOURCE_NAME_RE.fullmatch(filename)
+    if parsed.scheme != "https" or parsed.hostname != ASSET_HOST or match is None:
+        raise ValueError(f"Unexpected Apartment List source URL: {url}")
+    return url, match.group(1)
+
+
+def historic_asset_urls(value: object) -> list[str]:
+    """Find historic rent-estimate assets in the nested Next.js payload."""
+    found: list[str] = []
+    if isinstance(value, dict):
+        assets = value.get("downloadableAssets")
+        if isinstance(assets, list):
+            for asset in assets:
+                if not isinstance(asset, dict):
+                    continue
+                label = asset.get("label")
+                url = asset.get("url")
+                if (
+                    isinstance(label, str)
+                    and label.startswith("Historic Rent Estimates")
+                    and isinstance(url, str)
+                ):
+                    found.append(urljoin(DATA_PAGE_URL, url))
+        for child in value.values():
+            found.extend(historic_asset_urls(child))
+    elif isinstance(value, list):
+        for child in value:
+            found.extend(historic_asset_urls(child))
+    return found
+
+
+def discover_source_url(page: str) -> str:
+    parser = NextDataParser()
+    parser.feed(page)
+    if not parser.parts:
+        raise ValueError("Apartment List data page did not contain a Next.js data payload")
+    payload = json.loads("".join(parser.parts))
+    candidates = [validate_source_url(url) for url in historic_asset_urls(payload)]
+    if not candidates:
+        raise ValueError("Apartment List data page did not list a historic Rent Estimates CSV")
+    return max(candidates, key=lambda item: item[1])[0]
+
+
+def request(url: str) -> urllib.request.Request:
+    return urllib.request.Request(url, headers={"User-Agent": "rent-tool-data-refresh/1.0"})
+
+
+def download_latest(target: Path) -> str:
+    print(f"Discovering the latest rent estimates from {DATA_PAGE_URL} …", flush=True)
+    with urllib.request.urlopen(request(DATA_PAGE_URL), timeout=60) as response:
+        source_url = discover_source_url(response.read().decode("utf-8"))
+    print(f"Downloading {Path(urlparse(source_url).path).name} …", flush=True)
+    with urllib.request.urlopen(request(source_url), timeout=120) as response, target.open("wb") as output:
+        while chunk := response.read(1024 * 1024):
+            output.write(chunk)
+    return source_url
 
 
 def number(value: str) -> int:
@@ -51,8 +153,18 @@ def number(value: str) -> int:
 def month_label(period: str) -> str:
     year, month = period.split("_")
     names = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ]
     return f"{names[int(month) - 1]} {year}"
 
@@ -117,29 +229,98 @@ def build_payload(
             "source": "Apartment List Rent Estimates",
             "period": period,
             "label": month_label(period),
-            "dataUrl": "https://www.apartmentlist.com/research/category/data-rent-estimates",
+            "dataUrl": DATA_PAGE_URL,
             "termsUrl": "https://www.apartmentlist.com/about/terms",
         },
         "cities": cities,
     }
 
 
-def main() -> None:
-    args = parse_args()
-    if not args.input.is_file():
-        raise FileNotFoundError(f"Input CSV not found: {args.input}")
-
-    with args.input.open(newline="", encoding="utf-8-sig") as source:
+def build_from_csv(path: Path, period: str | None = None) -> dict[str, object]:
+    with path.open(newline="", encoding="utf-8-sig") as source:
         reader = csv.DictReader(source)
         if reader.fieldnames is None:
             raise ValueError("CSV has no header")
-        payload = build_payload(reader.fieldnames, reader, args.period)
+        return build_payload(reader.fieldnames, reader, period)
 
-    OUT.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
+
+def encoded(payload: dict[str, object]) -> str:
+    return json.dumps(payload, separators=(",", ":")) + "\n"
+
+
+def write_atomically(payload: dict[str, object]) -> None:
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=OUT.parent,
+            prefix=f".{OUT.name}.",
+            delete=False,
+        ) as destination:
+            destination.write(encoded(payload))
+            temporary = Path(destination.name)
+        os.replace(temporary, OUT)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def existing_summary() -> tuple[str, int]:
+    if not OUT.exists():
+        return "none", 0
+    current = json.loads(OUT.read_text(encoding="utf-8"))
+    return current.get("meta", {}).get("period", "unknown"), len(current.get("cities", {}))
+
+
+def finish(payload: dict[str, object], check: bool) -> None:
+    previous_period, previous_count = existing_summary()
+    period = payload["meta"]["period"]
+    city_count = len(payload["cities"])
+    unchanged = OUT.exists() and OUT.read_text(encoding="utf-8") == encoded(payload)
+
+    if check:
+        if unchanged:
+            print(f"Rent snapshot is current — {period}, {city_count} cities", flush=True)
+            return
+        print(
+            f"Rent snapshot is stale — bundled {previous_period} ({previous_count} cities), "
+            f"latest {period} ({city_count} cities)",
+            flush=True,
+        )
+        raise SystemExit(1)
+
+    if unchanged:
+        print(f"No update needed — {period}, {city_count} cities", flush=True)
+        return
+
+    write_atomically(payload)
     print(
-        f"Wrote {OUT} — {len(payload['cities'])} cities "
-        f"({OUT.stat().st_size / 1024:.0f} KB), {payload['meta']['period']}"
+        f"Updated {OUT} — {previous_period} ({previous_count} cities) → "
+        f"{period} ({city_count} cities, {OUT.stat().st_size / 1024:.0f} KB)",
+        flush=True,
     )
+
+
+def main() -> None:
+    options = parse_args()
+    if options.input is not None:
+        if not options.input.is_file():
+            raise FileNotFoundError(f"Input CSV not found: {options.input}")
+        payload = build_from_csv(options.input, options.period)
+    else:
+        with tempfile.TemporaryDirectory(prefix="rent-tool-apartment-list-") as directory:
+            source = Path(directory) / "rent-estimates.csv"
+            source_url = download_latest(source)
+            payload = build_from_csv(source, options.period)
+            _, source_period = validate_source_url(source_url)
+            if options.period is None and payload["meta"]["period"] != source_period:
+                raise ValueError(
+                    f"Source filename says {source_period}, but latest CSV period is "
+                    f"{payload['meta']['period']}"
+                )
+
+    finish(payload, options.check)
 
 
 if __name__ == "__main__":
