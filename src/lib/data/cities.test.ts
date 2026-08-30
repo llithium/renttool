@@ -2,24 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { ACS_DATA_META, findSeedCity, RENT_DATA_META, SEED_CITIES } from './cities';
 
 describe('bundled Apartment List city rents', () => {
-  it('loads the complete June 2026 snapshot with source metadata', () => {
-    expect(SEED_CITIES.length).toBeGreaterThanOrEqual(651);
+  it('loads the complete August 2026 snapshot with source metadata', () => {
+    expect(SEED_CITIES.length).toBeGreaterThanOrEqual(632);
     expect(RENT_DATA_META).toMatchObject({
       source: 'Apartment List Rent Estimates',
-      period: '2026_06',
-      label: 'June 2026',
+      period: '2026_08',
+      label: 'August 2026',
       termsUrl: 'https://www.apartmentlist.com/about/terms'
     });
   });
 
   it('maps a known city to the bundled estimates and metric', () => {
     expect(findSeedCity('New York, NY')).toMatchObject({
-      r1: 2443,
-      r2: 2576,
-      yoy: 2.9,
+      r1: 2480,
+      r2: 2615,
+      yoy: 3.5,
       source: 'apartment-list',
       rentMetric: 'estimated-median',
-      rentYear: 'June 2026',
+      rentYear: 'August 2026',
       citySnapshot: {
         population: 8483844,
         householdIncome: 80483,
