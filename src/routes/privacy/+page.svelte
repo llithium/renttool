@@ -19,6 +19,11 @@
       a result. Rent Tool does not sell personal information.
     </p>
     <p>
+      City pages may load a representative image from the checked-in Unsplash image manifest. The
+      browser loads that image from Unsplash's CDN, but Rent Tool does not send the city name to an
+      image-search API at runtime.
+    </p>
+    <p>
       Clear your browser storage or remove the plan details from the page address to reset them.
     </p>
   </div>

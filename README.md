@@ -25,7 +25,8 @@ Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run data:update` (refresh rents and realign dependent city facts),
 `bun run data:check` (report whether those bundles are current and aligned),
 `bun run test:e2e:install` (download Chromium), and
-`bun run test:e2e` (browser/accessibility tests).
+`bun run test:e2e` (browser/accessibility tests), and `bun run images:refresh` (maintainer-only
+Unsplash manifest refresh).
 `bun run validate` runs the format check, lint, type-check, unit tests, data-builder tests,
 and build in one go.
 `bun audit` is an optional manual check that needs network access.
@@ -75,11 +76,15 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | **Photon** (OSM)                            | `/api/city-suggest` | none       | City autocomplete + coordinates                  |
 | **Apartment List Rent Estimates** (bundled) | none                | none       | Monthly city 1BR/2BR estimates                   |
 | **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 632 Census places           |
+| **Unsplash**                                | bundled             | none       | Curated credited city header image               |
 | **FCC Area API**                            | `/api/geocode`      | none       | Coords → county FIPS                             |
 | **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2026 Fair Market Rents for **every US county** |
 | **SimpleMaps places** (bundled)             | `/api/nearby`       | none       | Nearby towns/suburbs around a point              |
 | **SimpleMaps places** (bundled)             | `/api/population`   | none       | Population for a coordinate                      |
 | **SimpleMaps places** (bundled)             | `/api/coordinates`  | none       | Exact city/state coordinate fallback             |
+
+- `UNSPLASH_ACCESS_KEY` is only needed by maintainers running `bun run images:refresh`; it is not
+  needed by the deployed app.
 
 The app **degrades gracefully** and needs **no keys at all**: 632 cities use the bundled
 August 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
@@ -90,6 +95,19 @@ request or API key.
 The UI identifies the statistic it is showing: Apartment List estimated median rent, or
 HUD 40th-percentile Fair Market Rent. See
 [docs/API.md](docs/API.md) for the full endpoint reference (params, responses, examples).
+
+City pages use an optional checked-in Unsplash manifest at
+`src/lib/data/city-images.json`. The browser loads the selected image directly from Unsplash's CDN,
+and the city name is not sent to an image-search API at runtime. Entries include the image URL,
+photographer, photo page, and referral links. To refresh or extend the manifest, copy
+`.env.example` to `.env.local`, set `UNSPLASH_ACCESS_KEY`, and run `bun run images:refresh`.
+Full-catalog runs save every accepted entry immediately and automatically wait for an exhausted
+hourly quota before resuming. Use `--no-wait` to stop at the quota boundary. Explicit
+`--city="City, ST"` smoke tests do not wait unless `--wait` is also supplied.
+The refresh command prefers landscape results whose Unsplash metadata matches the requested city,
+rejects results with explicitly contradictory location metadata, and otherwise uses the search
+result's relevance. Review the checked-in manifest before publishing; the page omits the image when
+no manifest entry exists.
 
 The full SimpleMaps places table stays server-side. Restored cities that lack a curated
 coordinate use `/api/coordinates` for an exact city/state match, avoiding a roughly 1.25 MB
@@ -195,7 +213,7 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
 - `src/lib/components/ui/` — shared: Brand, CitySearch (autocomplete combobox), SalaryInput,
   SectionHeading, StatGrid, ThemeToggle
 - `src/lib/components/city/` — the city view: CitySidebar (brand, search, salary, actions,
-  BudgetCard), SalarySlider, CityActions, CityHeadline, Verdict, CityFacts, SearchLinks,
+  BudgetCard), SalarySlider, CityActions, CityHeadline, CityImage, Verdict, CityFacts, SearchLinks,
   NearbySuburbs, RentTrendChart, TaxBreakdownChart, ComparisonTable, RentMap (Leaflet),
   SourcesFooter
 - `src/lib/components/compare/` — the compare view: ScenarioCard, CompareHighlights,
