@@ -45,9 +45,9 @@ describe('RentPlanPresentation', () => {
     plan.setSalary(96_000);
     await plan.chooseCity(suggestion('Current, ZZ'));
 
-    expect(plan.snapshot.activeCity?.name).toBe('Current, ZZ');
-    expect(plan.snapshot.rentTarget).toBe(2_400);
-    expect(plan.snapshot.budget?.maxRent).toBe(2_400);
+    expect(plan.activeCity?.name).toBe('Current, ZZ');
+    expect(plan.rentTarget).toBe(2_400);
+    expect(plan.budget?.maxRent).toBe(2_400);
   });
 
   it('keeps active and comparison pending state distinct through one interface', async () => {
@@ -63,18 +63,18 @@ describe('RentPlanPresentation', () => {
     const active = plan.chooseCity(suggestion('Active, ZZ'));
     const comparison = plan.addComparison(suggestion('Nearby, ZZ', 41));
 
-    expect(plan.snapshot.pendingName).toBe('Active, ZZ');
-    expect(plan.snapshot.pendingComparisonNames).toEqual(['Nearby, ZZ']);
+    expect(plan.pendingName).toBe('Active, ZZ');
+    expect(plan.pendingComparisonNames).toEqual(['Nearby, ZZ']);
 
     resolveActive(rent);
     await active;
-    expect(plan.snapshot.pendingName).toBeNull();
-    expect(plan.snapshot.pendingComparisonNames).toEqual(['Nearby, ZZ']);
+    expect(plan.pendingName).toBeNull();
+    expect(plan.pendingComparisonNames).toEqual(['Nearby, ZZ']);
 
     resolveComparison(rent);
     await comparison;
-    expect(plan.snapshot.comparisonNames).toEqual(['Nearby, ZZ']);
-    expect(plan.snapshot.pendingComparisonNames).toEqual([]);
+    expect(plan.comparisonNames).toEqual(['Nearby, ZZ']);
+    expect(plan.pendingComparisonNames).toEqual([]);
   });
 
   it('delegates comparison membership and owns map-focus requests', async () => {
@@ -85,12 +85,12 @@ describe('RentPlanPresentation', () => {
 
     expect(result).toMatchObject({ status: 'added', name: 'Tampa, FL' });
     expect(plan.selectComparisonCity('Tampa, FL')).toBe(true);
-    expect(plan.snapshot.activeCity?.name).toBe('Tampa, FL');
-    expect(plan.snapshot.mapFocusRequest).toBe(1);
+    expect(plan.activeCity?.name).toBe('Tampa, FL');
+    expect(plan.mapFocusRequest).toBe(1);
 
     expect(plan.selectCity('Current, ZZ')).toBe(true);
-    expect(plan.snapshot.activeCity?.name).toBe('Current, ZZ');
-    expect(plan.snapshot.mapFocusRequest).toBe(1);
+    expect(plan.activeCity?.name).toBe('Current, ZZ');
+    expect(plan.mapFocusRequest).toBe(1);
   });
 
   it('exposes canonical comparison state and navigation intents to planning views', async () => {
@@ -114,7 +114,7 @@ describe('RentPlanPresentation', () => {
     expect(shareUrl.searchParams.getAll('compare')).toEqual(['Tampa, FL']);
 
     expect(plan.selectComparisonCity('Tampa, FL')).toBe(true);
-    expect(plan.snapshot.activeCity?.name).toBe('Tampa, FL');
+    expect(plan.activeCity?.name).toBe('Tampa, FL');
     expect(plan.mapFocusRequest).toBe(1);
     expect(plan.removeComparison('Tampa, FL')).toBe(true);
     expect(plan.comparisonNames).toEqual([]);

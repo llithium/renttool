@@ -1,6 +1,7 @@
 import { SEED_CITIES, STATE_TAX, cityOf, findSeedCity, stateOf } from '$lib/data/cities';
-import { popText } from '$lib/format';
 import { isValidCoordinates } from '$lib/geo';
+import { cityIdentity } from '$lib/cityIdentity';
+import { restorePopulation } from '$lib/population';
 import type { City, CitySnapshot, CitySuggestion } from '$lib/types';
 
 export type PlanSuggestion = CitySuggestion & {
@@ -13,36 +14,40 @@ function cloneSeed(): City[] {
   return SEED_CITIES.map((city) => ({ ...city }));
 }
 
-function nameKey(name: string): string {
-  return name.toLowerCase();
-}
-
 function restoreCitySnapshot(value: unknown): CitySnapshot | null {
   if (!value || typeof value !== 'object') return null;
   const snapshot = value as Partial<CitySnapshot>;
   if (
     typeof snapshot.population !== 'number' ||
+    !Number.isFinite(snapshot.population) ||
     snapshot.population <= 0 ||
     typeof snapshot.householdIncome !== 'number' ||
+    !Number.isFinite(snapshot.householdIncome) ||
     snapshot.householdIncome <= 0 ||
-    typeof snapshot.commuteMinutes !== 'number' ||
-    snapshot.commuteMinutes < 0 ||
-    snapshot.commuteMinutes > 300 ||
-    typeof snapshot.renterShare !== 'number' ||
-    snapshot.renterShare < 0 ||
-    snapshot.renterShare > 100 ||
-    typeof snapshot.rentalVacancy !== 'number' ||
-    snapshot.rentalVacancy < 0 ||
-    snapshot.rentalVacancy > 100
+    (snapshot.commuteMinutes != null &&
+      (typeof snapshot.commuteMinutes !== 'number' ||
+        !Number.isFinite(snapshot.commuteMinutes) ||
+        snapshot.commuteMinutes < 0 ||
+        snapshot.commuteMinutes > 300)) ||
+    (snapshot.renterShare != null &&
+      (typeof snapshot.renterShare !== 'number' ||
+        !Number.isFinite(snapshot.renterShare) ||
+        snapshot.renterShare < 0 ||
+        snapshot.renterShare > 100)) ||
+    (snapshot.rentalVacancy != null &&
+      (typeof snapshot.rentalVacancy !== 'number' ||
+        !Number.isFinite(snapshot.rentalVacancy) ||
+        snapshot.rentalVacancy < 0 ||
+        snapshot.rentalVacancy > 100))
   ) {
     return null;
   }
   return {
     population: snapshot.population,
     householdIncome: snapshot.householdIncome,
-    commuteMinutes: snapshot.commuteMinutes,
-    renterShare: snapshot.renterShare,
-    rentalVacancy: snapshot.rentalVacancy
+    commuteMinutes: snapshot.commuteMinutes ?? null,
+    renterShare: snapshot.renterShare ?? null,
+    rentalVacancy: snapshot.rentalVacancy ?? null
   };
 }
 
@@ -70,29 +75,34 @@ export function restoreCity(value: unknown): City | null {
     typeof city.city !== 'string' ||
     typeof city.state !== 'string' ||
     !/^[A-Z]{2}$/.test(city.state) ||
-    !['apartment-list', 'hud-fmr', 'none'].includes(city.source ?? '')
+    !['apartment-list', 'hud-fmr', 'none'].includes(city.source ?? '') ||
+    city.name.trim() !== `${city.city}, ${city.state}` ||
+    city.city.trim().length === 0
   ) {
     return null;
   }
   const numberOrNull = (number: unknown) =>
     number == null || (typeof number === 'number' && Number.isFinite(number));
   if (!numberOrNull(city.r1) || !numberOrNull(city.r2) || !numberOrNull(city.yoy)) return null;
-  if (
-    city.lat != null &&
-    (typeof city.lat !== 'number' || !Number.isFinite(city.lat) || city.lat < -90 || city.lat > 90)
-  ) {
+  if ((city.r1 != null && city.r1 <= 0) || (city.r2 != null && city.r2 <= 0)) return null;
+  if ((city.lat != null || city.lng != null) && !isValidCoordinates(city.lat, city.lng))
     return null;
-  }
-  if (
-    city.lng != null &&
-    (typeof city.lng !== 'number' ||
-      !Number.isFinite(city.lng) ||
-      city.lng < -180 ||
-      city.lng > 180)
-  ) {
-    return null;
-  }
   const source = city.source as City['source'];
+  const metric = ['estimated-median', 'fair-market-rent', 'unknown'].includes(city.rentMetric ?? '')
+    ? (city.rentMetric as City['rentMetric'])
+    : source === 'apartment-list'
+      ? 'estimated-median'
+      : source === 'hud-fmr'
+        ? 'fair-market-rent'
+        : 'unknown';
+  if (
+    (source === 'apartment-list' && metric !== 'estimated-median') ||
+    (source === 'hud-fmr' && metric !== 'fair-market-rent') ||
+    (source === 'none' && (metric !== 'unknown' || city.r1 != null || city.r2 != null))
+  )
+    return null;
+  const canonical = findSeedCity(city.name);
+  const population = restorePopulation(city.pop) ?? canonical?.pop ?? null;
   return {
     name: city.name,
     city: city.city,
@@ -101,18 +111,15 @@ export function restoreCity(value: unknown): City | null {
     r2: city.r2 ?? null,
     yoy: city.yoy ?? null,
     tax: typeof city.tax === 'string' ? city.tax.slice(0, 200) : STATE_TAX[city.state] || 'varies',
-    pop: typeof city.pop === 'string' ? city.pop.slice(0, 200) : '',
+    pop: population,
+    populationSource: ['acs', 'apartment-list', 'simplemaps'].includes(city.populationSource ?? '')
+      ? (city.populationSource as City['populationSource'])
+      : (canonical?.populationSource ?? null),
     citySnapshot: restoreCitySnapshot(city.citySnapshot),
-    lat: city.lat,
-    lng: city.lng,
+    lat: city.lat ?? undefined,
+    lng: city.lng ?? undefined,
     source,
-    rentMetric: ['estimated-median', 'fair-market-rent', 'unknown'].includes(city.rentMetric ?? '')
-      ? (city.rentMetric as City['rentMetric'])
-      : source === 'apartment-list'
-        ? 'estimated-median'
-        : source === 'hud-fmr'
-          ? 'fair-market-rent'
-          : 'unknown',
+    rentMetric: metric,
     rentArea: typeof city.rentArea === 'string' ? city.rentArea.slice(0, 150) : city.name,
     rentYear: typeof city.rentYear === 'string' ? city.rentYear.slice(0, 40) : ''
   };
@@ -136,8 +143,8 @@ export class CityCatalog {
   }
 
   byName(name: string): City | null {
-    const key = nameKey(name);
-    return this.citiesValue.find((city) => nameKey(city.name) === key) ?? null;
+    const key = cityIdentity(name);
+    return this.citiesValue.find((city) => cityIdentity(city.name) === key) ?? null;
   }
 
   canonicalSuggestion(suggestion: PlanSuggestion): PlanSuggestion {
@@ -148,9 +155,9 @@ export class CityCatalog {
   }
 
   patch(name: string, patch: Partial<City>): City | null {
-    const key = nameKey(name);
+    const key = cityIdentity(name);
     this.citiesValue = this.citiesValue.map((city) =>
-      nameKey(city.name) === key ? { ...city, ...patch } : city
+      cityIdentity(city.name) === key ? { ...city, ...patch } : city
     );
     const updated = this.byName(name);
     if (updated) this.onUpdated(updated);
@@ -186,8 +193,9 @@ export class CityCatalog {
           patch.rentYear = '';
         }
       }
-      if (!existing.pop && suggestion.pop != null && suggestion.pop > 0) {
-        patch.pop = popText(suggestion.pop);
+      if (existing.pop == null && suggestion.pop != null && suggestion.pop > 0) {
+        patch.pop = suggestion.pop;
+        patch.populationSource = 'simplemaps';
       }
       if (Object.keys(patch).length) this.patch(existing.name, patch);
       return this.byName(existing.name) ?? existing;
@@ -201,7 +209,8 @@ export class CityCatalog {
       r2: null,
       yoy: null,
       tax: STATE_TAX[suggestion.state] || 'varies',
-      pop: suggestion.pop != null && suggestion.pop > 0 ? popText(suggestion.pop) : '',
+      pop: suggestion.pop != null && suggestion.pop > 0 ? suggestion.pop : null,
+      populationSource: suggestion.pop != null && suggestion.pop > 0 ? 'simplemaps' : null,
       citySnapshot: null,
       lat: suggestion.lat,
       lng: suggestion.lng,
@@ -216,16 +225,17 @@ export class CityCatalog {
 
   addMissing(cities: readonly City[]): void {
     if (!cities.length) return;
-    const existing = new Set(this.citiesValue.map((city) => nameKey(city.name)));
-    const additions = cities.filter((city) => !existing.has(nameKey(city.name)));
+    const existing = new Set(this.citiesValue.map((city) => cityIdentity(city.name)));
+    const additions = cities.filter((city) => !existing.has(cityIdentity(city.name)));
     if (additions.length) this.citiesValue = [...this.citiesValue, ...additions];
   }
 
   referencedCustom(names: Iterable<string>): City[] {
-    const seedNames = new Set(SEED_CITIES.map((city) => nameKey(city.name)));
-    const referencedNames = new Set([...names].map(nameKey));
+    const seedNames = new Set(SEED_CITIES.map((city) => cityIdentity(city.name)));
+    const referencedNames = new Set([...names].map(cityIdentity));
     return this.citiesValue.filter(
-      (city) => !seedNames.has(nameKey(city.name)) && referencedNames.has(nameKey(city.name))
+      (city) =>
+        !seedNames.has(cityIdentity(city.name)) && referencedNames.has(cityIdentity(city.name))
     );
   }
 }

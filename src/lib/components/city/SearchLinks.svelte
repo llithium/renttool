@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { City } from '$lib/types';
-  import { money, parseCity } from '$lib/format';
+  import { money } from '$lib/format';
   import { buildSearchLinks } from '$lib/searchLinks';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
@@ -10,11 +10,8 @@
     class: className = ''
   }: { city: City; maxRent: number; class?: string } = $props();
 
-  let links = $derived.by(() => {
-    const parts = parseCity(city.name);
-    return parts ? buildSearchLinks(parts, maxRent) : [];
-  });
-  let recommended = $derived(links.find((link) => link.label.startsWith('Zillow')));
+  let links = $derived(buildSearchLinks(city, maxRent));
+  let recommended = $derived(links.find((link) => link.provider === 'zillow'));
   let alternatives = $derived(links.filter((link) => link !== recommended));
 </script>
 
@@ -58,19 +55,17 @@
 
   {#if alternatives.length}
     <div class="grid border-b border-line sm:grid-cols-3">
-      {#each alternatives as link (link.label)}
+      {#each alternatives as link (link.provider)}
         <a
           href={link.url}
           target="_blank"
           rel="noopener"
           class="group flex min-h-22 flex-col justify-between gap-2 border-b border-line px-0 py-4 text-sm no-underline hover:text-accent sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0 sm:last:pr-0"
         >
-          <span class="font-semibold text-ink group-hover:text-accent"
-            >{link.label.split(' · ')[0]}</span
-          >
+          <span class="font-semibold text-ink group-hover:text-accent">{link.providerName}</span>
           <span class="text-meta text-muted group-hover:text-accent">
-            {#if link.prefiltered}
-              Shows listings {link.label.split(' · ')[1]}
+            {#if link.prefiltered && link.capDescription}
+              Shows listings {link.capDescription}
             {:else}
               Browse listings — set your max rent
             {/if}

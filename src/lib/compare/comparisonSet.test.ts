@@ -1,18 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { SEED_CITIES } from '$lib/data/cities';
+import { city } from '../../../tests/fixtures/city';
 import {
   COMPARISON_STORAGE_KEY,
   DEFAULT_COMPARISON_SALARY,
   LEGACY_PLAN_STORAGE_KEY,
   LEGACY_SALARIES_STORAGE_KEY,
   MAX_COMPARISON_ENTRIES,
-  ComparisonSet,
-  createMemoryComparisonStorage
+  ComparisonSet
 } from './comparisonSet.svelte';
 
-const cities = SEED_CITIES.slice(0, MAX_COMPARISON_ENTRIES + 1);
+function createMemoryComparisonStorage(initial: Record<string, string> = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    read: (key: string) => values.get(key) ?? null,
+    write: (key: string, value: string) => {
+      values.set(key, value);
+      return true;
+    }
+  };
+}
+
+const cities = Array.from({ length: MAX_COMPARISON_ENTRIES + 1 }, (_, index) =>
+  city(`City ${index}, ZZ`, 1_000 + index * 100)
+);
 
 describe('ComparisonSet', () => {
+  it('normalizes replacement and restored salaries without committing zero', () => {
+    const storage = createMemoryComparisonStorage();
+    const set = new ComparisonSet({ storage });
+    set.replace([
+      { city: cities[0], salary: 0.1 },
+      { city: cities[1], salary: 123.8 }
+    ]);
+    expect(set.entries.map((entry) => entry.salary)).toEqual([124]);
+    expect(set.setSalary(cities[1].name, 0.1)).toBe(false);
+    storage.write(
+      COMPARISON_STORAGE_KEY,
+      JSON.stringify({
+        entries: [
+          { city: cities[0], salary: 0.1 },
+          { city: cities[1], salary: 123.8 }
+        ]
+      })
+    );
+    const restored = new ComparisonSet({ storage });
+    restored.restore({ resolveCity: () => null });
+    expect(restored.entries.map((entry) => entry.salary)).toEqual([124]);
+  });
+
   it('commits each added city with an independent initialized salary', () => {
     const storage = createMemoryComparisonStorage();
     const comparison = new ComparisonSet({ storage });

@@ -8,22 +8,16 @@
    */
   let {
     title,
-    level = 'h2',
     class: className = '',
     children
   }: {
     title: string;
-    level?: 'h2' | 'h3';
     class?: string;
     children?: Snippet;
   } = $props();
 </script>
 
 <div class="mb-6 flex flex-wrap items-baseline justify-between gap-4 {className}">
-  {#if level === 'h2'}
-    <h2 class="text-title text-ink">{title}</h2>
-  {:else}
-    <h3 class="text-body font-semibold tracking-tight text-ink">{title}</h3>
-  {/if}
+  <h2 class="text-title text-ink">{title}</h2>
   {@render children?.()}
 </div>

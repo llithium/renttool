@@ -137,9 +137,6 @@
   --shadow-card: var(--elevation-card);
   --shadow-pop: var(--elevation-pop);
 
-  /* 1120px — the page measure, between Tailwind's 6xl and 7xl containers. */
-  --container-page: 70rem;
-
   /* Motion — the plan resolves like a ledger: search choices settle into place,
      then a confirmed city gets one brief document refresh. All CSS-based so the
      reduced-motion block below neutralizes it automatically. */

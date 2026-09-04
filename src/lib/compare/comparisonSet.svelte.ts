@@ -1,8 +1,7 @@
 import { restoreCity } from '$lib/cityCatalog.svelte';
-import { MAX_SALARY } from '$lib/salary';
+import { cityIdentity } from '$lib/cityIdentity';
+import { normalizeSalary } from '$lib/salary';
 import type { City } from '$lib/types';
-
-export { restoreCity } from '$lib/cityCatalog.svelte';
 
 export const DEFAULT_COMPARISON_SALARY = 80_000;
 export const MAX_COMPARISON_ENTRIES = 5;
@@ -45,12 +44,12 @@ export type RestoreComparisonResult = {
   entries: readonly ComparisonEntry[];
 };
 
-export function isValidCommittedSalary(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_SALARY;
+function isValidCommittedSalary(value: unknown): value is number {
+  return normalizeSalary(value) != null;
 }
 
 function committedSalary(value: number | null | undefined): number {
-  return isValidCommittedSalary(value) ? Math.round(value) : DEFAULT_COMPARISON_SALARY;
+  return normalizeSalary(value) ?? DEFAULT_COMPARISON_SALARY;
 }
 
 export const browserComparisonStorage: ComparisonStorage = {
@@ -71,26 +70,8 @@ export const browserComparisonStorage: ComparisonStorage = {
   }
 };
 
-/** A deterministic adapter for module tests and non-browser sessions. */
-export function createMemoryComparisonStorage(
-  initial: Record<string, string> = {}
-): ComparisonStorage {
-  const values = new Map(Object.entries(initial));
-  return {
-    read: (key) => values.get(key) ?? null,
-    write: (key, value) => {
-      values.set(key, value);
-      return true;
-    }
-  };
-}
-
 function cloneEntry(entry: ComparisonEntry): ComparisonEntry {
-  return { city: { ...entry.city }, salary: Math.round(entry.salary) };
-}
-
-function nameKey(name: string): string {
-  return name.toLowerCase();
+  return { city: { ...entry.city }, salary: entry.salary };
 }
 
 function validEntry(value: unknown): value is {
@@ -125,10 +106,11 @@ function readSalaryRecord(raw: string | null): Record<string, number> {
 
 function salaryForName(salaries: Record<string, number>, name: string): number | null {
   const exact = salaries[name];
-  if (isValidCommittedSalary(exact)) return Math.round(exact);
-  const key = nameKey(name);
-  const match = Object.entries(salaries).find(([storedName]) => nameKey(storedName) === key);
-  return match && isValidCommittedSalary(match[1]) ? Math.round(match[1]) : null;
+  const exactNormalized = normalizeSalary(exact);
+  if (exactNormalized != null) return exactNormalized;
+  const key = cityIdentity(name);
+  const match = Object.entries(salaries).find(([storedName]) => cityIdentity(storedName) === key);
+  return match ? normalizeSalary(match[1]) : null;
 }
 
 function legacyPlan(raw: string | null): { names: string[]; salary: number | null } | null {
@@ -139,7 +121,7 @@ function legacyPlan(raw: string | null): { names: string[]; salary: number | nul
     : [];
   return {
     names,
-    salary: isValidCommittedSalary(value.salary) ? Math.round(value.salary) : null
+    salary: normalizeSalary(value.salary)
   };
 }
 
@@ -152,14 +134,16 @@ function currentEntries(
   const entries: ComparisonEntry[] = [];
   const seen = new Set<string>();
   for (const candidate of value.entries) {
-    if (!validEntry(candidate) || !isValidCommittedSalary(candidate.salary)) continue;
+    if (!validEntry(candidate)) continue;
+    const salary = normalizeSalary(candidate.salary);
+    if (salary == null) continue;
     const city =
       restoreCity(candidate.city) ??
       (typeof candidate.city === 'string' ? resolveCity?.(candidate.city) : null) ??
       (typeof candidate.name === 'string' ? resolveCity?.(candidate.name) : null);
-    if (!city || seen.has(nameKey(city.name))) continue;
-    seen.add(nameKey(city.name));
-    entries.push({ city, salary: Math.round(candidate.salary) });
+    if (!city || seen.has(cityIdentity(city.name))) continue;
+    seen.add(cityIdentity(city.name));
+    entries.push({ city, salary });
     if (entries.length >= MAX_COMPARISON_ENTRIES) break;
   }
   return entries;
@@ -194,12 +178,12 @@ export class ComparisonSet {
   }
 
   isComparing(name: string): boolean {
-    return this.entriesValue.some((entry) => nameKey(entry.city.name) === nameKey(name));
+    return this.entriesValue.some((entry) => cityIdentity(entry.city.name) === cityIdentity(name));
   }
 
   add(city: City, initialSalary: number | null): ComparisonAddResult {
     const existing = this.entriesValue.find(
-      (entry) => nameKey(entry.city.name) === nameKey(city.name)
+      (entry) => cityIdentity(entry.city.name) === cityIdentity(city.name)
     );
     if (existing) {
       return {
@@ -230,13 +214,14 @@ export class ComparisonSet {
 
   /** Commit one valid salary; presentation drafts never cross this seam. */
   setSalary(name: string, value: number): boolean {
-    if (!isValidCommittedSalary(value)) return false;
+    const salary = normalizeSalary(value);
+    if (salary == null) return false;
     const index = this.entriesValue.findIndex(
-      (entry) => nameKey(entry.city.name) === nameKey(name)
+      (entry) => cityIdentity(entry.city.name) === cityIdentity(name)
     );
     if (index < 0) return false;
     const next = [...this.entriesValue];
-    next[index] = { ...next[index], salary: Math.round(value) };
+    next[index] = { ...next[index], salary };
     this.entriesValue = next;
     this.persist();
     return true;
@@ -245,7 +230,7 @@ export class ComparisonSet {
   /** Keep a complete entry current when the rent-plan resolver hydrates its city. */
   updateCity(city: City): boolean {
     const index = this.entriesValue.findIndex(
-      (entry) => nameKey(entry.city.name) === nameKey(city.name)
+      (entry) => cityIdentity(entry.city.name) === cityIdentity(city.name)
     );
     if (index < 0) return false;
     const next = [...this.entriesValue];
@@ -256,7 +241,9 @@ export class ComparisonSet {
   }
 
   remove(name: string): boolean {
-    const next = this.entriesValue.filter((entry) => nameKey(entry.city.name) !== nameKey(name));
+    const next = this.entriesValue.filter(
+      (entry) => cityIdentity(entry.city.name) !== cityIdentity(name)
+    );
     if (next.length === this.entriesValue.length) return false;
     this.entriesValue = next;
     this.persist();
@@ -274,11 +261,13 @@ export class ComparisonSet {
     const next: ComparisonEntry[] = [];
     const seen = new Set<string>();
     for (const entry of entries) {
-      if (!entry || !entry.city || !isValidCommittedSalary(entry.salary)) continue;
-      const key = nameKey(entry.city.name);
+      if (!entry || !entry.city) continue;
+      const salary = normalizeSalary(entry.salary);
+      if (salary == null) continue;
+      const key = cityIdentity(entry.city.name);
       if (seen.has(key)) continue;
       seen.add(key);
-      next.push(cloneEntry(entry));
+      next.push(cloneEntry({ ...entry, salary }));
       if (next.length >= MAX_COMPARISON_ENTRIES) break;
     }
     this.entriesValue = next;
@@ -307,7 +296,7 @@ export class ComparisonSet {
       if (!city) {
         return { source: 'failed', entries: this.entriesValue };
       }
-      const key = nameKey(city.name);
+      const key = cityIdentity(city.name);
       if (seen.has(key)) continue;
       seen.add(key);
       next.push({
@@ -347,8 +336,4 @@ export class ComparisonSet {
       return false;
     }
   }
-}
-
-export function createComparisonSet(options: ComparisonSetOptions = {}): ComparisonSet {
-  return new ComparisonSet(options);
 }

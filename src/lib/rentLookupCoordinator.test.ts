@@ -99,15 +99,39 @@ describe('RentLookupCoordinator', () => {
       coordinatesForPlace
     });
 
-    const first = coordinator.coordinatesFor('City', 'ZZ');
-    const second = coordinator.coordinatesFor('city', 'zz');
+    const firstLease = coordinator.acquireCoordinates('City', 'ZZ');
+    const secondLease = coordinator.acquireCoordinates('city', 'zz');
+    const first = firstLease.promise;
+    const second = secondLease.promise;
     expect(coordinatesForPlace).toHaveBeenCalledOnce();
 
     request.resolve([40.7, -74]);
     await expect(first).resolves.toEqual([40.7, -74]);
     await expect(second).resolves.toEqual([40.7, -74]);
+    firstLease.release();
+    secondLease.release();
 
     coordinatesForPlace.mockRejectedValueOnce(new Error('unavailable'));
-    await expect(coordinator.coordinatesFor('Other', 'ZZ')).resolves.toBeUndefined();
+    const failed = coordinator.acquireCoordinates('Other', 'ZZ');
+    await expect(failed.promise).resolves.toBeUndefined();
+    failed.release();
+  });
+
+  it('aborts shared coordinate work only after the last lease releases', () => {
+    const request = deferred<readonly [number, number] | undefined>();
+    const signals: AbortSignal[] = [];
+    const coordinator = createRentLookupCoordinator({
+      lookupRent: vi.fn(async () => rent),
+      coordinatesForPlace: vi.fn((_city, _state, signal?: AbortSignal) => {
+        signals.push(signal!);
+        return request.promise;
+      })
+    });
+    const first = coordinator.acquireCoordinates('City', 'ZZ');
+    const second = coordinator.acquireCoordinates('city', 'zz');
+    first.release();
+    expect(signals[0]?.aborted).toBe(false);
+    second.release();
+    expect(signals[0]?.aborted).toBe(true);
   });
 });

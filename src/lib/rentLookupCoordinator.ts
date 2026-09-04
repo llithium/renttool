@@ -1,4 +1,5 @@
 import type { LookupResult } from '$lib/types';
+import { cityIdentity } from '$lib/cityIdentity';
 
 export interface RentLookupAdapters {
   /** Resolve a city's rent data, with cancellation owned by the coordinator. */
@@ -6,7 +7,8 @@ export interface RentLookupAdapters {
   /** Resolve coordinates for an exact city/state identity. */
   coordinatesForPlace: (
     city: string,
-    state: string
+    state: string,
+    signal?: AbortSignal
   ) => Promise<readonly [number, number] | undefined>;
 }
 
@@ -21,8 +23,13 @@ export interface RentLookupLease {
   release(): void;
 }
 
+export interface CoordinateLookupLease {
+  readonly promise: Promise<readonly [number, number] | undefined>;
+  release(): void;
+}
+
 export interface RentLookupCoordinator {
-  coordinatesFor(city: string, state: string): Promise<readonly [number, number] | undefined>;
+  acquireCoordinates(city: string, state: string): CoordinateLookupLease;
   acquireRent(target: RentLookupTarget): RentLookupLease;
 }
 
@@ -55,34 +62,59 @@ export function createRentLookupCoordinator(
   adapters: RentLookupAdapters,
   onRentResolved: (name: string, result: LookupResult) => void = () => undefined
 ): RentLookupCoordinator {
-  const coordinateLookups = new Map<string, Promise<readonly [number, number] | undefined>>();
+  const coordinateLookups = new Map<
+    string,
+    {
+      controller: AbortController;
+      promise: Promise<readonly [number, number] | undefined>;
+      consumers: Set<symbol>;
+    }
+  >();
   const rentLookups = new Map<string, SharedRentLookup>();
 
-  function coordinatesFor(
-    city: string,
-    state: string
-  ): Promise<readonly [number, number] | undefined> {
-    const key = `${city.toLowerCase()},${state.toLowerCase()}`;
-    const existing = coordinateLookups.get(key);
-    if (existing) return existing;
-
-    let request: Promise<readonly [number, number] | undefined>;
-    try {
-      request = Promise.resolve(adapters.coordinatesForPlace(city, state));
-    } catch {
-      request = Promise.resolve(undefined);
+  function acquireCoordinates(city: string, state: string): CoordinateLookupLease {
+    const key = cityIdentity(`${city}, ${state}`);
+    let shared = coordinateLookups.get(key);
+    if (shared?.controller.signal.aborted) {
+      coordinateLookups.delete(key);
+      shared = undefined;
     }
-    const lookup = request
-      .catch(() => undefined)
-      .finally(() => {
-        if (coordinateLookups.get(key) === lookup) coordinateLookups.delete(key);
-      });
-    coordinateLookups.set(key, lookup);
-    return lookup;
+    if (!shared) {
+      const controller = new AbortController();
+      let request: Promise<readonly [number, number] | undefined>;
+      try {
+        request = Promise.resolve(adapters.coordinatesForPlace(city, state, controller.signal));
+      } catch {
+        request = Promise.resolve(undefined);
+      }
+      shared = {
+        controller,
+        promise: request
+          .catch(() => undefined)
+          .finally(() => {
+            if (coordinateLookups.get(key) === shared) coordinateLookups.delete(key);
+          }),
+        consumers: new Set()
+      };
+      coordinateLookups.set(key, shared);
+    }
+    const consumer = Symbol();
+    shared.consumers.add(consumer);
+    let released = false;
+    return {
+      promise: shared.promise,
+      release() {
+        if (released) return;
+        released = true;
+        shared!.consumers.delete(consumer);
+        if (!shared!.consumers.size && coordinateLookups.get(key) === shared)
+          shared!.controller.abort();
+      }
+    };
   }
 
   function acquireRent(target: RentLookupTarget): RentLookupLease {
-    const key = target.name.toLowerCase();
+    const key = cityIdentity(target.name);
     let lookup = rentLookups.get(key);
     if (lookup?.controller.signal.aborted) {
       rentLookups.delete(key);
@@ -134,5 +166,5 @@ export function createRentLookupCoordinator(
     };
   }
 
-  return { coordinatesFor, acquireRent };
+  return { acquireCoordinates, acquireRent };
 }

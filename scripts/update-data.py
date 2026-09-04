@@ -38,6 +38,19 @@ def run(*arguments: str) -> None:
     subprocess.run([sys.executable, *arguments], cwd=ROOT, check=True)
 
 
+def require_aligned_membership() -> None:
+    rent_cities = city_names(load(RENT))
+    acs_cities = city_names(load(ACS))
+    if rent_cities != acs_cities:
+        missing = sorted(rent_cities - acs_cities)
+        extra = sorted(acs_cities - rent_cities)
+        raise RuntimeError(
+            "ACS rebuild did not produce exact rent membership; "
+            f"missing: {', '.join(missing[:15]) or 'none'}; "
+            f"extra: {', '.join(extra[:15]) or 'none'}"
+        )
+
+
 def main() -> None:
     options = parse_args()
     rent_builder = "scripts/build-apartment-list-data.py"
@@ -70,6 +83,8 @@ def main() -> None:
         flush=True,
     )
     run("scripts/build-acs-city-data.py", "--year", str(year))
+    require_aligned_membership()
+    print(f"City-facts coverage is aligned — {len(rent_cities)} cities", flush=True)
 
 
 if __name__ == "__main__":

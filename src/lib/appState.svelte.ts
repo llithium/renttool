@@ -12,7 +12,6 @@ import {
   MAX_COMPARISON_ENTRIES,
   type ComparisonEntry
 } from '$lib/compare/comparisonSet.svelte';
-import { popText } from '$lib/format';
 import {
   rentPlanHref,
   restoreRentPlan,
@@ -20,7 +19,8 @@ import {
   type RentPlanRepresentationInput,
   type RestoredRentPlan
 } from '$lib/planRepresentation';
-import { MAX_SALARY } from '$lib/salary';
+import { normalizeSalary } from '$lib/salary';
+import { cityIdentity } from '$lib/cityIdentity';
 import {
   createRentLookupCoordinator,
   type RentLookupAdapters,
@@ -32,19 +32,6 @@ import { fetchCoordinates, fetchPopulation, lookupRent } from '$lib/api';
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
 const LEGACY_KEY = LEGACY_PLAN_V2_STORAGE_KEY;
 const PLAN_PERSISTENCE_DELAY_MS = 150;
-
-export interface RentPlanSnapshot {
-  readonly salary: number | null;
-  readonly selected: City | null;
-  readonly selectedName: string | null;
-  readonly cities: readonly City[];
-  readonly compareCities: readonly City[];
-  readonly compareNames: readonly string[];
-  readonly compareEntries: readonly ComparisonEntry[];
-  readonly looking: boolean;
-  readonly pendingName: string | null;
-  readonly pendingComparisonNames: readonly string[];
-}
 
 type ResolutionIntent = 'active' | 'comparison';
 
@@ -92,8 +79,8 @@ const browserAdapters: RentPlanAdapters = {
 /**
  * The rent-plan workspace module.
  *
- * Callers express intent (`chooseCity`, `addComparison`, `setSalary`) and read a
- * snapshot. Lookup, persistence, canonicalization, cancellation, and capacity
+ * Callers express intent (`chooseCity`, `addComparison`, `setSalary`) and read focused
+ * state getters. Lookup, persistence, canonicalization, cancellation, and capacity
  * rules remain behind this seam, so the route and city modules do not need to
  * coordinate the workflow themselves.
  */
@@ -112,6 +99,7 @@ export class RentPlanWorkspace {
   private readonly comparisonRestoreOperations = new Map<string, ResolutionOperation>();
   private persistenceTimer: ReturnType<typeof setTimeout> | undefined;
   private persistencePending = false;
+  private readonly coordinateReleases = new Map<string, () => void>();
 
   constructor(adapters: RentPlanAdapters = browserAdapters) {
     this.adapters = adapters;
@@ -163,8 +151,8 @@ export class RentPlanWorkspace {
   }
 
   isComparisonPending(name: string): boolean {
-    const key = name.toLowerCase();
-    return this.pendingComparisonNamesValue.some((pending) => pending.toLowerCase() === key);
+    const key = cityIdentity(name);
+    return this.pendingComparisonNamesValue.some((pending) => cityIdentity(pending) === key);
   }
 
   get selected(): City | null {
@@ -183,27 +171,9 @@ export class RentPlanWorkspace {
     return this.cityCatalog.byName(name);
   }
 
-  get snapshot(): RentPlanSnapshot {
-    return {
-      salary: this.salary,
-      selected: this.selected,
-      selectedName: this.selectedName,
-      cities: this.cities,
-      compareCities: this.compareCities,
-      compareNames: this.compareNames,
-      compareEntries: this.compareEntries,
-      looking: this.looking,
-      pendingName: this.pendingName,
-      pendingComparisonNames: this.pendingComparisonNames
-    };
-  }
-
   /** Set the offer salary and queue the new plan for persistence. Invalid input clears it. */
   setSalary(value: number | null) {
-    this.salaryValue =
-      value != null && Number.isFinite(value) && value > 0 && value <= MAX_SALARY
-        ? Math.round(value)
-        : null;
+    this.salaryValue = normalizeSalary(value);
     this.schedulePersistence();
   }
 
@@ -222,6 +192,8 @@ export class RentPlanWorkspace {
     if (this.activeOperation) this.cancelOperation(this.activeOperation);
     this.activeOperation = null;
     this.pendingNameValue = null;
+    for (const release of this.coordinateReleases.values()) release();
+    this.coordinateReleases.clear();
   }
 
   private beginActiveOperation(): ResolutionOperation {
@@ -236,15 +208,15 @@ export class RentPlanWorkspace {
   }
 
   private markComparisonPending(name: string): void {
-    const key = name.toLowerCase();
-    if (this.pendingComparisonNamesValue.some((pending) => pending.toLowerCase() === key)) return;
+    const key = cityIdentity(name);
+    if (this.pendingComparisonNamesValue.some((pending) => cityIdentity(pending) === key)) return;
     this.pendingComparisonNamesValue = [...this.pendingComparisonNamesValue, name];
   }
 
   private clearComparisonPending(name: string): void {
-    const key = name.toLowerCase();
+    const key = cityIdentity(name);
     this.pendingComparisonNamesValue = this.pendingComparisonNamesValue.filter(
-      (pending) => pending.toLowerCase() !== key
+      (pending) => cityIdentity(pending) !== key
     );
   }
 
@@ -324,22 +296,35 @@ export class RentPlanWorkspace {
   private async ensureCoordinates(name: string) {
     const city = this.cityByName(name);
     if (!city || city.lat != null || city.lng != null) return;
-    const coords = await this.lookupCoordinator.coordinatesFor(city.city, city.state);
-    if (coords && this.cityCatalog.patchIfCurrent(city, { lat: coords[0], lng: coords[1] })) {
-      // A selected city can start without curated coordinates. Its initial
-      // population attempt necessarily ran before this lookup completed, so
-      // retry now that the population endpoint has a usable point.
-      void this.ensurePopulation(name);
+    const coordinateKey = cityIdentity(name);
+    if (this.coordinateReleases.has(coordinateKey)) return;
+    const lease = this.lookupCoordinator.acquireCoordinates(city.city, city.state);
+    this.coordinateReleases.set(coordinateKey, lease.release);
+    try {
+      const coords = await lease.promise;
+      if (
+        coords &&
+        this.coordinateReleases.get(coordinateKey) === lease.release &&
+        this.cityCatalog.patchIfCurrent(city, { lat: coords[0], lng: coords[1] })
+      ) {
+        // A selected city can start without curated coordinates. Its initial
+        // population attempt necessarily ran before this lookup completed, so
+        // retry now that the population endpoint has a usable point.
+        void this.ensurePopulation(name);
+      }
+    } finally {
+      lease.release();
+      if (this.coordinateReleases.get(coordinateKey) === lease.release)
+        this.coordinateReleases.delete(coordinateKey);
     }
   }
 
   private popLookups = new WeakMap<City, Set<string>>();
 
-  /** Fill in a missing population figure for a city (fire-and-forget).
-   * Curated seed blurbs like "2.8M metro" are kept as-is. */
+  /** Fill a missing population from the bundled places endpoint. */
   private async ensurePopulation(name: string) {
     const city = this.cityByName(name);
-    if (!city || city.pop || city.lat == null || city.lng == null) return;
+    if (!city || city.pop != null || city.lat == null || city.lng == null) return;
     const lat = city.lat;
     const lng = city.lng;
     const key = `${lat},${lng}`;
@@ -350,7 +335,7 @@ export class RentPlanWorkspace {
     try {
       const pop = await this.adapters.fetchPopulation(lat, lng);
       if (pop != null && this.cityByName(name) === city && city.lat === lat && city.lng === lng) {
-        this.cityCatalog.patchIfCurrent(city, { pop: popText(pop) });
+        this.cityCatalog.patchIfCurrent(city, { pop, populationSource: 'simplemaps' });
         this.persistImmediately();
       }
     } finally {
@@ -376,7 +361,7 @@ export class RentPlanWorkspace {
     const requestedName = typeof input === 'string' ? input : input.label;
     const canonicalName =
       typeof input === 'string' ? requestedName : this.cityCatalog.canonicalSuggestion(input).label;
-    const key = canonicalName.toLowerCase();
+    const key = cityIdentity(canonicalName);
     const known = this.cityByName(requestedName) ?? this.cityByName(canonicalName);
     if (known && this.isComparing(known.name)) {
       return this.comparisonSet.add(known, this.salary);
@@ -407,7 +392,7 @@ export class RentPlanWorkspace {
 
   /** Remove one comparison entry without changing the active plan. */
   removeComparison(name: string): boolean {
-    const key = name.toLowerCase();
+    const key = cityIdentity(name);
     const task = this.comparisonTasks.get(key);
     if (task) {
       this.cancelOperation(task.operation);
@@ -483,7 +468,7 @@ export class RentPlanWorkspace {
   ): Promise<string> {
     const selectOnResolve = options.select ?? true;
     const operation = options.operation;
-    const prefillPop = sug.pop != null && sug.pop > 0 ? popText(sug.pop) : '';
+    const prefillPop = sug.pop != null && sug.pop > 0 ? sug.pop : null;
     const seed = findSeedCity(sug.label);
     let target = this.cityCatalog.canonicalSuggestion(sug);
     if (!this.operationIsCurrent(operation)) return target.label;
@@ -492,7 +477,8 @@ export class RentPlanWorkspace {
       if (seed.lat == null && target.lat != null && target.lng != null) {
         this.cityCatalog.patch(seed.name, { lat: target.lat, lng: target.lng });
       }
-      if (!seed.pop && prefillPop) this.cityCatalog.patch(seed.name, { pop: prefillPop });
+      if (seed.pop == null && prefillPop != null)
+        this.cityCatalog.patch(seed.name, { pop: prefillPop, populationSource: 'simplemaps' });
       if (seed.r1 != null) {
         if (selectOnResolve && this.activeOperationIsCurrent(operation)) {
           this.commitSelection(seed.name);
@@ -503,18 +489,23 @@ export class RentPlanWorkspace {
 
     if (!seed && (target.lat == null || target.lng == null)) {
       this.markOperationPending(operation, target.label);
-      const coords = await this.lookupCoordinator.coordinatesFor(target.city, target.state);
-      if (!this.operationIsCurrent(operation)) return target.label;
-      if (coords) {
-        target = { ...target, lat: coords[0], lng: coords[1] };
+      const coordinateLease = this.lookupCoordinator.acquireCoordinates(target.city, target.state);
+      operation.lookupRelease = coordinateLease.release;
+      try {
+        const coords = await coordinateLease.promise;
+        if (!this.operationIsCurrent(operation)) return target.label;
+        if (coords) target = { ...target, lat: coords[0], lng: coords[1] };
+      } finally {
+        coordinateLease.release();
+        operation.lookupRelease = null;
       }
     }
 
     let existing = this.cityByName(target.label);
     if (!existing) {
       existing = this.cityCatalog.ensurePlaceholder({ ...target, pop: sug.pop });
-    } else if (!existing.pop && prefillPop) {
-      this.cityCatalog.patch(target.label, { pop: prefillPop });
+    } else if (existing.pop == null && prefillPop != null) {
+      this.cityCatalog.patch(target.label, { pop: prefillPop, populationSource: 'simplemaps' });
     }
 
     // Load rent BEFORE switching the view. Selecting immediately would flash the
@@ -576,9 +567,9 @@ export class RentPlanWorkspace {
       // Off-list cities added via autocomplete aren't in the seed set — store them
       // whole so selection/comparison survives a reload.
       const referencedNames = new Set<string>();
-      if (this.selectedNameValue) referencedNames.add(this.selectedNameValue.toLowerCase());
+      if (this.selectedNameValue) referencedNames.add(cityIdentity(this.selectedNameValue));
       for (const entry of this.comparisonSet.entries) {
-        referencedNames.add(entry.city.name.toLowerCase());
+        referencedNames.add(cityIdentity(entry.city.name));
       }
       const custom = this.cityCatalog.referencedCustom(referencedNames);
       this.adapters.writeStorage(
@@ -627,7 +618,7 @@ export class RentPlanWorkspace {
 
   private startComparisonRestore(suggestion: PlanSuggestion): void {
     const canonical = this.cityCatalog.canonicalSuggestion(suggestion);
-    const key = canonical.label.toLowerCase();
+    const key = cityIdentity(canonical.label);
     if (this.comparisonRestoreOperations.has(key) || this.comparisonTasks.has(key)) return;
     const operation = this.createOperation('comparison');
     this.comparisonRestoreOperations.set(key, operation);
@@ -681,7 +672,7 @@ export class RentPlanWorkspace {
       }
       if (!city) continue;
 
-      const cityKey = city.name.toLowerCase();
+      const cityKey = cityIdentity(city.name);
       if (seen.has(cityKey)) continue;
       seen.add(cityKey);
       entries.push({ city, salary: restored.salary });
@@ -764,14 +755,8 @@ export class RentPlanWorkspace {
       }
 
       if (restoredPlan) {
-        if (
-          typeof restoredPlan.salary === 'number' &&
-          Number.isFinite(restoredPlan.salary) &&
-          restoredPlan.salary > 0 &&
-          restoredPlan.salary <= MAX_SALARY
-        ) {
-          this.salaryValue = restoredPlan.salary;
-        }
+        const restoredSalary = normalizeSalary(restoredPlan.salary);
+        if (restoredSalary != null) this.salaryValue = restoredSalary;
         if (Array.isArray(restoredPlan.custom)) {
           const valid = restoredPlan.custom
             .map(restoreCity)

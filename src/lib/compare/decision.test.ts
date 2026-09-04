@@ -1,33 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeComparison } from './decision';
-import type { City } from '$lib/types';
-
-function city(name: string, r1: number | null): City {
-  const [cityName, state] = name.split(', ');
-  return {
-    name,
-    city: cityName,
-    state,
-    r1,
-    r2: r1 == null ? null : r1 + 300,
-    yoy: 1.2,
-    tax: 'varies',
-    pop: '100,000',
-    citySnapshot: null,
-    lat: 40,
-    lng: -74,
-    source: r1 == null ? 'none' : 'apartment-list',
-    rentMetric: r1 == null ? 'unknown' : 'estimated-median',
-    rentArea: name,
-    rentYear: 'June 2026'
-  };
-}
+import { city } from '../../../tests/fixtures/city';
 
 function entry(name: string, salary: number, r1: number | null) {
   return { city: city(name, r1), salary };
 }
 
 describe('comparison decision', () => {
+  it('excludes missing facts from ranking while displaying genuine zero values', () => {
+    const missing = city('Missing, ZZ', 1200);
+    const zero = city('Zero, ZZ', 1200);
+    missing.citySnapshot = {
+      population: 100000,
+      householdIncome: 60000,
+      commuteMinutes: null,
+      renterShare: null,
+      rentalVacancy: null
+    };
+    zero.citySnapshot = {
+      population: 100000,
+      householdIncome: 60000,
+      commuteMinutes: 0,
+      renterShare: 0,
+      rentalVacancy: 0
+    };
+    const view = analyzeComparison([
+      { city: missing, salary: 80000 },
+      { city: zero, salary: 80000 }
+    ]);
+    for (const key of ['commute', 'renters', 'vacancy'] as const) {
+      expect(view.entries[0].metrics[key]).toMatchObject({ number: null, value: '—', tone: null });
+      expect(view.entries[1].metrics[key]).toMatchObject({ number: 0, tone: null });
+    }
+    expect(view.entries[1].metrics.commute.value).toBe('0 min');
+    expect(view.entries[1].metrics.vacancy.value).toBe('0%');
+  });
+
   it('turns numeric city salary entries into a complete decision view', () => {
     const view = analyzeComparison([entry('Alpha, ZZ', 80_000, 1_200)]);
     const result = view.entries[0];

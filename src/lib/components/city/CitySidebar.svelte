@@ -60,7 +60,7 @@
       {#if activeCity && budget}
         <div class="border-line @max-4xl:border-t @max-4xl:pt-7 @4xl:border-l @4xl:pl-10">
           <BudgetCard {budget} />
-          <CityActions {presentation} cityName={activeCity.name} canShare={true} />
+          <CityActions {presentation} cityName={activeCity.name} />
         </div>
       {/if}
     </div>

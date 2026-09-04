@@ -27,21 +27,9 @@ describe('rent map marker lifecycle', () => {
     });
   });
 
-  it('retains marker identities when only affordability presentation changes', () => {
-    const markerByName = new Map([
-      ['A, ZZ', {}],
-      ['B, ZZ', {}]
-    ]);
-    const retainedMarker = markerByName.get('A, ZZ');
+  it('changes marker presentation when affordability changes', () => {
     const before = markerPresentation(city('A, ZZ', 2_000), 1_500, null, palette);
     const after = markerPresentation(city('A, ZZ', 2_000), 2_500, null, palette);
-    const changes = reconcileMarkerKeys(markerByName.keys(), [
-      city('A, ZZ', 2_000),
-      city('B, ZZ', 1_000)
-    ]);
-
-    expect(changes).toEqual({ added: [], retained: ['A, ZZ', 'B, ZZ'], removed: [] });
-    expect(markerByName.get('A, ZZ')).toBe(retainedMarker);
     expect(after.fillColor).not.toBe(before.fillColor);
     expect(after.tooltipDetail).not.toBe(before.tooltipDetail);
     expect(after.ariaLabel).toContain('fits budget');

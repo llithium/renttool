@@ -2,6 +2,7 @@ import type { City, CitySnapshot } from '$lib/types';
 import { COORDS } from './coordinates';
 import apartmentListData from './apartment-list-rents.json';
 import acsCityData from './acs-city-facts.json';
+import { cityIdentity } from '$lib/cityIdentity';
 
 /** Curated context layered over the bundled Apartment List city estimates. */
 interface ApartmentListData {
@@ -141,17 +142,6 @@ function cityOf(name: string): string {
   return name.replace(/,\s*[A-Za-z]{2}$/, '').trim();
 }
 
-function normalizedCityKey(name: string): string {
-  const key = name
-    .trim()
-    .toLowerCase()
-    .replace(/[.-]/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-  return key === 'new york city ny' ? 'new york ny' : key;
-}
-
 /** Build the immutable seed city map keyed by canonical "City, ST". */
 function buildSeed(): Map<string, City> {
   const map = new Map<string, City>();
@@ -168,7 +158,8 @@ function buildSeed(): Map<string, City> {
       r2: rent.r2,
       yoy: rent.yoy,
       tax: TAX_OVERRIDES[name] ?? STATE_TAX[st] ?? 'varies',
-      pop: (citySnapshot?.population ?? rent.population).toLocaleString('en-US'),
+      pop: citySnapshot?.population ?? rent.population ?? null,
+      populationSource: citySnapshot ? 'acs' : 'apartment-list',
       citySnapshot,
       lat: coord?.[0],
       lng: coord?.[1],
@@ -187,11 +178,11 @@ export const SEED_CITIES: City[] = [...buildSeed().values()].sort((a, b) =>
   a.name.localeCompare(b.name)
 );
 
-const SEED_BY_KEY = new Map(SEED_CITIES.map((city) => [normalizedCityKey(city.name), city]));
+const SEED_BY_KEY = new Map(SEED_CITIES.map((city) => [cityIdentity(city.name), city]));
 
 /** Punctuation-tolerant lookup of a seed city by "City, ST". */
 export function findSeedCity(name: string): City | undefined {
-  return SEED_BY_KEY.get(normalizedCityKey(name));
+  return SEED_BY_KEY.get(cityIdentity(name));
 }
 
 export { stateOf, cityOf };

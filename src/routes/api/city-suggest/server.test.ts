@@ -125,6 +125,45 @@ describe('GET /api/city-suggest', () => {
     });
   });
 
+  it('skips malformed features without dropping later valid suggestions', async () => {
+    const response = await GET(
+      requestEvent(
+        '?q=tampa',
+        vi.fn(async () =>
+          Response.json({
+            features: [
+              null,
+              12,
+              {
+                properties: {
+                  countrycode: 'US',
+                  osm_key: 'place',
+                  osm_value: 'city',
+                  name: 'Bad geometry',
+                  state: 'FL'
+                },
+                geometry: { coordinates: {} }
+              },
+              {
+                properties: {
+                  countrycode: 'US',
+                  osm_key: 'place',
+                  osm_value: 'city',
+                  name: 'Tampa',
+                  state: 'FL'
+                },
+                geometry: { coordinates: [-82.4584, 27.9477] }
+              }
+            ]
+          })
+        )
+      )
+    );
+    expect(await response.json()).toEqual({
+      suggestions: [{ label: 'Tampa, FL', city: 'Tampa', state: 'FL', lat: 27.9477, lng: -82.4584 }]
+    });
+  });
+
   it('returns an empty list when Photon fails', async () => {
     const response = await GET(
       requestEvent(

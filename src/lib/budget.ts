@@ -146,9 +146,6 @@ export function computeBudget(
     localMonthly,
     localRate,
     localTaxModeled,
-    taxAssumptions: localTaxModeled
-      ? 'single filer · standard deduction · estimated state and local rates'
-      : 'single filer · standard deduction · local income tax not modeled',
     effRate: grossMonthly > 0 ? totalTaxMonthly / grossMonthly : 0
   };
 }

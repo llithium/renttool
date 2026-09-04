@@ -20,10 +20,14 @@
   onMount(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    let cleanup = () => {};
+    let disposed = false;
+    let cleanup = () => {
+      disposed = true;
+    };
 
     void Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
       ([{ default: gsap }, { ScrollTrigger }]) => {
+        if (disposed) return;
         gsap.registerPlugin(ScrollTrigger);
 
         const context = gsap.context(() => {
@@ -62,9 +66,16 @@
               }
             });
           });
-        });
+        }, root);
 
-        cleanup = () => context.revert();
+        cleanup = () => {
+          disposed = true;
+          context.revert();
+        };
+      },
+      () => {
+        // Motion is an enhancement; an unavailable optional module leaves the page usable.
+        disposed = true;
       }
     );
 

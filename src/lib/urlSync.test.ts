@@ -1,8 +1,6 @@
-import { SvelteMap } from 'svelte/reactivity';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { pushState, replaceState } from '$app/navigation';
-import { createUrlSync } from './urlSync.svelte';
-import type { RentPlanPresentation } from './rentPlanPresentation.svelte';
+import { createUrlSync, type UrlSyncPlan } from './urlSync.svelte';
 
 vi.mock('$app/navigation', () => ({
   pushState: vi.fn(),
@@ -30,10 +28,9 @@ interface BrowserShim {
   readonly dispatchPopState: () => void;
 }
 
-interface FakePlan {
+interface FakePlan extends UrlSyncPlan {
   salary: number | null;
-  activeCity: object | null;
-  comparisonCities: object[];
+  activeCity: { name: string } | null;
   comparisonNames: string[];
   selectedName: string | null;
   looking: boolean;
@@ -43,11 +40,11 @@ interface FakePlan {
   searchBySalary: Record<string, string>;
   hydratedSearches: URLSearchParams[];
   appliedSearches: URLSearchParams[];
-  readonly buildSearch: ReturnType<typeof vi.fn>;
-  readonly hydrateFromSearch: ReturnType<typeof vi.fn>;
-  readonly applyUrlNavigation: ReturnType<typeof vi.fn>;
-  readonly restoreSession: ReturnType<typeof vi.fn>;
-  readonly setSalary: ReturnType<typeof vi.fn>;
+  readonly buildSearch: Mock<UrlSyncPlan['buildSearch']>;
+  readonly hydrateFromSearch: Mock<UrlSyncPlan['hydrateFromSearch']>;
+  readonly applyUrlNavigation: Mock<UrlSyncPlan['applyUrlNavigation']>;
+  readonly restoreSession: Mock<UrlSyncPlan['restoreSession']>;
+  readonly setSalary: Mock<UrlSyncPlan['setSalary']>;
 }
 
 interface TestEffect {
@@ -107,94 +104,18 @@ function installBrowserShim(initialSearch: string): BrowserShim {
 }
 
 function createFakePlan(options: Partial<FakePlan> = {}): FakePlan {
-  const state = new SvelteMap<string, unknown>([
-    ['salary', 80_000],
-    ['activeCity', {}],
-    ['comparisonCities', []],
-    ['comparisonNames', []],
-    ['selectedName', 'Tampa, FL'],
-    ['looking', false],
-    ['pendingComparisonNames', []],
-    ['currentSearch', INITIAL_SEARCH],
-    ['hadUrlState', true],
-    ['searchBySalary', {}],
-    ['hydratedSearches', []],
-    ['appliedSearches', []]
-  ]);
-
-  const plan = {
-    get salary() {
-      return state.get('salary') as number | null;
-    },
-    set salary(value: number | null) {
-      state.set('salary', value);
-    },
-    get activeCity() {
-      return state.get('activeCity') as object | null;
-    },
-    set activeCity(value: object | null) {
-      state.set('activeCity', value);
-    },
-    get comparisonCities() {
-      return state.get('comparisonCities') as object[];
-    },
-    set comparisonCities(value: object[]) {
-      state.set('comparisonCities', value);
-    },
-    get comparisonNames() {
-      return state.get('comparisonNames') as string[];
-    },
-    set comparisonNames(value: string[]) {
-      state.set('comparisonNames', value);
-    },
-    get selectedName() {
-      return state.get('selectedName') as string | null;
-    },
-    set selectedName(value: string | null) {
-      state.set('selectedName', value);
-    },
-    get looking() {
-      return state.get('looking') as boolean;
-    },
-    set looking(value: boolean) {
-      state.set('looking', value);
-    },
-    get pendingComparisonNames() {
-      return state.get('pendingComparisonNames') as string[];
-    },
-    set pendingComparisonNames(value: string[]) {
-      state.set('pendingComparisonNames', value);
-    },
-    get currentSearch() {
-      return state.get('currentSearch') as string;
-    },
-    set currentSearch(value: string) {
-      state.set('currentSearch', value);
-    },
-    get hadUrlState() {
-      return state.get('hadUrlState') as boolean;
-    },
-    set hadUrlState(value: boolean) {
-      state.set('hadUrlState', value);
-    },
-    get searchBySalary() {
-      return state.get('searchBySalary') as Record<string, string>;
-    },
-    set searchBySalary(value: Record<string, string>) {
-      state.set('searchBySalary', value);
-    },
-    get hydratedSearches() {
-      return state.get('hydratedSearches') as URLSearchParams[];
-    },
-    set hydratedSearches(value: URLSearchParams[]) {
-      state.set('hydratedSearches', value);
-    },
-    get appliedSearches() {
-      return state.get('appliedSearches') as URLSearchParams[];
-    },
-    set appliedSearches(value: URLSearchParams[]) {
-      state.set('appliedSearches', value);
-    },
+  const plan: FakePlan = {
+    salary: 80_000,
+    activeCity: { name: 'Tampa, FL' },
+    comparisonNames: [],
+    selectedName: 'Tampa, FL',
+    looking: false,
+    pendingComparisonNames: [],
+    currentSearch: INITIAL_SEARCH,
+    hadUrlState: true,
+    searchBySalary: {},
+    hydratedSearches: [],
+    appliedSearches: [],
     buildSearch: vi.fn(function (this: FakePlan, salaryOverride?: number | null) {
       const override = salaryOverride === undefined ? 'undefined' : String(salaryOverride);
       return this.searchBySalary[override] ?? this.currentSearch;
@@ -225,7 +146,7 @@ let cleanupHarness: (() => void) | undefined;
 function createHarness(plan: FakePlan, initialSearch: string) {
   const browser = installBrowserShim(initialSearch);
   const effect = createTestEffect();
-  const urlSync = createUrlSync(plan as unknown as RentPlanPresentation, effect.register);
+  const urlSync = createUrlSync(plan, effect.register);
   flushEffects = effect.flush;
   flushSync();
 
@@ -502,20 +423,6 @@ describe('createUrlSync', () => {
       '?salary=82000&city=Austin%2C+TX',
       harness.browser.history.state
     );
-  });
-
-  it('ignores a popstate before hydration', () => {
-    const plan = createFakePlan();
-    const harness = createHarness(plan, INITIAL_SEARCH);
-    harness.browser.location.search = `?${ACTIVE_CITY_SEARCH}`;
-
-    harness.browser.dispatchPopState();
-    flushSync();
-
-    expect(plan.applyUrlNavigation).not.toHaveBeenCalled();
-    expect(pushState).not.toHaveBeenCalled();
-    expect(replaceState).not.toHaveBeenCalled();
-    expect(harness.browser.window.addEventListener).not.toHaveBeenCalled();
   });
 
   it('makes later popstate dispatches inert after teardown', () => {

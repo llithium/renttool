@@ -8,9 +8,9 @@ export type RentMetric = 'estimated-median' | 'fair-market-rent' | 'unknown';
 export interface CitySnapshot {
   population: number;
   householdIncome: number;
-  commuteMinutes: number;
-  renterShare: number;
-  rentalVacancy: number;
+  commuteMinutes: number | null;
+  renterShare: number | null;
+  rentalVacancy: number | null;
 }
 
 /** A city record: curated context merged with bundled rent figures. */
@@ -19,16 +19,18 @@ export interface City {
   name: string;
   city: string;
   state: string;
-  /** Median 1BR rent, monthly USD. */
+  /** 1BR rent, monthly USD; interpreted according to rentMetric. */
   r1: number | null;
-  /** Median 2BR rent, monthly USD. */
+  /** 2BR rent, monthly USD; interpreted according to rentMetric. */
   r2: number | null;
   /** 1BR year-over-year change, percent. null = unknown. */
   yoy: number | null;
   /** State/local income-tax note. */
   tax: string;
-  /** Display population; ACS place estimate when available. */
-  pop: string;
+  /** Place population estimate when available. */
+  pop: number | null;
+  /** Provider for the population estimate. */
+  populationSource: 'acs' | 'apartment-list' | 'simplemaps' | null;
   /** Structured, bundled ACS place facts. */
   citySnapshot: CitySnapshot | null;
   lat?: number;
@@ -63,7 +65,7 @@ export interface CityImage {
   sourceUrl: string;
 }
 
-/** A nearby place returned by /api/nearby (OpenStreetMap via Overpass). */
+/** A nearby place returned by /api/nearby (bundled SimpleMaps places). */
 export interface NearbyPlace {
   label: string; // "City, ST"
   city: string;
@@ -100,7 +102,7 @@ export interface Budget {
   grossMonthly: number;
   maxRent: number; // 30% rule
   comfyRent: number; // 25% rule
-  takeHomeMonthly: number; // after federal + FICA + state tax
+  takeHomeMonthly: number; // after federal + FICA + state + modeled local tax
   federalMonthly: number; // federal income tax
   ficaMonthly: number; // Social Security + Medicare
   stateMonthly: number; // state income tax
@@ -108,6 +110,5 @@ export interface Budget {
   localMonthly: number; // modeled city/local income tax
   localRate: number; // city/local effective-rate estimate
   localTaxModeled: boolean; // false means a possible local tax is not included
-  taxAssumptions: string;
   effRate: number; // total tax / gross, for the summary label
 }

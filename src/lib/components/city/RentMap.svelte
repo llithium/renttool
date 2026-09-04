@@ -1,6 +1,6 @@
 <script lang="ts">
   import 'leaflet/dist/leaflet.css';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import type { City } from '$lib/types';
   import type { Map as LMap, LayerGroup, CircleMarker } from 'leaflet';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
@@ -27,6 +27,7 @@
   let ready = $state(false);
   let centeredName: string | null = null;
   let handledFocusRequest = 0;
+  let disposed = false;
 
   const markers = new Map<string, CircleMarker>();
   const tooltipParts = new Map<string, { title: HTMLElement; detail: Text }>();
@@ -196,43 +197,52 @@
     }
   }
 
-  onMount(async () => {
-    L = (await import('leaflet')).default ?? (await import('leaflet'));
-    // zoomAnimation off: an interrupted zoom animation (wheel during the
-    // select-recenter, or vice versa) leaves the SVG marker pane with a stale
-    // transform, detaching markers from their coordinates. Discrete zoom steps
-    // have no animation window to corrupt.
-    map = L.map(el, {
-      scrollWheelZoom: false,
-      attributionControl: true,
-      zoomAnimation: false
-    }).setView([39.5, -96], 4);
-    // Wheel scrolling passes through to the page until focus is inside the map
-    // (click or keyboard), so it never traps the page scroll unintentionally.
-    // focusin/focusout, not Leaflet's focus/blur: those only watch the container
-    // element itself, and focus usually sits on a marker inside it.
-    const container = map.getContainer();
-    container.addEventListener('focusin', () => map?.scrollWheelZoom.enable());
-    container.addEventListener('focusout', (event) => {
-      const next = event.relatedTarget;
-      if (!(next instanceof Node) || !container.contains(next)) {
-        map?.scrollWheelZoom.disable();
-      }
-    });
-    // CARTO Positron: a light, low-detail basemap so the affordability markers stand out.
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors © CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
-    group = L.layerGroup().addTo(map);
-    ready = true;
-    reconcileMarkers();
-    updateMarkerPresentation();
-  });
+  onMount(() => {
+    void import('leaflet')
+      .then((leaflet) => {
+        if (disposed) return;
+        L = leaflet.default ?? leaflet;
+        // zoomAnimation off: an interrupted zoom animation (wheel during the
+        // select-recenter, or vice versa) leaves the SVG marker pane with a stale
+        // transform, detaching markers from their coordinates. Discrete zoom steps
+        // have no animation window to corrupt.
+        map = L.map(el, {
+          scrollWheelZoom: false,
+          attributionControl: true,
+          zoomAnimation: false
+        }).setView([39.5, -96], 4);
+        // Wheel scrolling passes through to the page until focus is inside the map
+        // (click or keyboard), so it never traps the page scroll unintentionally.
+        // focusin/focusout, not Leaflet's focus/blur: those only watch the container
+        // element itself, and focus usually sits on a marker inside it.
+        const container = map.getContainer();
+        container.addEventListener('focusin', () => map?.scrollWheelZoom.enable());
+        container.addEventListener('focusout', (event) => {
+          const next = event.relatedTarget;
+          if (!(next instanceof Node) || !container.contains(next)) {
+            map?.scrollWheelZoom.disable();
+          }
+        });
+        // CARTO Positron: a light, low-detail basemap so the affordability markers stand out.
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors © CARTO',
+          subdomains: 'abcd',
+          maxZoom: 19
+        }).addTo(map);
+        group = L.layerGroup().addTo(map);
+        ready = true;
+        reconcileMarkers();
+        updateMarkerPresentation();
+      })
+      .catch(() => {
+        // Leaflet is an enhancement; keep the rest of the city view usable if it fails to load.
+        ready = false;
+      });
 
-  onDestroy(() => {
-    map?.remove();
+    return () => {
+      disposed = true;
+      map?.remove();
+    };
   });
 
   // Reconcile marker identities only when the located city collection changes.

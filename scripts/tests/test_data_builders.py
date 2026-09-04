@@ -3,14 +3,18 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import sys
+import shutil
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 def load_script(module_name: str, filename: str):
@@ -26,6 +30,7 @@ def load_script(module_name: str, filename: str):
 apartment = load_script("build_apartment_list_data", "build-apartment-list-data.py")
 acs = load_script("build_acs_city_data", "build-acs-city-data.py")
 fmr = load_script("build_fmr_data", "build-fmr-data.py")
+updater = load_script("update_data", "update-data.py")
 
 
 class ApartmentListBuilderTests(unittest.TestCase):
@@ -89,6 +94,25 @@ class ApartmentListBuilderTests(unittest.TestCase):
     def test_default_city_guard_remains_fail_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "expected at least 600"):
             apartment.build_payload(self.fieldnames, self.rows)
+
+    def test_conflicting_duplicate_city_bed_rows_are_rejected(self) -> None:
+        rows = [row.copy() for row in self.rows]
+        rows.append(rows[0] | {"2025_07": "9999"})
+        with self.assertRaisesRegex(ValueError, "conflicting duplicate row"):
+            apartment.build_payload(self.fieldnames, rows, minimum_cities=5)
+
+    def test_missing_population_is_rejected_explicitly(self) -> None:
+        rows = [row.copy() for row in self.rows]
+        rows[0]["population"] = ""
+        with self.assertRaisesRegex(ValueError, "missing population"):
+            apartment.build_payload(self.fieldnames, rows, minimum_cities=5)
+
+    def test_invalid_population_values_are_rejected(self) -> None:
+        for value in ("-1", "NaN", "Infinity"):
+            rows = [row.copy() for row in self.rows]
+            rows[0]["population"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "population"):
+                apartment.build_payload(self.fieldnames, rows, minimum_cities=5)
 
     def test_discovers_the_historic_csv_from_next_data(self) -> None:
         payload = {
@@ -154,8 +178,8 @@ class AcsBuilderTests(unittest.TestCase):
             ("B19013_E001",),
         )
 
-        self.assertEqual(values["0000002"]["B19013_E001"], 0)
-        self.assertEqual(values["0000003"]["B19013_E001"], 0)
+        self.assertIsNone(values["0000002"]["B19013_E001"])
+        self.assertIsNone(values["0000003"]["B19013_E001"])
         self.assertNotIn("0400000US13", values)
         self.assertEqual(acs.percent(40, 100), 40.0)
         self.assertEqual(acs.percent(-1, 100), None)
@@ -207,8 +231,52 @@ class AcsBuilderTests(unittest.TestCase):
                 minimum_places=0,
             )
 
+    def test_optional_missing_facts_remain_null_and_measured_zero_stays_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.table_paths()
+            copied = {}
+            for table, source in paths.items():
+                destination = root / source.name
+                shutil.copy(source, destination)
+                copied[table] = destination
+            commute_text = copied["B08013"].read_text()
+            copied["B08013"].write_text(commute_text.replace("0000001|600", "0000001|0"))
+            vacancy_text = copied["B25004"].read_text()
+            copied["B25004"].write_text(vacancy_text.replace("1600000US0000001|4|2\n", ""))
+            payload = acs.build(
+                2024,
+                {acs.normalize("Athens, GA"): "Athens, GA"},
+                copied,
+                FIXTURES / "2024_Gaz_place_national.txt",
+                minimum_matches=1,
+                minimum_places=0,
+            )
+            self.assertEqual(payload["cities"]["Athens, GA"]["commuteMinutes"], 0.0)
+            self.assertIsNone(payload["cities"]["Athens, GA"]["rentalVacancy"])
+
 
 class FmrBuilderTests(unittest.TestCase):
+    def test_non_default_year_requires_explicit_source(self) -> None:
+        with patch.object(sys, "argv", ["build-fmr-data.py", "--year", "FY2027"]):
+            with self.assertRaisesRegex(ValueError, "explicit --url or --input"):
+                fmr.validate_args(fmr.parse_args())
+
+    def test_hud_url_year_must_match_label(self) -> None:
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "build-fmr-data.py",
+                "--year",
+                "FY2027",
+                "--url",
+                "https://www.huduser.gov/FY26_FMRs.xlsx",
+            ],
+        ):
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                fmr.validate_args(fmr.parse_args())
+
     def test_col_index_edge_cases(self) -> None:
         self.assertEqual(fmr.col_index("A1"), 0)
         self.assertEqual(fmr.col_index("Z7"), 25)
@@ -240,6 +308,67 @@ class FmrBuilderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "expected at least 3000"):
             fmr.build_payload(rows, "FY2027")
+
+
+class MaintenanceCommandTests(unittest.TestCase):
+    def test_atomic_writers_preserve_existing_bundle_when_replace_fails(self) -> None:
+        payload = {"meta": {"year": 2027}, "cities": {"Example, ZZ": {}}}
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "snapshot.json"
+            original = '{"original":true}\n'
+            output.write_text(original, encoding="utf-8")
+            from data_output import write_json_atomically
+
+            with patch("data_output.os.replace", side_effect=OSError("disk full")):
+                with self.assertRaisesRegex(OSError, "disk full"):
+                    write_json_atomically(output, payload)
+            self.assertEqual(output.read_text(encoding="utf-8"), original)
+            self.assertEqual(list(output.parent.iterdir()), [output])
+
+            with self.assertRaises(TypeError):
+                write_json_atomically(output, {"bad": object()})
+            self.assertEqual(list(output.parent.iterdir()), [output])
+
+    def test_updater_rechecks_exact_membership_after_rebuild(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rent = root / "rent.json"
+            acs_path = root / "acs.json"
+            rent.write_text(json.dumps({"cities": {"A, ZZ": {}}}), encoding="utf-8")
+            acs_path.write_text(json.dumps({"cities": {"B, ZZ": {}}}), encoding="utf-8")
+            with patch.object(updater, "RENT", rent), patch.object(updater, "ACS", acs_path):
+                with self.assertRaisesRegex(RuntimeError, "missing: A, ZZ"):
+                    updater.require_aligned_membership()
+            acs_path.write_text(json.dumps({"cities": {"A, ZZ": {}}}), encoding="utf-8")
+            with patch.object(updater, "RENT", rent), patch.object(updater, "ACS", acs_path):
+                updater.require_aligned_membership()
+
+    def test_updater_command_reports_failed_and_repaired_rebuilds(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rent = root / "rent.json"
+            acs_path = root / "acs.json"
+            rent.write_text(json.dumps({"cities": {"A, ZZ": {}}}), encoding="utf-8")
+            acs_path.write_text(
+                json.dumps({"meta": {"year": 2024}, "cities": {"B, ZZ": {}}}),
+                encoding="utf-8",
+            )
+            with patch.object(updater, "RENT", rent), patch.object(updater, "ACS", acs_path):
+                with patch.object(updater, "run"), patch.object(updater.sys, "argv", ["update-data.py"]):
+                    with self.assertRaisesRegex(RuntimeError, "missing: A, ZZ"):
+                        updater.main()
+
+                def rebuild(*arguments: str) -> None:
+                    if "build-acs-city-data.py" in " ".join(arguments):
+                        acs_path.write_text(
+                            json.dumps({"meta": {"year": 2024}, "cities": {"A, ZZ": {}}}),
+                            encoding="utf-8",
+                        )
+
+                with patch.object(
+                    updater, "run", side_effect=rebuild
+                ), patch.object(updater.sys, "argv", ["update-data.py"]):
+                    updater.main()
 
 
 if __name__ == "__main__":

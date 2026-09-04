@@ -72,11 +72,8 @@
   />
 
   <div class="mt-6 flex flex-col gap-8">
-    <!-- The results column reads as one document: sections are separated by a
-         hairline and a small uppercase label, not by nested card boxes, and each
-         one carries its own rhythm and entrance delay. Because Svelte keeps these
-         children mounted across city/salary changes, the cascade plays once — on
-         the empty → results transition. -->
+    <!-- Result sections stay mounted across city/salary changes; their entrance
+         animation runs on the empty-to-results transition. -->
     <div data-testid="results" class="flex min-w-0 flex-col">
       {#if !urlSync.hydrated}
         <section

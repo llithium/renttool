@@ -22,6 +22,7 @@ import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+from data_output import write_json_atomically
 
 ROOT = Path(__file__).resolve().parent.parent
 RENT_INPUT = ROOT / "src" / "lib" / "data" / "apartment-list-rents.json"
@@ -133,28 +134,32 @@ def read_places(path: Path, minimum_places: int = MIN_PLACES) -> dict[str, tuple
     return places
 
 
-def read_table(path: Path, columns: tuple[str, ...]) -> dict[str, dict[str, int]]:
-    rows: dict[str, dict[str, int]] = {}
+def read_table(path: Path, columns: tuple[str, ...]) -> dict[str, dict[str, int | None]]:
+    rows: dict[str, dict[str, int | None]] = {}
     with path.open(encoding="utf-8", newline="") as source:
         reader = csv.DictReader(source, delimiter="|")
         for row in reader:
             geo_id = row.get("GEO_ID", "")
             if not geo_id.startswith(PLACE_GEO_PREFIX):
                 continue
-            values: dict[str, int] = {}
+            values: dict[str, int | None] = {}
             for column in columns:
                 raw = row.get(column, "")
                 try:
                     value = int(raw)
                 except (TypeError, ValueError):
-                    value = -1
-                values[column] = value if value >= 0 else 0
+                    value = None
+                values[column] = value if value is not None and value >= 0 else None
             rows[geo_id.removeprefix(PLACE_GEO_PREFIX)] = values
     return rows
 
 
-def percent(numerator: int, denominator: int) -> float | None:
-    return round(numerator / denominator * 100, 1) if numerator >= 0 and denominator > 0 else None
+def percent(numerator: int | None, denominator: int | None) -> float | None:
+    return (
+        round(numerator / denominator * 100, 1)
+        if numerator is not None and denominator is not None and numerator >= 0 and denominator > 0
+        else None
+    )
 
 
 def main() -> None:
@@ -175,7 +180,7 @@ def main() -> None:
             tables, gazetteer = source_files(options.year, Path(temp))
             result = build(options.year, targets, tables, gazetteer)
 
-    OUT.write_text(json.dumps(result, separators=(",", ":")) + "\n")
+    write_json_atomically(OUT, result)
     print(
         f"Wrote {OUT} — {len(result['cities'])} cities "
         f"({OUT.stat().st_size / 1024:.0f} KB), ACS {options.year} 5-year",
@@ -195,39 +200,42 @@ def build(
     places = read_places(gazetteer_path, minimum_places)
     data = {table: read_table(table_paths[table], columns) for table, columns in TABLES.items()}
 
-    cities: dict[str, dict[str, int | float]] = {}
+    cities: dict[str, dict[str, int | float | None]] = {}
     for geoid, (place_name, state) in places.items():
         canonical = targets.get(city_key(place_name, state))
         if canonical is None:
             continue
-        try:
-            population = data["B01003"][geoid]["B01003_E001"]
-            income = data["B19013"][geoid]["B19013_E001"]
-            occupied = data["B25003"][geoid]["B25003_E001"]
-            renter = data["B25003"][geoid]["B25003_E003"]
-            vacant_for_rent = data["B25004"][geoid]["B25004_E002"]
-            rented_unoccupied = data["B25004"][geoid]["B25004_E003"]
-            travel_minutes = data["B08013"][geoid]["B08013_E001"]
-            workers = data["B08301"][geoid]["B08301_E001"]
-            work_from_home = data["B08301"][geoid]["B08301_E021"]
-        except KeyError:
+        population = data["B01003"].get(geoid, {}).get("B01003_E001")
+        income = data["B19013"].get(geoid, {}).get("B19013_E001")
+        if population is None or income is None or population <= 0 or income <= 0:
             continue
+        occupied = data["B25003"].get(geoid, {}).get("B25003_E001")
+        renter = data["B25003"].get(geoid, {}).get("B25003_E003")
+        vacant_for_rent = data["B25004"].get(geoid, {}).get("B25004_E002")
+        rented_unoccupied = data["B25004"].get(geoid, {}).get("B25004_E003")
+        travel_minutes = data["B08013"].get(geoid, {}).get("B08013_E001")
+        workers = data["B08301"].get(geoid, {}).get("B08301_E001")
+        work_from_home = data["B08301"].get(geoid, {}).get("B08301_E021")
 
         renter_share = percent(renter, occupied)
-        vacancy_rate = percent(
-            vacant_for_rent,
-            renter + vacant_for_rent + rented_unoccupied,
+        vacancy_denominator = (
+            renter + vacant_for_rent + rented_unoccupied
+            if renter is not None and vacant_for_rent is not None and rented_unoccupied is not None
+            else None
         )
-        commuters = workers - work_from_home
-        commute = round(travel_minutes / commuters, 1) if travel_minutes > 0 and commuters > 0 else None
-        if population <= 0 or income <= 0 or renter_share is None:
-            continue
+        vacancy_rate = percent(vacant_for_rent, vacancy_denominator)
+        commuters = workers - work_from_home if workers is not None and work_from_home is not None else None
+        commute = (
+            round(travel_minutes / commuters, 1)
+            if travel_minutes is not None and travel_minutes >= 0 and commuters is not None and commuters > 0
+            else None
+        )
         cities[canonical] = {
             "population": population,
             "householdIncome": income,
-            "commuteMinutes": commute or 0,
+            "commuteMinutes": commute,
             "renterShare": renter_share,
-            "rentalVacancy": vacancy_rate or 0,
+            "rentalVacancy": vacancy_rate,
         }
 
     if len(cities) < minimum_matches:

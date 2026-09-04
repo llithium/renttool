@@ -27,7 +27,14 @@
         value: pctTrend(city.yoy),
         tone: city.yoy == null || city.yoy === 0 ? undefined : city.yoy > 0 ? 'up' : 'down'
       } satisfies Stat,
-      ...(!city.citySnapshot && city.pop ? [{ label: 'Population', value: city.pop }] : [])
+      ...(!city.citySnapshot && city.pop != null
+        ? [
+            {
+              label: 'Population',
+              value: city.pop.toLocaleString('en-US')
+            }
+          ]
+        : [])
     ].filter((f) => f.value && f.value !== '—')
   );
 
@@ -39,12 +46,15 @@
       { label: 'Median household income', value: money(f.householdIncome) },
       {
         label: 'Mean commute',
-        value: f.commuteMinutes > 0 ? `${f.commuteMinutes.toFixed(1)} min` : ''
+        value: f.commuteMinutes == null ? '' : `${f.commuteMinutes.toFixed(1)} min`
       },
-      { label: 'Renter-occupied homes', value: `${f.renterShare.toFixed(1)}%` },
+      {
+        label: 'Renter-occupied homes',
+        value: f.renterShare == null ? '' : `${f.renterShare.toFixed(1)}%`
+      },
       {
         label: 'Rental vacancy rate',
-        value: f.rentalVacancy > 0 ? `${f.rentalVacancy.toFixed(1)}%` : ''
+        value: f.rentalVacancy == null ? '' : `${f.rentalVacancy.toFixed(1)}%`
       }
     ].filter((fact) => fact.value);
   });

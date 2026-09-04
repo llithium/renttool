@@ -1,17 +1,25 @@
 <script lang="ts">
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
+  import { onDestroy } from 'svelte';
 
-  let {
-    presentation,
-    cityName,
-    canShare
-  }: { presentation: RentPlanPresentation; cityName: string; canShare: boolean } = $props();
+  let { presentation, cityName }: { presentation: RentPlanPresentation; cityName: string } =
+    $props();
 
   let comparing = $derived(presentation.isComparing(cityName));
   let compareFull = $derived(!comparing && presentation.comparisonFull);
 
   let shareLabel = $state('Copy link');
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function resetShareLabel() {
+    shareLabel = 'Copy link';
+    shareTimer = undefined;
+  }
+
+  function scheduleShareReset() {
+    clearTimeout(shareTimer);
+    shareTimer = setTimeout(resetShareLabel, 2600);
+  }
 
   async function onCompare() {
     if (presentation.isComparing(cityName)) {
@@ -24,8 +32,7 @@
   async function onShare() {
     if (!navigator.clipboard?.writeText) {
       shareLabel = 'Copy unavailable';
-      clearTimeout(shareTimer);
-      shareTimer = setTimeout(() => (shareLabel = 'Copy link'), 2600);
+      scheduleShareReset();
       return;
     }
     try {
@@ -34,9 +41,10 @@
     } catch {
       shareLabel = 'Copy unavailable';
     }
-    clearTimeout(shareTimer);
-    shareTimer = setTimeout(() => (shareLabel = 'Copy link'), 2600);
+    scheduleShareReset();
   }
+
+  onDestroy(() => clearTimeout(shareTimer));
 </script>
 
 <!-- Secondary actions live after the answer so they cannot compete with the plan. -->
@@ -72,7 +80,6 @@
     type="button"
     aria-live="polite"
     title="Copy a shareable link"
-    disabled={!canShare}
     onclick={onShare}
     class="cursor-pointer rounded-md p-1 text-sm font-medium text-muted transition-colors duration-200 not-disabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-55"
   >

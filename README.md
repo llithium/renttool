@@ -21,7 +21,7 @@ bun run dev        # http://localhost:5173
 Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
 `bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
-`bun run test` (unit tests), `bun run test:data` (network-free Python data-builder tests),
+`bun run test` (Vitest unit tests; use this rather than bare `bun test`), `bun run test:data` (network-free Python data-builder tests),
 `bun run data:update` (refresh rents and realign dependent city facts),
 `bun run data:check` (report whether those bundles are current and aligned),
 `bun run test:e2e:install` (download Chromium), and
@@ -102,7 +102,7 @@ and the city name is not sent to an image-search API at runtime. Entries include
 photographer, photo page, and referral links. To refresh or extend the manifest, copy
 `.env.example` to `.env.local`, set `UNSPLASH_ACCESS_KEY`, and run `bun run images:refresh`.
 Full-catalog runs save every accepted entry immediately and automatically wait for an exhausted
-hourly quota before resuming. Use `--no-wait` to stop at the quota boundary. Explicit
+hourly quota before resuming. Use `--no-wait` to stop at the quota boundary with a saved checkpoint and a nonzero exit status. Explicit
 `--city="City, ST"` smoke tests do not wait unless `--wait` is also supplied.
 The refresh command prefers landscape results whose Unsplash metadata matches the requested city,
 rejects results with explicitly contradictory location metadata, and otherwise uses the search
@@ -115,7 +115,8 @@ places-data chunk in the browser build while retaining bundled fallback coverage
 
 The City snapshot replaces editorial blurbs with consistently sourced Census-place facts:
 population, median household income, mean commute, renter-occupied housing share, and
-rental vacancy rate. Each snapshot shows its ACS vintage and geography in the UI.
+rental vacancy rate. Each snapshot shows its ACS vintage and geography in the UI. Missing
+optional facts remain absent; measured zeroes are displayed and remain eligible for comparison.
 
 ### Apartment List data refresh and attribution
 
@@ -161,7 +162,8 @@ python3 scripts/build-acs-city-data.py --year 2025
 The generator downloads six official table-based Summary Files plus the matching national
 place Gazetteer into a temporary directory. It uses no API key and makes no runtime request
 from the app. To retain or reuse the raw downloads locally, pass `--source-dir /path/to/acs`.
-It refuses to write unless at least 600 Apartment List cities match Census places; review
+The builder requires at least 600 matches; `data:update` additionally checks exact rent/ACS
+city membership after a rebuild and fails if any cities remain missing or extra. Review
 the reported match count and sample values before committing
 `src/lib/data/acs-city-facts.json`.
 
@@ -177,7 +179,8 @@ python3 scripts/build-fmr-data.py --year FY2027 --url https://www.huduser.gov/po
 python3 scripts/build-fmr-data.py --year FY2027 --input /path/to/FY27_FMRs.xlsx
 ```
 
-Running the script without arguments rebuilds the currently bundled FY2026 release. The
+Running the script without arguments rebuilds the currently bundled FY2026 release. A different
+year requires an explicit source. The
 generator refuses to overwrite the bundle when fewer than 3,000 counties are parsed and
 prints the final county count and file size. Review the metadata and sample counties, then run:
 
@@ -208,9 +211,10 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   history stay aligned with the client router.
 - `src/lib/compare/` — the compare view's logic: `comparisonModel.ts` (shared comparison input and
   view types), `decision.ts` (metric view model, fit status, and decision briefs),
-  `salaryEquivalence.ts` (equivalent-salary analysis), `links.ts` (city navigation links), and
-  `salaries.svelte.ts` (per-city salaries + persistence)
-- `src/lib/components/ui/` — shared: Brand, CitySearch (autocomplete combobox), SalaryInput,
+  `salaryEquivalence.ts` (equivalent-salary analysis), `links.ts` (city navigation links),
+  `comparisonSet.svelte.ts` (membership, committed salaries, and persistence), and
+  `salaries.svelte.ts` (editable salary drafts)
+- `src/lib/components/ui/` — shared: CitySearch (autocomplete combobox), SalaryInput,
   SectionHeading, StatGrid, ThemeToggle
 - `src/lib/components/city/` — the city view: CitySidebar (brand, search, salary, actions,
   BudgetCard), SalarySlider, CityActions, CityHeadline, CityImage, Verdict, CityFacts, SearchLinks,
@@ -232,5 +236,5 @@ through a `class` prop rather than a `:global()` selector.
 Push to a repo and import into Vercel (adapter-vercel is already configured), or run
 `vercel`. No API keys are required for off-list HUD rent coverage.
 
-This repository does not currently track a GitHub Actions workflow, so run the local checks
-above as needed. The app targets Node 22 on Vercel.
+GitHub Actions runs `bun run validate` and the Chromium end-to-end suite on pushes and pull
+requests. The app targets Node 22 on Vercel.

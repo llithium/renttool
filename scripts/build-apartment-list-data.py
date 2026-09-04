@@ -16,7 +16,7 @@ the same source file.
 import argparse
 import csv
 import json
-import os
+import math
 import re
 import tempfile
 import urllib.request
@@ -25,6 +25,7 @@ from collections.abc import Iterable
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+from data_output import write_json_atomically
 
 OUT = Path(__file__).resolve().parent.parent / "src" / "lib" / "data" / "apartment-list-rents.json"
 DATA_PAGE_URL = "https://www.apartmentlist.com/research/category/data-rent-estimates"
@@ -144,10 +145,28 @@ def download_latest(target: Path) -> str:
 
 
 def number(value: str) -> int:
-    parsed = round(float(value))
+    try:
+        parsed_float = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"expected a numeric rent, got {value!r}") from error
+    if not math.isfinite(parsed_float):
+        raise ValueError(f"expected a finite rent, got {value!r}")
+    parsed = round(parsed_float)
     if parsed <= 0:
         raise ValueError(f"expected a positive rent, got {value!r}")
     return parsed
+
+
+def population(value: str | None, city: str) -> int:
+    if value is None or not value.strip():
+        raise ValueError(f"missing population for {city}")
+    try:
+        parsed_float = float(value)
+    except ValueError as error:
+        raise ValueError(f"invalid population for {city}: {value!r}") from error
+    if not math.isfinite(parsed_float) or parsed_float <= 0:
+        raise ValueError(f"population for {city} must be a positive finite number")
+    return round(parsed_float)
 
 
 def month_label(period: str) -> str:
@@ -199,6 +218,9 @@ def build_payload(
         if not location_name or not bed_size:
             continue
         name = NAME_ALIASES.get(location_name, location_name)
+        previous = grouped[name].get(bed_size)
+        if previous is not None and previous != row:
+            raise ValueError(f"conflicting duplicate row for {name} / {bed_size}")
         grouped[name][bed_size] = row
 
     cities: dict[str, dict[str, int | float]] = {}
@@ -210,12 +232,12 @@ def build_payload(
         r1 = number(one[period])
         r2 = number(two[period])
         prior_r1 = number(one[prior])
-        population = int(float(one.get("population") or 0))
+        city_population = population(one.get("population"), name)
         cities[name] = {
             "r1": r1,
             "r2": r2,
             "yoy": round((r1 / prior_r1 - 1) * 100, 1),
-            "population": population,
+            "population": city_population,
         }
 
     if len(cities) < minimum_cities:
@@ -248,24 +270,6 @@ def encoded(payload: dict[str, object]) -> str:
     return json.dumps(payload, separators=(",", ":")) + "\n"
 
 
-def write_atomically(payload: dict[str, object]) -> None:
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=OUT.parent,
-            prefix=f".{OUT.name}.",
-            delete=False,
-        ) as destination:
-            destination.write(encoded(payload))
-            temporary = Path(destination.name)
-        os.replace(temporary, OUT)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-
-
 def existing_summary() -> tuple[str, int]:
     if not OUT.exists():
         return "none", 0
@@ -294,7 +298,7 @@ def finish(payload: dict[str, object], check: bool) -> None:
         print(f"No update needed — {period}, {city_count} cities", flush=True)
         return
 
-    write_atomically(payload)
+    write_json_atomically(OUT, payload)
     print(
         f"Updated {OUT} — {previous_period} ({previous_count} cities) → "
         f"{period} ({city_count} cities, {OUT.stat().st_size / 1024:.0f} KB)",

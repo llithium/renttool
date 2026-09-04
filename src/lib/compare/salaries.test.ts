@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SEED_CITIES } from '$lib/data/cities';
+import { city } from '../../../tests/fixtures/city';
 import { createCompareSalaries } from './salaries.svelte';
 
 function input(value: string): Event {
@@ -10,7 +10,7 @@ describe('comparison salary presentation', () => {
   it('commits valid numeric edits while invalid drafts leave the committed value alone', () => {
     const onSalaryChange = vi.fn();
     const salaries = createCompareSalaries(onSalaryChange);
-    const entry = { city: SEED_CITIES[0], salary: 80_000 };
+    const entry = { city: city('Alpha, ZZ', 1_200), salary: 80_000 };
     salaries.sync([entry]);
 
     salaries.oninput(entry.city.name, input('60'));
@@ -29,7 +29,7 @@ describe('comparison salary presentation', () => {
 
   it('formats a valid draft on blur and drops drafts for removed entries', () => {
     const salaries = createCompareSalaries();
-    const entry = { city: SEED_CITIES[0], salary: 80_000 };
+    const entry = { city: city('Alpha, ZZ', 1_200), salary: 80_000 };
     salaries.sync([entry]);
 
     salaries.oninput(entry.city.name, input('60'));

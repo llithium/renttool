@@ -1,6 +1,18 @@
 import { pushState, replaceState } from '$app/navigation';
 import { canonicalizeRentPlanSearch, restoreRentPlan } from '$lib/planRepresentation';
-import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
+export interface UrlSyncPlan {
+  readonly salary: number | null;
+  readonly activeCity: { readonly name: string } | null;
+  readonly comparisonNames: readonly string[];
+  readonly selectedName: string | null;
+  readonly looking: boolean;
+  readonly pendingComparisonNames: readonly string[];
+  buildSearch(salaryOverride?: number | null): string;
+  hydrateFromSearch(search: URLSearchParams): boolean;
+  applyUrlNavigation(search: URLSearchParams): void;
+  restoreSession(): void;
+  setSalary(salary: number | null): void;
+}
 
 type EffectRegistrar = (callback: () => void) => void;
 
@@ -17,7 +29,7 @@ type EffectRegistrar = (callback: () => void) => void;
  * registrar so this registers an `$effect` inside the component's effect context.
  * The registrar is a deterministic test seam for the URL-sync contract.
  */
-export function createUrlSync(plan: RentPlanPresentation, registerEffect?: EffectRegistrar) {
+export function createUrlSync(plan: UrlSyncPlan, registerEffect?: EffectRegistrar) {
   let hydrated = $state(false);
   let salaryForUrl = $state<number | null>(null);
   let salaryWritePending = $state(false);
@@ -95,7 +107,7 @@ export function createUrlSync(plan: RentPlanPresentation, registerEffect?: Effec
       const hadUrlState = plan.hydrateFromSearch(initialSearch);
       if (!hadUrlState) {
         const urlSalary = plan.salary;
-        if (!plan.activeCity && !plan.comparisonCities.length) plan.restoreSession();
+        if (!plan.activeCity && !plan.comparisonNames.length) plan.restoreSession();
         if (urlSalary != null) plan.setSalary(urlSalary);
       }
       salaryForUrl = plan.salary;

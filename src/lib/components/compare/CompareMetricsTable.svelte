@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ComparisonView } from '$lib/compare/decision';
+  import type { ComparisonView, MetricCell } from '$lib/compare/decision';
   import type { ComparisonCity } from '$lib/compare/comparisonModel';
 
   let {
@@ -7,6 +7,41 @@
     hrefForCity
   }: { analysis: ComparisonView; hrefForCity: (city: ComparisonCity) => string } = $props();
 </script>
+
+{#snippet metricCell(cell: MetricCell, index: number, entryCount: number, withTitle = false)}
+  <td
+    data-tone={cell.tone}
+    title={withTitle
+      ? cell.tone === 'best'
+        ? 'Best in comparison'
+        : cell.tone === 'worst'
+          ? 'Worst in comparison'
+          : undefined
+      : undefined}
+    class="relative text-right tabular-nums {cell.tone ? 'border-b-transparent' : ''} {cell.tone ===
+    'best'
+      ? 'text-green'
+      : cell.tone === 'worst'
+        ? 'text-red'
+        : ''}"
+  >
+    {#key cell.value}<span class="motion-value">{cell.value}</span>{/key}
+    {#if cell.tone}
+      <span
+        class="absolute bottom-0 h-0.5 {cell.tone === 'best' ? 'bg-green' : 'bg-red'} {index === 0
+          ? 'left-0'
+          : 'left-1.5'} {index === entryCount - 1 ? 'right-0' : 'right-1.5'}"
+      ></span>
+      <span
+        class="mt-1 block text-meta font-semibold {cell.tone === 'best'
+          ? 'text-green'
+          : 'text-red'}"
+      >
+        {cell.toneLabel}
+      </span>
+    {/if}
+  </td>
+{/snippet}
 
 <div>
   <div class="mb-3">
@@ -44,43 +79,7 @@
             </th>
             {#each analysis.entries as entry, index (entry.city.name)}
               {@const cell = entry.metrics[metric.key]}
-              <td
-                data-tone={cell.tone}
-                title={cell.tone === 'best'
-                  ? 'Best in comparison'
-                  : cell.tone === 'worst'
-                    ? 'Worst in comparison'
-                    : undefined}
-                class="relative text-right tabular-nums {cell.tone
-                  ? 'border-b-transparent'
-                  : ''} {cell.tone === 'best'
-                  ? 'text-green'
-                  : cell.tone === 'worst'
-                    ? 'text-red'
-                    : ''}"
-              >
-                {#key cell.value}<span class="motion-value">{cell.value}</span>{/key}
-                {#if cell.tone}
-                  <!-- Best/worst is called out with a rule under the cell rather
-                     than a fill, so the number stays the loudest thing in the row.
-                     It runs to the table edge on the outer columns. -->
-                  <span
-                    class="absolute bottom-0 h-0.5 {cell.tone === 'best'
-                      ? 'bg-green'
-                      : 'bg-red'} {index === 0 ? 'left-0' : 'left-1.5'} {index ===
-                    analysis.entries.length - 1
-                      ? 'right-0'
-                      : 'right-1.5'}"
-                  ></span>
-                  <span
-                    class="mt-1 block text-meta font-semibold {cell.tone === 'best'
-                      ? 'text-green'
-                      : 'text-red'}"
-                  >
-                    {cell.toneLabel}
-                  </span>
-                {/if}
-              </td>
+              {@render metricCell(cell, index, analysis.entries.length, true)}
             {/each}
           </tr>
         {/each}
@@ -99,33 +98,7 @@
             </th>
             {#each analysis.entries as entry, index (entry.city.name)}
               {@const cell = entry.metrics[metric.key]}
-              <td
-                data-tone={cell.tone}
-                class="relative text-right tabular-nums {cell.tone === 'best'
-                  ? 'text-green'
-                  : cell.tone === 'worst'
-                    ? 'text-red'
-                    : ''}"
-              >
-                {#key cell.value}<span class="motion-value">{cell.value}</span>{/key}
-                {#if cell.tone}
-                  <span
-                    class="absolute bottom-0 h-0.5 {cell.tone === 'best'
-                      ? 'bg-green'
-                      : 'bg-red'} {index === 0 ? 'left-0' : 'left-1.5'} {index ===
-                    analysis.entries.length - 1
-                      ? 'right-0'
-                      : 'right-1.5'}"
-                  ></span>
-                  <span
-                    class="mt-1 block text-meta font-semibold {cell.tone === 'best'
-                      ? 'text-green'
-                      : 'text-red'}"
-                  >
-                    {cell.toneLabel}
-                  </span>
-                {/if}
-              </td>
+              {@render metricCell(cell, index, analysis.entries.length)}
             {/each}
           </tr>
         {/each}

@@ -8,32 +8,13 @@ import {
 } from './comparisonModel';
 
 export type { ComparisonCity, ComparisonEntryInput } from './comparisonModel';
-export { analyzeSalaryEquivalence } from './salaryEquivalence';
-export type { SalaryEquivalenceEntry, SalaryEquivalenceView } from './salaryEquivalence';
 
 export interface ComparisonRent {
   oneBedroom: number | null;
-  twoBedroom: number | null;
   metricLabel: string;
 }
 
-const METRIC_KEYS = [
-  'salary',
-  'takehome',
-  'tax',
-  'budget',
-  'rent1',
-  'rent2',
-  'after',
-  'needed',
-  'trend',
-  'income',
-  'commute',
-  'renters',
-  'vacancy'
-] as const;
-
-export type MetricKey = (typeof METRIC_KEYS)[number];
+export type MetricKey = keyof typeof METRIC_DEFINITIONS;
 
 export interface ComparisonMetric {
   key: MetricKey;
@@ -70,7 +51,7 @@ export interface ComparisonEntry {
   metrics: Readonly<Record<MetricKey, MetricCell>>;
 }
 
-export type DecisionCriterion = 'afterRent' | 'rent' | 'takeHome';
+export type DecisionCriterion = keyof typeof CRITERIA;
 
 export interface DecisionCriterionDefinition {
   key: DecisionCriterion;
@@ -80,26 +61,28 @@ export interface DecisionCriterionDefinition {
 }
 
 /** Fixed product criteria keep the external interface small and stable. */
-export const DECISION_CRITERIA: readonly DecisionCriterionDefinition[] = [
-  {
-    key: 'afterRent',
+const CRITERIA = {
+  afterRent: {
     label: 'Most left after rent',
     title: 'Most room after 1BR rent',
     metricKey: 'after'
   },
-  {
-    key: 'rent',
+  rent: {
     label: 'Lowest 1BR rent',
     title: 'Lowest typical 1BR rent',
     metricKey: 'rent1'
   },
-  {
-    key: 'takeHome',
+  takeHome: {
     label: 'Highest take-home',
     title: 'Highest estimated take-home',
     metricKey: 'takehome'
   }
-];
+} satisfies Record<string, Omit<DecisionCriterionDefinition, 'key'>>;
+
+export const DECISION_CRITERIA = Object.entries(CRITERIA).map(([key, definition]) => ({
+  ...definition,
+  key: key as DecisionCriterion
+}));
 
 export type DecisionStatus = 'decided' | 'tie' | 'not-enough-data';
 
@@ -127,7 +110,9 @@ interface ComparisonEntryBase {
   afterRent: number | null;
 }
 
-interface MetricDefinition extends ComparisonMetric {
+interface MetricDefinition {
+  label: string;
+  direction: 'high' | 'low';
   group: 'affordability' | 'city-context';
   read: (entry: ComparisonEntryBase) => number | null;
   format: (value: number) => string;
@@ -152,9 +137,8 @@ function monthlyMoney(value: number): string {
   return `${money(value)}/mo`;
 }
 
-const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
-  {
-    key: 'salary',
+const METRIC_DEFINITIONS = {
+  salary: {
     label: 'Annual salary',
     direction: 'high',
     group: 'affordability',
@@ -163,8 +147,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'takehome',
+  takehome: {
     label: 'Est. take-home',
     direction: 'high',
     group: 'affordability',
@@ -173,8 +156,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'tax',
+  tax: {
     label: 'Effective tax rate',
     direction: 'low',
     group: 'affordability',
@@ -183,8 +165,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'budget',
+  budget: {
     label: '30% rent budget',
     direction: 'high',
     group: 'affordability',
@@ -193,8 +174,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'rent1',
+  rent1: {
     label: '1BR rent',
     direction: 'low',
     group: 'affordability',
@@ -203,8 +183,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'rent2',
+  rent2: {
     label: '2BR rent',
     direction: 'low',
     group: 'affordability',
@@ -213,8 +192,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'after',
+  after: {
     label: 'Take-home after 1BR',
     direction: 'high',
     group: 'affordability',
@@ -223,8 +201,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Most left',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'needed',
+  needed: {
     label: 'Salary needed for 1BR',
     direction: 'low',
     group: 'affordability',
@@ -236,8 +213,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'trend',
+  trend: {
     label: 'Rent trend',
     direction: 'low',
     group: 'city-context',
@@ -246,8 +222,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'income',
+  income: {
     label: 'Median household income',
     direction: 'high',
     group: 'city-context',
@@ -256,8 +231,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'commute',
+  commute: {
     label: 'Average commute',
     direction: 'low',
     group: 'city-context',
@@ -266,8 +240,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
-  {
-    key: 'renters',
+  renters: {
     label: 'Renter households',
     direction: 'high',
     group: 'city-context',
@@ -276,8 +249,7 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
-  {
-    key: 'vacancy',
+  vacancy: {
     label: 'Rental vacancy',
     direction: 'high',
     group: 'city-context',
@@ -286,25 +258,19 @@ const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   }
-];
+} satisfies Record<string, MetricDefinition>;
 
-function metricDescriptor({ key, label, direction }: MetricDefinition): ComparisonMetric {
-  return { key, label, direction };
-}
-
-/** The values that answer the affordability decision before city context. */
-export const AFFORDABILITY_METRICS: readonly ComparisonMetric[] = METRIC_DEFINITIONS.filter(
-  (definition) => definition.group === 'affordability'
-).map(metricDescriptor);
-
-/** Secondary city facts, available after the core rent decision is understood. */
-export const CITY_CONTEXT_METRICS: readonly ComparisonMetric[] = METRIC_DEFINITIONS.filter(
-  (definition) => definition.group === 'city-context'
-).map(metricDescriptor);
-
-function metricNumber(entry: ComparisonEntryBase, definition: MetricDefinition): number | null {
-  return definition.read(entry);
-}
+const metricEntries = Object.entries(METRIC_DEFINITIONS) as [MetricKey, MetricDefinition][];
+const metricDescriptors = metricEntries.map(([key, { label, direction, group }]) => ({
+  key,
+  label,
+  direction,
+  group
+}));
+const AFFORDABILITY_METRICS = metricDescriptors.filter(
+  (metric) => metric.group === 'affordability'
+);
+const CITY_CONTEXT_METRICS = metricDescriptors.filter((metric) => metric.group === 'city-context');
 
 function metricTone(
   entries: readonly ComparisonEntryBase[],
@@ -312,9 +278,9 @@ function metricTone(
   definition: MetricDefinition
 ): MetricTone {
   const values = entries
-    .map((candidate) => metricNumber(candidate, definition))
+    .map((candidate) => definition.read(candidate))
     .filter((value): value is number => value != null);
-  const value = metricNumber(entry, definition);
+  const value = definition.read(entry);
   if (value == null || values.length < 2) return null;
   const low = Math.min(...values);
   const high = Math.max(...values);
@@ -330,30 +296,16 @@ function fitStatus(entry: ComparisonEntryBase): FitStatus {
   return { label: `${money(Math.abs(entry.rentGap))} over budget`, tone: 'bad' };
 }
 
-function completeMetricRecord(
-  entries: readonly (readonly [MetricKey, MetricCell])[]
-): Readonly<Record<MetricKey, MetricCell>> {
-  const cells: Partial<Record<MetricKey, MetricCell>> = {};
-  for (const [key, cell] of entries) {
-    if (cells[key]) throw new Error(`Duplicate comparison metric: ${key}`);
-    cells[key] = cell;
-  }
-  for (const key of METRIC_KEYS) {
-    if (!cells[key]) throw new Error(`Missing comparison metric: ${key}`);
-  }
-  return cells as Record<MetricKey, MetricCell>;
-}
-
 function buildMetrics(
   entry: ComparisonEntryBase,
   entries: readonly ComparisonEntryBase[]
 ): Readonly<Record<MetricKey, MetricCell>> {
-  return completeMetricRecord(
-    METRIC_DEFINITIONS.map((definition) => {
-      const number = metricNumber(entry, definition);
+  return Object.fromEntries(
+    metricEntries.map(([key, definition]) => {
+      const number = definition.read(entry);
       const tone = metricTone(entries, entry, definition);
       return [
-        definition.key,
+        key,
         {
           value: number == null ? '—' : definition.format(number),
           number,
@@ -363,13 +315,12 @@ function buildMetrics(
         }
       ] as const;
     })
-  );
+  ) as Record<MetricKey, MetricCell>;
 }
 
 function comparisonRent(city: City): ComparisonRent {
   return {
     oneBedroom: finiteOrNull(city.r1),
-    twoBedroom: finiteOrNull(city.r2),
     metricLabel: rentMetricLabel(city.rentMetric)
   };
 }
@@ -404,7 +355,7 @@ function leaderDetail(
   leaders: readonly ComputedEntry[]
 ): string {
   const names = leaders.map((leader) => leader.view.city.name).join(' and ');
-  const value = leaders.length ? metricNumber(leaders[0].base, metric) : null;
+  const value = leaders.length ? metric.read(leaders[0].base) : null;
   if (definition.key === 'afterRent') {
     return leaders.length > 1
       ? `${names} are tied with ${money(value)} left after a typical 1BR.`
@@ -428,14 +379,11 @@ function noDataDetail(definition: DecisionCriterionDefinition): string {
   return 'Add cities with salary estimates to identify a leading option.';
 }
 
-function buildBrief(
-  entries: readonly ComputedEntry[],
-  definition: DecisionCriterionDefinition
-): DecisionBrief {
-  const metric = METRIC_DEFINITIONS.find((candidate) => candidate.key === definition.metricKey);
-  if (!metric) throw new Error(`Unknown decision metric: ${definition.metricKey}`);
+function buildBrief(entries: readonly ComputedEntry[], key: DecisionCriterion): DecisionBrief {
+  const definition = { ...CRITERIA[key], key };
+  const metric: MetricDefinition = METRIC_DEFINITIONS[definition.metricKey];
 
-  const eligible = entries.filter((entry) => metricNumber(entry.base, metric) != null);
+  const eligible = entries.filter((entry) => metric.read(entry.base) != null);
   if (!eligible.length) {
     return {
       criterion: definition.key,
@@ -448,10 +396,10 @@ function buildBrief(
   }
 
   const values = eligible
-    .map((entry) => metricNumber(entry.base, metric))
+    .map((entry) => metric.read(entry.base))
     .filter((value): value is number => value != null);
   const target = metric.direction === 'high' ? Math.max(...values) : Math.min(...values);
-  const leaders = eligible.filter((entry) => metricNumber(entry.base, metric) === target);
+  const leaders = eligible.filter((entry) => metric.read(entry.base) === target);
   return {
     criterion: definition.key,
     title: definition.title,
@@ -484,20 +432,15 @@ function baseEntry({ city, salary }: ComparisonEntryInput): ComparisonEntryBase 
 export function analyzeComparison(inputs: readonly ComparisonEntryInput[]): ComparisonView {
   const bases = inputs.map(baseEntry);
   const entries = bases.map((base) => ({ base, view: viewEntry(base, bases) }));
-  const criterion = (key: DecisionCriterion): DecisionCriterionDefinition => {
-    const definition = DECISION_CRITERIA.find((candidate) => candidate.key === key);
-    if (!definition) throw new Error(`Unknown decision criterion: ${key}`);
-    return definition;
-  };
 
   return {
     entries: entries.map((entry) => entry.view),
     affordabilityMetrics: AFFORDABILITY_METRICS,
     cityContextMetrics: CITY_CONTEXT_METRICS,
     briefs: {
-      afterRent: buildBrief(entries, criterion('afterRent')),
-      rent: buildBrief(entries, criterion('rent')),
-      takeHome: buildBrief(entries, criterion('takeHome'))
+      afterRent: buildBrief(entries, 'afterRent'),
+      rent: buildBrief(entries, 'rent'),
+      takeHome: buildBrief(entries, 'takeHome')
     }
   };
 }

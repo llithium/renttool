@@ -1,15 +1,29 @@
-import type { CityParts } from './format';
 import { money } from './format';
 
+export type SearchProvider = 'apartments' | 'zillow' | 'zumper' | 'hotpads';
+
 export interface SearchLink {
-  label: string;
+  provider: SearchProvider;
+  providerName: string;
   url: string;
   prefiltered: boolean;
+  capDescription?: string;
 }
 
-/** Build pre-filtered apartment-search links for a city + max rent.
- * Migrated from the original artifact (Apartments.com, Zillow, Zumper, HotPads). */
-export function buildSearchLinks(parts: CityParts, maxRent: number): SearchLink[] {
+/** Build apartment-search links and describe which providers support a rent cap. */
+export function buildSearchLinks(
+  city: { city: string; state: string },
+  maxRent: number
+): SearchLink[] {
+  const parts = {
+    city: city.city,
+    state: city.state.toUpperCase(),
+    slug: city.city
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, ''),
+    st: city.state.toLowerCase()
+  };
   const capped = Math.floor(maxRent / 100) * 100;
 
   const zState = {
@@ -30,29 +44,36 @@ export function buildSearchLinks(parts: CityParts, maxRent: number): SearchLink[
   return [
     capped >= 500
       ? {
-          label: `Apartments.com · under ${money(capped)}`,
+          provider: 'apartments',
+          providerName: 'Apartments.com',
+          capDescription: `under ${money(capped)}`,
           url: `https://www.apartments.com/${parts.slug}-${parts.st}/under-${capped}/`,
           prefiltered: true
         }
       : {
-          label: 'Apartments.com · browse listings',
+          provider: 'apartments',
+          providerName: 'Apartments.com',
           url: `https://www.apartments.com/${parts.slug}-${parts.st}/`,
           prefiltered: false
         },
     {
-      label: `Zillow · under ${money(maxRent)}`,
+      provider: 'zillow',
+      providerName: 'Zillow',
+      capDescription: `under ${money(maxRent)}`,
       url: `https://www.zillow.com/${parts.slug}-${parts.st}/rentals/?searchQueryState=${encodeURIComponent(
         JSON.stringify(zState)
       )}`,
       prefiltered: true
     },
     {
-      label: 'Zumper',
+      provider: 'zumper',
+      providerName: 'Zumper',
       url: `https://www.zumper.com/apartments-for-rent/${parts.slug}-${parts.st}`,
       prefiltered: false
     },
     {
-      label: 'HotPads',
+      provider: 'hotpads',
+      providerName: 'HotPads',
       url: `https://hotpads.com/${parts.slug}-${parts.st}/apartments-for-rent`,
       prefiltered: false
     }

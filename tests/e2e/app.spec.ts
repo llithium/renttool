@@ -1,6 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import rentData from '../../src/lib/data/apartment-list-rents.json' with { type: 'json' };
+import acsData from '../../src/lib/data/acs-city-facts.json' with { type: 'json' };
+import fmrData from '../../src/lib/data/fmr-county.json' with { type: 'json' };
+import imageData from '../../src/lib/data/city-images.json' with { type: 'json' };
 
 const BUNDLED_RENTS = rentData.cities as Record<string, { r1: number }>;
 
@@ -81,7 +84,7 @@ test('serves bundled HUD rents without an upstream API', async ({ request }) => 
     ok: true,
     r1: expect.any(Number),
     r2: expect.any(Number),
-    year: 'FY2026',
+    year: fmrData.meta.year,
     bundled: true
   });
 });
@@ -255,7 +258,7 @@ test('supports keyboard city selection and salary results', async ({ page }) => 
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'City snapshot' })).toBeVisible();
   await expect(page.getByText('Median household income', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '2020–2024 ACS 5-year estimates ↗' })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${acsData.meta.label} ↗` })).toBeVisible();
 });
 
 test('shows a static credited city image when the city has a manifest entry', async ({ page }) => {
@@ -264,12 +267,14 @@ test('shows a static credited city image when the city has a manifest entry', as
 
   const image = page.getByTestId('city-image');
   await expect(image).toBeVisible();
-  await expect(image.locator('img')).toHaveAttribute('alt', 'Buildings near body of water');
-  await expect(image).toContainText('Kody Cheyne');
+  const expected = imageData['Tampa, FL'];
+  await expect(image.locator('img')).toHaveAttribute('alt', expected.alt);
+  await expect(image.locator('img')).toHaveAttribute('src', expected.url);
+  await expect(image).toContainText(expected.photographerName);
   await expect(image).toContainText('Unsplash');
-  await expect(image.getByRole('link', { name: 'Kody Cheyne' })).toHaveAttribute(
+  await expect(image.getByRole('link', { name: expected.photographerName })).toHaveAttribute(
     'href',
-    'https://unsplash.com/@kodycheyne?utm_source=rent_tool&utm_medium=referral'
+    expected.photographerUrl
   );
 });
 
@@ -562,7 +567,11 @@ test('shows salary equivalence only when two comparison entries are present', as
   await expect(page.getByTestId('salary-equivalence')).toHaveCount(0);
 
   await selectCity(page, 'Austin', 'Austin, TX');
-  await expect(page.getByTestId('salary-equivalence')).toBeVisible();
+  const equivalence = page.getByTestId('salary-equivalence');
+  await expect(equivalence).toBeVisible();
+  await expect(equivalence.locator('article')).toHaveCount(2);
+  const reference = equivalence.locator('article').filter({ hasText: 'Tampa, FL' });
+  await expect(reference.locator('dd').nth(1)).toHaveText('$80,000/yr');
 });
 
 test('exposes map markers to the keyboard', async ({ page }) => {
@@ -689,6 +698,7 @@ test('restores selected city and salary after reload', async ({ page }) => {
   await page.reload();
   await waitForHydration(page);
   await expect(page.getByRole('heading', { name: 'Tampa, FL' })).toBeVisible();
+  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
 });
 
 test('restores state from a deep link with no stored data', async ({ page, context }) => {
@@ -728,4 +738,19 @@ test('re-resolves an off-list city from deep-linked coordinates', async ({ page 
   await expect(
     page.locator('[data-testid="fact"]').getByText('1BR Fair Market Rent', { exact: true })
   ).toBeVisible();
+});
+
+test('retains actual map marker elements when salary changes', async ({ page }) => {
+  await page.goto('/?salary=80000&city=Tampa%2C+FL');
+  await waitForHydration(page);
+  const marker = page.getByRole('button', { name: markerName('Tampa, FL', 80_000) });
+  await expect(marker).toBeVisible();
+  const original = await marker.elementHandle();
+  if (!original) throw new Error('The selected city marker did not mount.');
+
+  await page.getByLabel('Annual salary', { exact: true }).fill('30000');
+  const updated = page.getByRole('button', { name: markerName('Tampa, FL', 30_000) });
+  await expect(updated).toBeVisible();
+  expect(await updated.evaluate((element, previous) => element === previous, original)).toBe(true);
+  await original.dispose();
 });

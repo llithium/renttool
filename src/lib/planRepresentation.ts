@@ -3,7 +3,8 @@ import {
   MAX_COMPARISON_ENTRIES
 } from '$lib/compare/comparisonSet.svelte';
 import { isValidCoordinates } from '$lib/geo';
-import { MAX_SALARY } from '$lib/salary';
+import { normalizeSalary } from '$lib/salary';
+import { cityIdentity } from '$lib/cityIdentity';
 import type { RentSource } from '$lib/types';
 
 export const COMPARISON_SALARY_PARAM = 'compare-salary';
@@ -60,10 +61,6 @@ interface ParsedOffListValue {
   salary: number | null;
 }
 
-function nameKey(name: string): string {
-  return name.toLowerCase();
-}
-
 function validName(value: unknown): value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 100) return false;
   const match = value.match(/,\s*([A-Za-z]{2})$/);
@@ -77,14 +74,6 @@ function validCoordinate(value: unknown, minimum: number, maximum: number): valu
 }
 
 export { isValidCoordinates } from '$lib/geo';
-
-function normalizedSalary(value: unknown): number | null {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_SALARY) {
-    return null;
-  }
-  const rounded = Math.round(value);
-  return rounded > 0 && rounded <= MAX_SALARY ? rounded : null;
-}
 
 function normalizedCity(input: PlanCityInput | null | undefined): NormalizedCity | null {
   if (!input || !validName(input.name)) return null;
@@ -116,11 +105,11 @@ export function appendComparisonParameters(
     if (count >= MAX_COMPARISON_ENTRIES) break;
     const city = normalizedCity(input.city);
     if (!city) continue;
-    const key = nameKey(city.name);
+    const key = cityIdentity(city.name);
     if (seen.has(key)) continue;
     seen.add(key);
     appendCity(search, city, city.kind === 'bundled' ? 'compare' : 'compare-offlist');
-    const salary = normalizedSalary(input.salary);
+    const salary = normalizeSalary(input.salary);
     if (salary != null) {
       search.append(COMPARISON_SALARY_PARAM, comparisonSalaryLink(city.name, salary));
     }
@@ -131,7 +120,7 @@ export function appendComparisonParameters(
 /** Serialize the shareable rent plan into a canonical query string. */
 export function serializeRentPlan(input: RentPlanRepresentationInput): string {
   const search = new URLSearchParams();
-  const salary = normalizedSalary(input.salary);
+  const salary = normalizeSalary(input.salary);
   if (salary != null) search.set('salary', String(salary));
 
   const selected = normalizedCity(input.selected);
@@ -163,7 +152,7 @@ function parseNumeric(raw: string | null): number | null {
 
 function parseSalary(raw: string | null): number | null {
   const value = parseNumeric(raw);
-  return normalizedSalary(value);
+  return normalizeSalary(value);
 }
 
 function parseCoordinate(raw: string | null, minimum: number, maximum: number): number | null {
@@ -180,7 +169,7 @@ export function parseComparisonSalaryLink(raw: string): { name: string; salary: 
     const value: unknown = JSON.parse(raw);
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const record = value as Record<string, unknown>;
-    const salary = normalizedSalary(record.salary);
+    const salary = normalizeSalary(record.salary);
     if (!validName(record.name) || salary == null) return null;
     return { name: record.name, salary };
   } catch {
@@ -203,7 +192,7 @@ function parseOffListValue(raw: string): ParsedOffListValue | null {
     }
     return {
       city: { name: record.name, kind: 'off-list', lat: record.lat, lng: record.lng },
-      salary: normalizedSalary(record.salary)
+      salary: normalizeSalary(record.salary)
     };
   } catch {
     return null;
@@ -230,7 +219,7 @@ function comparisonSalaries(search: URLSearchParams): {
   for (const raw of search.getAll(COMPARISON_SALARY_PARAM)) {
     const named = parseComparisonSalaryLink(raw);
     if (named) {
-      byName.set(nameKey(named.name), named.salary);
+      byName.set(cityIdentity(named.name), named.salary);
       continue;
     }
     const positionalSalary = parseSalary(raw);
@@ -258,7 +247,7 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
     }
     if (!city) continue;
 
-    const identity = nameKey(city.name);
+    const identity = cityIdentity(city.name);
     if (seen.has(identity) || comparisons.length >= MAX_COMPARISON_ENTRIES) continue;
     seen.add(identity);
     comparisons.push({

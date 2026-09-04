@@ -1,27 +1,7 @@
 import { computeBudget } from '$lib/budget';
-import {
-  RentPlanWorkspace,
-  type ComparisonResult,
-  type RentPlanSnapshot
-} from '$lib/appState.svelte';
+import { RentPlanWorkspace, type ComparisonResult } from '$lib/appState.svelte';
 import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
 import type { Budget, City, CitySuggestion } from '$lib/types';
-
-export interface RentPlanPresentationSnapshot {
-  readonly salary: number | null;
-  readonly activeCity: City | null;
-  readonly selectedName: string | null;
-  readonly rentTarget: number | null;
-  readonly budget: Budget | null;
-  readonly cities: readonly City[];
-  readonly comparisonCities: readonly City[];
-  readonly comparisonNames: readonly string[];
-  readonly comparisonEntries: readonly ComparisonEntry[];
-  readonly looking: boolean;
-  readonly pendingName: string | null;
-  readonly pendingComparisonNames: readonly string[];
-  readonly mapFocusRequest: number;
-}
 
 /**
  * Presentation seam for the primary rent-planning flow.
@@ -97,26 +77,6 @@ export class RentPlanPresentation {
 
   get mapFocusRequest(): number {
     return this.mapFocusRequestValue;
-  }
-
-  get snapshot(): RentPlanPresentationSnapshot {
-    const workspaceSnapshot: RentPlanSnapshot = this.workspace.snapshot;
-    const budget = this.budget;
-    return {
-      salary: workspaceSnapshot.salary,
-      activeCity: workspaceSnapshot.selected,
-      selectedName: workspaceSnapshot.selectedName,
-      rentTarget: budget?.maxRent ?? null,
-      budget,
-      cities: workspaceSnapshot.cities,
-      comparisonCities: workspaceSnapshot.compareCities,
-      comparisonNames: workspaceSnapshot.compareNames,
-      comparisonEntries: workspaceSnapshot.compareEntries,
-      looking: workspaceSnapshot.looking,
-      pendingName: workspaceSnapshot.pendingName,
-      pendingComparisonNames: workspaceSnapshot.pendingComparisonNames,
-      mapFocusRequest: this.mapFocusRequest
-    };
   }
 
   setSalary(value: number | null): void {

@@ -25,32 +25,4 @@ export function sentenceLabel(label: string): string {
   return label ? label[0].toLowerCase() + label.slice(1) : label;
 }
 
-/** Population fact text: "874,579" for place-level figures, "3.4M metro" for
- * the aggregated urban estimates the dataset uses on large anchor cities. */
-export function popText(pop: number): string {
-  if (pop >= 1_000_000) return `${(pop / 1_000_000).toFixed(1)}M metro`;
-  return pop.toLocaleString('en-US');
-}
-
-export interface CityParts {
-  slug: string;
-  st: string; // lowercase state, for URL paths
-  city: string;
-  state: string; // uppercase
-}
-
-/** Parse "City, ST" into URL-friendly parts. Returns null if it doesn't match. */
-export function parseCity(cityState: string): CityParts | null {
-  const m = cityState.match(/^(.+?),\s*([A-Za-z]{2})$/);
-  if (!m) return null;
-  return {
-    slug: m[1]
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, ''),
-    st: m[2].toLowerCase(),
-    city: m[1].trim(),
-    state: m[2].toUpperCase()
-  };
-}
+/** Population fact text for a place-level estimate. */

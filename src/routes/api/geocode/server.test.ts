@@ -46,6 +46,35 @@ describe('GET /api/geocode', () => {
     });
   });
 
+  it('does not pass malformed FCC metadata through to the client', async () => {
+    const response = await GET(
+      requestEvent(
+        '?lat=27.9477&lng=-82.4584',
+        vi.fn(async () =>
+          Response.json({
+            results: [
+              { county_fips: '12057', county_name: { unexpected: true }, state_code: ['FL'] }
+            ]
+          })
+        )
+      )
+    );
+    expect(await response.json()).toMatchObject({ ok: true, county: '', state: '' });
+  });
+
+  it.each([null, { results: {} }, { results: [null] }, { results: [{ county_fips: ['12057'] }] }])(
+    'rejects malformed FCC response shapes: %j',
+    async (body) => {
+      const response = await GET(
+        requestEvent(
+          '?lat=27.9477&lng=-82.4584',
+          vi.fn(async () => Response.json(body))
+        )
+      );
+      expect(await response.json()).toEqual({ ok: false });
+    }
+  );
+
   it('returns { ok: false } for malformed and failed upstream responses', async () => {
     const malformed = await GET(
       requestEvent(

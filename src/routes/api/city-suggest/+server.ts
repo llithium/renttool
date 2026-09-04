@@ -21,25 +21,42 @@ export const GET: RequestHandler = async ({ url, fetch, setHeaders }) => {
       signal: AbortSignal.timeout(5_000)
     });
     if (!res.ok) return json({ suggestions: [] });
-    const data = await res.json();
+    const data: unknown = await res.json();
+    if (!data || typeof data !== 'object' || !('features' in data) || !Array.isArray(data.features))
+      return json({ suggestions: [] });
 
     const seen = new Set<string>();
     const suggestions: CitySuggestion[] = [];
 
-    for (const f of data.features ?? []) {
-      const p = f.properties ?? {};
+    for (const feature of data.features) {
+      if (!feature || typeof feature !== 'object') continue;
+      const f = feature as Record<string, unknown>;
+      if (!f.properties || typeof f.properties !== 'object') continue;
+      const p = f.properties as Record<string, unknown>;
       if (p.countrycode !== 'US') continue;
       if (p.osm_key !== 'place') continue;
-      if (!['city', 'town', 'village'].includes(p.osm_value)) continue;
+      if (typeof p.osm_value !== 'string' || !['city', 'town', 'village'].includes(p.osm_value))
+        continue;
 
       const cityName = typeof p.name === 'string' ? p.name.trim().slice(0, 80) : '';
-      const stateAbbr = STATE_ABBR[p.state] || (VALID_STATES.has(p.state) ? p.state : '');
+      const stateAbbr =
+        typeof p.state === 'string'
+          ? STATE_ABBR[p.state] || (VALID_STATES.has(p.state) ? p.state : '')
+          : '';
       if (!cityName || !stateAbbr || /[<>]/.test(cityName)) continue;
 
       const label = `${cityName}, ${stateAbbr}`;
       if (seen.has(label)) continue;
 
-      const [lng, lat] = f.geometry?.coordinates ?? [];
+      const geometry = f.geometry;
+      if (
+        !geometry ||
+        typeof geometry !== 'object' ||
+        !('coordinates' in geometry) ||
+        !Array.isArray(geometry.coordinates)
+      )
+        continue;
+      const [lng, lat] = geometry.coordinates;
       if (
         typeof lat !== 'number' ||
         typeof lng !== 'number' ||

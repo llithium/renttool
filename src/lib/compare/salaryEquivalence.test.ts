@@ -1,28 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeBudget } from '$lib/budget';
-import type { City } from '$lib/types';
+import { city } from '../../../tests/fixtures/city';
 import { analyzeSalaryEquivalence } from './salaryEquivalence';
-
-function city(name: string, r1: number | null): City {
-  const [cityName, state] = name.split(', ');
-  return {
-    name,
-    city: cityName,
-    state,
-    r1,
-    r2: r1 == null ? null : r1 + 300,
-    yoy: 1.2,
-    tax: 'varies',
-    pop: '100,000',
-    citySnapshot: null,
-    lat: 40,
-    lng: -74,
-    source: r1 == null ? 'none' : 'apartment-list',
-    rentMetric: r1 == null ? 'unknown' : 'estimated-median',
-    rentArea: name,
-    rentYear: 'June 2026'
-  };
-}
 
 function entry(name: string, salary: number, r1: number | null) {
   return { city: city(name, r1), salary };

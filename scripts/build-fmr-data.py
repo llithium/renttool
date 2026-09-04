@@ -20,12 +20,14 @@ Re-run when HUD publishes or revises a fiscal year's county-level data.
 import argparse
 import json
 import re
+import tempfile
 import urllib.request
 import zipfile
 from collections.abc import Iterable
 from collections import defaultdict
 from pathlib import Path
 from xml.etree import ElementTree
+from data_output import write_json_atomically
 
 DEFAULT_YEAR = "FY2026"
 DEFAULT_URL = "https://www.huduser.gov/portal/datasets/fmr/fmr2026/FY26_FMRs.xlsx"
@@ -51,8 +53,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def download(url: str) -> Path:
-    dest = Path("/tmp") / url.rsplit("/", 1)[-1]
+def validate_args(args: argparse.Namespace) -> argparse.Namespace:
+    if not re.fullmatch(r"FY\d{4}", args.year):
+        raise ValueError("--year must use the FY#### format, for example FY2027")
+    if args.year != DEFAULT_YEAR and args.url is None and args.input is None:
+        raise ValueError("--year requires an explicit --url or --input source")
+    if args.url is not None:
+        match = re.search(r"/FY(\d{2,4})_FMRs\.xlsx$", args.url, re.IGNORECASE)
+        if match:
+            source_year = int(match.group(1))
+            if source_year < 100:
+                source_year += 2000
+            if source_year != int(args.year[2:]):
+                raise ValueError(f"HUD source URL year FY{source_year} does not match --year {args.year}")
+    if args.input is not None and not args.input.is_file():
+        raise FileNotFoundError(f"Input workbook not found: {args.input}")
+    return args
+
+
+def download(url: str, directory: Path) -> Path:
+    dest = directory / url.rsplit("/", 1)[-1]
     print(f"Downloading {url} …")
     req = urllib.request.Request(
         url,
@@ -76,23 +96,25 @@ def col_index(cell_ref: str) -> int:
 
 
 def read_rows(xlsx: Path):
-    z = zipfile.ZipFile(xlsx)
-    shared = [
-        (t.text or "")
-        for t in ElementTree.fromstring(z.read("xl/sharedStrings.xml")).iter(
-            "{%s}t" % NS["m"]
-        )
-    ]
-    sheet = ElementTree.fromstring(z.read("xl/worksheets/sheet1.xml"))
-    for row in sheet.iter("{%s}row" % NS["m"]):
-        cells: dict[int, str] = {}
-        for c in row.iter("{%s}c" % NS["m"]):
-            v = c.find("{%s}v" % NS["m"])
-            if v is None or v.text is None:
-                continue
-            val = shared[int(v.text)] if c.get("t") == "s" else v.text
-            cells[col_index(c.get("r"))] = val
-        yield cells
+    with zipfile.ZipFile(xlsx) as z:
+        shared = [
+            (t.text or "")
+            for t in ElementTree.fromstring(z.read("xl/sharedStrings.xml")).iter(
+                "{%s}t" % NS["m"]
+            )
+        ]
+        sheet = ElementTree.fromstring(z.read("xl/worksheets/sheet1.xml"))
+        rows = []
+        for row in sheet.iter("{%s}row" % NS["m"]):
+            cells: dict[int, str] = {}
+            for c in row.iter("{%s}c" % NS["m"]):
+                v = c.find("{%s}v" % NS["m"])
+                if v is None or v.text is None:
+                    continue
+                val = shared[int(v.text)] if c.get("t") == "s" else v.text
+                cells[col_index(c.get("r"))] = val
+            rows.append(cells)
+        yield from rows
 
 
 def aggregate_rows(rows: Iterable[dict[int, str]]) -> dict[str, list[int]]:
@@ -140,15 +162,15 @@ def build_payload(
 
 
 def main() -> None:
-    args = parse_args()
-    if not re.fullmatch(r"FY\d{4}", args.year):
-        raise ValueError("--year must use the FY#### format, for example FY2027")
-    if args.input is not None and not args.input.is_file():
-        raise FileNotFoundError(f"Input workbook not found: {args.input}")
-    xlsx = args.input if args.input is not None else download(args.url or DEFAULT_URL)
-    payload = build_payload(read_rows(xlsx), args.year)
+    args = validate_args(parse_args())
+    if args.input is not None:
+        payload = build_payload(read_rows(args.input), args.year)
+    else:
+        with tempfile.TemporaryDirectory(prefix="rent-tool-fmr-") as directory:
+            xlsx = download(args.url or DEFAULT_URL, Path(directory))
+            payload = build_payload(read_rows(xlsx), args.year)
 
-    OUT.write_text(json.dumps(payload, separators=(",", ":")) + "\n")
+    write_json_atomically(OUT, payload)
     print(f"Wrote {OUT} — {len(payload['counties'])} counties ({OUT.stat().st_size / 1024:.0f} KB)")
 
 

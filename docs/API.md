@@ -6,7 +6,8 @@ They provide a stable client contract over keyless and bundled data sources.
 **Conventions**
 
 - All endpoints are `GET` and return JSON.
-- Bad/missing **required** params return **HTTP 400** (`{ "message": "…" }`). Every other
+- Bad/missing **required** params return **HTTP 400**, except autocomplete queries shorter
+  than two characters, which return an empty list (`{ "message": "…" }`). Every other
   failure — upstream down or not found — returns **HTTP 200** with an `ok: false`
   (or empty-result) body, so the client can degrade gracefully instead of throwing.
 - FIPS params are strings: `state` is 2 digits, `county` is 3 digits.
@@ -28,9 +29,9 @@ the map without a second geocode call.
 
 **Query params**
 
-| Param | Required | Description                                            |
-| ----- | -------- | ------------------------------------------------------ |
-| `q`   | yes      | Search text. Fewer than 2 chars returns an empty list. |
+| Param | Required | Description                                                                          |
+| ----- | -------- | ------------------------------------------------------------------------------------ |
+| `q`   | no       | Search text, at most 100 chars. Missing or fewer than 2 chars returns an empty list. |
 
 **Response** `200`
 
@@ -186,6 +187,8 @@ curl "http://localhost:5173/api/fmr?state=12&county=057"
 
 Returns nearby towns and suburbs from the bundled SimpleMaps places dataset. Results include
 coordinates, rounded distance, and population so they can be selected without another search.
+The endpoint returns up to eight places within 25 miles, ordered by population descending
+and then distance. It excludes the named origin and places less than 0.75 miles away.
 
 **Query params**
 
@@ -228,8 +231,9 @@ curl "http://localhost:5173/api/nearby?lat=27.9477&lng=-82.4584&city=Tampa&state
 
 ## GET `/api/population`
 
-Returns the population of the nearest place within 10 miles from the bundled SimpleMaps
-places dataset.
+Returns the population value of the nearest place within 10 miles from the bundled SimpleMaps
+places dataset. This preserves the source's population definition; it does not infer metropolitan
+geography from the size of the number.
 
 **Query params**
 

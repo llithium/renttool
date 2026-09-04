@@ -1,5 +1,12 @@
 export const MAX_SALARY = 10_000_000;
 
+/** Round first, then validate the committed salary invariant. */
+export function normalizeSalary(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  return rounded > 0 && rounded <= MAX_SALARY ? rounded : null;
+}
+
 /** Keep only decimal digits from a user-entered salary. */
 export function sanitizeSalaryInput(value: string): string {
   return value.replace(/\D/g, '');
