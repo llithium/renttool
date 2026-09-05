@@ -84,7 +84,7 @@
       Keep {city.city} as your active plan while you add a nearby place to compare. Distances are straight-line,
       within roughly 25 miles.
     </p>
-    <p aria-live="polite" class="sr-only">{status}</p>
+    <p aria-live="polite" class="mb-3 text-sm text-muted">{status}</p>
 
     {#if !places.length}
       <div class="flex items-center gap-3 text-sm text-muted" aria-live="polite">

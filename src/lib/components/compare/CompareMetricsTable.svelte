@@ -47,13 +47,19 @@
   <div class="mb-3">
     <p class="text-label text-ink">Affordability first</p>
   </div>
-  <div class="overflow-x-auto">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard users need to focus this region to scroll the table.) -->
+  <div
+    class="overflow-x-auto rounded-sm"
+    role="region"
+    aria-label="Full city comparison; scroll horizontally for more"
+    tabindex="0"
+  >
     <!-- Cell padding and rules are uniform across the table, so they ride on the
        row and body; alignment and stickiness vary per column. -->
     <table class="w-full min-w-170 border-collapse text-sm">
       <thead>
         <tr
-          class="[&>th]:border-b [&>th]:border-line [&>th]:px-4 [&>th]:py-3 [&>th]:align-top [&>th]:text-xs [&>th]:tracking-wider [&>th]:text-muted [&>th]:uppercase"
+          class="[&>th]:border-b [&>th]:border-line [&>th]:px-4 [&>th]:py-3 [&>th]:align-top [&>th]:text-xs [&>th]:text-muted"
         >
           <!-- The metric column stays put while the city columns scroll sideways. -->
           <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left">Metric</th>

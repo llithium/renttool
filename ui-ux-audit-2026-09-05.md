@@ -1,0 +1,48 @@
+# UI and UX audit — September 5, 2026
+
+## Scope and approach
+
+Reviewed the landing flow, city search, salary entry, populated rent plan, city imagery, source disclosures, charts, nearby comparisons, map controls, comparison entries, decision criteria, salary equivalence, full breakdown, and error navigation. Used source inspection, local Chromium screenshots, keyboard interaction, accessibility scans, and the existing functional suite. Inspected desktop and phone layouts visually and checked comparison overflow at 320, 390, 768, 820, and 1024px.
+
+## Design direction
+
+Keep Geist and the established palette: canvas #f4f4f4, surface #ffffff, ink #151515, muted text #5f5f5f, affordability green #147b3b, and over-target red #b7352d. Preserve the dark-theme equivalents. Use the existing display, headline, and body roles instead of oversized one-off headings. Left-align inputs and explanations, align money consistently, and make the rent decision the primary visual result.
+
+The original landing page treated a short planning task like a promotional campaign. A second decorative hero or another set of feature cards would repeat that problem. The revised structure is introduction → inputs → result → supporting context, with color carrying affordability information and motion limited mainly to interaction feedback.
+
+## Findings and changes
+
+| Finding                                                  | User impact                                                                                                          | Implemented change                                                                                                                           | Location                                                                |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Large hero before the form                               | The user had to navigate a promotional panel to reach the task; mobile imposed a 38rem minimum hero height.          | Replaced it with a compact introduction and directly accessible controls.                                                                    | `src/lib/components/landing/LandingContent.svelte`                      |
+| Decorative feature grid and scroll reveals               | Repeated the introduction, consumed substantial vertical space, and made copy visibility depend on scroll animation. | Replaced with concise planning context; removed GSAP and unused ornament CSS.                                                                | `LandingContent.svelte`, `src/app.css`, `package.json`                  |
+| City photography preceded the answer                     | A full-width photograph pushed inputs and the budget down the page.                                                  | Moved the credited photograph below the affordability result, bounded its dimensions, and enabled lazy loading. Kept city-keyed image state. | `src/routes/+page.svelte`, `src/lib/components/city/CityImage.svelte`   |
+| Oversized city title and repeated labels                 | Title, “Offer planner,” and “Your inputs” competed with the actual decision.                                         | Used the shared display scale and removed redundant labels.                                                                                  | `CityHeadline.svelte`, `CitySidebar.svelte`, both main routes           |
+| Unnecessary edit link                                    | A mobile link pointed back to controls immediately above it.                                                         | Removed the duplicate action.                                                                                                                | `src/routes/+page.svelte`                                               |
+| Missing product identity in navigation                   | Header only showed mode links and a theme button.                                                                    | Added a Rent Tool home link; adjusted spacing to fit a 320px viewport with a comparison count.                                               | `src/lib/components/ui/AppHeader.svelte`                                |
+| Empty search had no visible explanation                  | Users could not tell whether an unmatched query had completed.                                                       | Added an announced, visible no-match message with a recovery instruction; showed `/mo` beside suggestion prices.                             | `src/lib/components/ui/CitySearch.svelte`                               |
+| Comparison toolbar minimum columns exceeded tablet space | Fixed minimum column widths plus gaps could exceed the available width at the medium breakpoint.                     | Stack until the large breakpoint and use shrinkable columns. Removed page-wide overflow hiding so problems are detectable.                   | `src/routes/compare/+page.svelte`                                       |
+| Editable comparison cards lifted on hover                | Movement and a large shadow implied a clickable card and distracted from editing.                                    | Removed card translation, entrance staggering, and hover elevation.                                                                          | `src/lib/components/compare/ScenarioCard.svelte`                        |
+| Small secondary action targets                           | Remove, compare, and copy actions were harder to tap.                                                                | Increased the affected controls to 44px minimum height; removal controls also have 44px minimum width.                                       | `ScenarioCard.svelte`, `CityActions.svelte`, `CompareHighlights.svelte` |
+| Oversized decision brief with excessive separation       | A 96–128px gap and very large heading disconnected it from the comparison entries.                                   | Restored consistent section spacing and heading scale.                                                                                       | `src/lib/components/compare/CompareHighlights.svelte`                   |
+| Wide tables lacked a keyboard scrolling stop             | A keyboard user could reach links without a convenient way to scroll the whole table.                                | Added named, focusable scroll regions, retaining native table semantics and sticky metric labels.                                            | Both comparison table components                                        |
+| Internal terminology and repeated instructions           | “Current committed salary,” repeated empty-state steps, and standalone “Estimate” labels added noise.                | Simplified labels and removed repetition while preserving assumptions and provenance.                                                        | `SalaryEquivalence.svelte`, comparison route                            |
+| Nearby action outcomes were screen-reader-only           | Sighted users could miss lookup failures and comparison feedback.                                                    | Made the existing live status visible.                                                                                                       | `src/lib/components/city/NearbySuburbs.svelte`                          |
+
+## Verification
+
+- `bun run validate`: formatting, ESLint, Svelte/TypeScript checks, 213 unit tests, 23 Python data tests, and production build.
+- `bun run test:e2e`: 31 Chromium tests passed, including new no-match recovery, five responsive widths, keyboard table scrolling, and a serious/critical accessibility scan of the populated mobile comparison.
+- Existing coverage preserved salary editing, keyboard autocomplete, throttled autocomplete fallback, source attribution, comparison capacity, per-city salaries, salary equivalence, shared URLs, history, restored state, tax chart contrast in both themes, keyboard map markers, marker identity, and delayed Leaflet lifecycle cleanup.
+- Removed the GSAP lifecycle test with the feature it tested. Updated the landing focus test to require direct access rather than a now-unnecessary scroll button.
+- Screenshots and execution logs are in `/tmp/renttool-ui-audit/` for this local session.
+
+## Limits
+
+This is a local implementation audit, not a usability study. Browser automation used Chromium, not Safari or Firefox. No live rent datasets, tax calculations, external marketplace behavior, or deployment were changed or revalidated. Financial assumptions and data-source qualifications remain visible in the product.
+
+## Follow-up: interrupted first salary edit
+
+A city-only URL such as `/?city=Milwaukee%2C+WI` rendered a different copy of the controls from the populated results state. The first valid salary removed the active slider from the DOM, interrupting a pointer drag; typing could also lose focus. A browser reproduction confirmed the original slider became disconnected while the mouse button was still held.
+
+The page now mounts one controls instance outside the budget-dependent results branch. The heading and desktop column arrangement depend on the chosen city, so the first salary does not move the slider. Regression coverage drags continuously at 686px and 1440px and types, clears, and re-enters a salary without losing focus.

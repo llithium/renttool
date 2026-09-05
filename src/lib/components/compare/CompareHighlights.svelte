@@ -14,12 +14,10 @@
   let decision = $derived(analysis.briefs[criterion]);
 </script>
 
-<section class="mt-24 border-t border-line-strong pt-8 md:mt-32" aria-labelledby="decision-heading">
+<section class="mt-8 border-t border-line-strong pt-7" aria-labelledby="decision-heading">
   <div class="flex flex-col justify-between gap-5 md:flex-row md:items-end">
     <div class="max-w-xl">
-      <h2 id="decision-heading" class="text-[clamp(2.5rem,5vw,5rem)] leading-none tracking-tighter">
-        Decision brief
-      </h2>
+      <h2 id="decision-heading" class="text-headline">Decision brief</h2>
       <p class="mt-1 text-sm/relaxed text-muted">
         Choose what matters most for this move. The result uses the salaries shown in each
         comparison entry.
@@ -31,7 +29,7 @@
           type="button"
           aria-pressed={criterion === option.key}
           onclick={() => (criterion = option.key)}
-          class="cursor-pointer border px-3 py-2 text-sm font-semibold transition-colors {criterion ===
+          class="min-h-11 cursor-pointer rounded-lg border px-3 py-2 text-sm font-semibold transition-colors {criterion ===
           option.key
             ? 'border-accent bg-accent text-accent-ink'
             : 'border-line-strong bg-card text-ink hover:border-accent hover:text-accent'}"
@@ -47,7 +45,7 @@
       class="motion-copy mt-6 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6"
     >
       <div>
-        <span class="block text-label tracking-wide text-muted uppercase">{decision.title}</span>
+        <span class="block text-label text-muted">{decision.title}</span>
         {#if decision.leaders.length}
           <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {#each decision.leaders as leader, index (leader.city.name)}

@@ -26,14 +26,11 @@
 <aside data-testid="sidebar" class="@container min-w-0">
   <section id="plan-controls" class="scroll-mt-6 border-y border-line-strong py-6 md:py-8">
     <div
-      class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-10 {activeCity && budget
+      class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-10 {activeCity
         ? '@4xl:grid-cols-[1fr_1fr_1.1fr]'
         : ''}"
     >
       <div>
-        <p class="mb-5 text-meta font-semibold tracking-[0.14em] text-accent uppercase">
-          Your inputs
-        </p>
         <CitySearch
           onselect={(suggestion) => void presentation.chooseCity(suggestion)}
           selectedName={presentation.selectedName}
@@ -49,7 +46,7 @@
           oninput={salary.oninput}
           onblur={salary.onblur}
           onkeydown={salary.onkeydown}
-          class="mb-2.5 @2xl:mt-8"
+          class="mb-2.5"
         />
         <SalarySlider
           value={presentation.salary}

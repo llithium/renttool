@@ -41,13 +41,19 @@
     {/if}
   </p>
 
-  <div class="overflow-x-auto">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard users need to focus this region to scroll the table.) -->
+  <div
+    class="overflow-x-auto rounded-sm"
+    role="region"
+    aria-label="City rent comparison; scroll horizontally for more"
+    tabindex="0"
+  >
     <!-- Cell padding and rules are uniform down the table, so they ride on the
          row; alignment and wrapping vary per column and stay on the cells. -->
     <table class="w-full min-w-136 border-collapse text-sm">
       <thead>
         <tr
-          class="[&>th]:border-b-2 [&>th]:border-line-strong [&>th]:px-3 [&>th]:py-2 [&>th]:text-xs [&>th]:font-semibold [&>th]:tracking-wider [&>th]:whitespace-nowrap [&>th]:text-muted [&>th]:uppercase"
+          class="[&>th]:border-b-2 [&>th]:border-line-strong [&>th]:px-3 [&>th]:py-2 [&>th]:text-xs [&>th]:font-semibold [&>th]:whitespace-nowrap [&>th]:text-muted"
         >
           <th class="text-left">City</th>
           <th class="text-right">1BR</th>

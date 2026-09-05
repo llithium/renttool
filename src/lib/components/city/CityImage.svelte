@@ -22,9 +22,9 @@
       <img
         src={image.url}
         alt={image.alt}
-        loading="eager"
+        loading="lazy"
         decoding="async"
-        class="aspect-[2.35/1] w-full object-cover transition duration-700 ease-out group-hover:scale-[1.02] max-md:aspect-video"
+        class="aspect-3/1 max-h-64 w-full object-cover"
         onerror={() => (hidden = true)}
       />
       <span

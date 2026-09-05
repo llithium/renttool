@@ -36,34 +36,6 @@ async function holdModule(page: Page, fragment: string) {
   };
 }
 
-test('landing animation does not initialize after navigation during GSAP import', async ({
-  page
-}) => {
-  const errors: Error[] = [];
-  page.on('pageerror', (error) => errors.push(error));
-  const gsap = await holdModule(page, 'gsap');
-
-  await page.goto('/');
-  await waitForHydration(page);
-  await gsap.waitUntilRequested();
-
-  const heroLine = page.locator('[data-hero-line]').first();
-  await expect(heroLine).toBeVisible();
-  const heroElement = await heroLine.elementHandle();
-  await page.getByRole('link', { name: 'Compare' }).click();
-  await expect(page).toHaveURL(/\/compare/);
-  gsap.release();
-  await gsap.complete();
-  const heroState = await heroElement?.evaluate((element) => ({
-    connected: element.isConnected,
-    style: element.getAttribute('style') ?? ''
-  }));
-  expect(heroState?.connected).toBe(false);
-  expect(heroState?.style).not.toMatch(/transform|opacity/);
-  await heroElement?.dispose();
-  expect(errors).toEqual([]);
-});
-
 test('map does not initialize after navigation during Leaflet import', async ({ page }) => {
   const errors: Error[] = [];
   page.on('pageerror', (error) => errors.push(error));

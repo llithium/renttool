@@ -6,7 +6,6 @@
   import { createUrlSync } from '$lib/urlSync.svelte';
 
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
-  import CityHeadline from '$lib/components/city/CityHeadline.svelte';
   import CityImage from '$lib/components/city/CityImage.svelte';
   import Verdict from '$lib/components/city/Verdict.svelte';
   import CityFacts from '$lib/components/city/CityFacts.svelte';
@@ -62,7 +61,7 @@
 <main
   id="main-content"
   data-hydrated={urlSync.hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-384 overflow-x-hidden px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-384 px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
     planHref={plan.buildHref('/')}
@@ -72,8 +71,7 @@
   />
 
   <div class="mt-6 flex flex-col gap-8">
-    <!-- Result sections stay mounted across city/salary changes; their entrance
-         animation runs on the empty-to-results transition. -->
+    <!-- Keep supporting results mounted while the plan changes. -->
     <div data-testid="results" class="flex min-w-0 flex-col">
       {#if !urlSync.hydrated}
         <section
@@ -86,47 +84,31 @@
           <div class="mt-4 h-12 max-w-xl animate-pulse rounded-lg bg-line"></div>
           <div class="mt-8 h-6 max-w-2xl animate-pulse rounded-md bg-line"></div>
         </section>
-      {:else if selected && budget}
-        {#key selected.name}
-          <!-- The selected city is the plan's identity. Recreating only this
-               identity band makes a completed city choice explicit while the
-               larger results document stays stable and readable. -->
-          <div class="animate-ledger-refresh">
-            <div class="border-b border-line-strong pb-6 md:pb-8">
-              <p class="mb-3 text-meta font-semibold tracking-[0.14em] text-accent uppercase">
-                Offer planner
-              </p>
-              <CityHeadline city={selected} />
-              <CityImage city={selected} class="mt-7" />
-            </div>
-            <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
-            <a
-              href="#plan-controls"
-              class="mt-3 inline-flex self-start rounded-lg px-2 py-1 text-label text-accent no-underline hover:bg-accent-soft hover:text-accent-deep lg:hidden"
-            >
-              Edit city or salary
-            </a>
+      {:else}
+        <!-- The same controls stay mounted across empty, valid, and invalid salaries. -->
+        <LandingContent city={selected}>
+          <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
+        </LandingContent>
+      {/if}
 
-            {#if selected.r1 != null}
-              <Verdict {budget} city={selected} class="mt-7" />
-            {/if}
-            <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
-          </div>
+      {#if urlSync.hydrated && selected && budget}
+        {#if selected.r1 != null}
+          <Verdict {budget} city={selected} class="mt-7" />
+        {/if}
+        <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
+        {#key selected.name}
+          <CityImage city={selected} class="mt-7 max-w-3xl" />
         {/key}
         <CityFacts
           city={selected}
           looking={plan.looking}
-          class="animate-rise [animation-delay:100ms] {selected.r1 != null
-            ? 'mt-7 border-t border-line pt-7'
-            : 'mt-3.5'}"
+          class={selected.r1 != null ? 'mt-7 border-t border-line pt-7' : 'mt-3.5'}
         />
 
         <!-- The two charts share one section band, split by a hairline rather
              than sitting in two boxes. They remain visible because the budget
              and market comparison are part of the same decision. -->
-        <div
-          class="mt-7 grid animate-rise grid-cols-1 gap-6 border-t border-line pt-7 [animation-delay:150ms] md:grid-cols-2 md:gap-8"
-        >
+        <div class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8">
           <RentTrendChart city={selected} {budget} />
           <TaxBreakdownChart
             city={selected}
@@ -138,36 +120,20 @@
         <SearchLinks
           city={selected}
           maxRent={budget.maxRent}
-          class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:200ms]"
+          class="mt-7 border-t border-line pt-7"
         />
 
-        <NearbySuburbs
-          presentation={plan}
-          city={selected}
-          class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:250ms]"
-        />
+        <NearbySuburbs presentation={plan} city={selected} class="mt-7 border-t border-line pt-7" />
 
         {#if plan.comparisonCities.length}
-          <ComparisonTable
-            presentation={plan}
-            class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
-          />
+          <ComparisonTable presentation={plan} class="mt-7 border-t border-line pt-7" />
         {/if}
 
-        <RentMap
-          presentation={plan}
-          class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:300ms]"
-        />
-      {:else}
-        <LandingContent>
-          <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
-        </LandingContent>
+        <RentMap presentation={plan} class="mt-7 border-t border-line pt-7" />
       {/if}
 
       {#if urlSync.hydrated && selected && budget}
-        <SourcesFooter
-          class="mt-7 animate-rise border-t border-line pt-7 [animation-delay:200ms]"
-        />
+        <SourcesFooter class="mt-7 border-t border-line pt-7" />
       {/if}
     </div>
   </div>

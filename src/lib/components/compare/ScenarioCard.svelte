@@ -7,13 +7,11 @@
     entry,
     href,
     salaries,
-    entranceDelay = 0,
     onremove
   }: {
     entry: ComparisonEntry;
     href: string;
     salaries: CompareSalaries;
-    entranceDelay?: number;
     onremove: () => void;
   } = $props();
 
@@ -22,8 +20,7 @@
 
 <article
   data-testid="scenario"
-  style:animation-delay={`${entranceDelay}ms`}
-  class="group min-w-0 animate-rise border-r border-b border-line-strong bg-card p-6 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:bg-card-2 hover:shadow-pop md:p-8"
+  class="min-w-0 border-r border-b border-line-strong bg-card p-5 md:p-7"
 >
   <div class="flex min-h-12 items-start justify-between gap-2">
     <div>
@@ -35,7 +32,7 @@
     <button
       onclick={onremove}
       aria-label={`Remove ${entry.city.name}`}
-      class="cursor-pointer border border-line-strong bg-transparent p-2 text-muted hover:border-red hover:text-red"
+      class="min-h-11 min-w-11 shrink-0 cursor-pointer rounded-lg border border-line-strong bg-transparent p-3 text-muted hover:border-red hover:text-red"
     >
       <svg class="size-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <path

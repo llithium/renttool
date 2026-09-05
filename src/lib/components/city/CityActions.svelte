@@ -55,7 +55,7 @@
     disabled={compareFull}
     title={compareFull ? 'Remove a city before adding another' : undefined}
     onclick={onCompare}
-    class="inline-flex cursor-pointer items-center gap-1.5 rounded-md p-1 text-sm font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-55 {comparing
+    class="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md px-1 py-2 text-sm font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-55 {comparing
       ? 'text-ink'
       : 'text-accent hover:text-accent-deep'}"
   >
@@ -81,14 +81,14 @@
     aria-live="polite"
     title="Copy a shareable link"
     onclick={onShare}
-    class="cursor-pointer rounded-md p-1 text-sm font-medium text-muted transition-colors duration-200 not-disabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-55"
+    class="min-h-11 cursor-pointer rounded-md px-1 py-2 text-sm font-medium text-muted transition-colors duration-200 not-disabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-55"
   >
     {shareLabel}
   </button>
   {#if presentation.comparisonNames.length}
     <a
       href="#comparison-section"
-      class="rounded-md px-1 py-0.5 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
+      class="min-h-11 rounded-md px-1 py-2 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
     >
       View comparison ({presentation.comparisonNames.length})
     </a>

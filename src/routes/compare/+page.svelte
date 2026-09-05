@@ -87,7 +87,7 @@
 <main
   id="main-content"
   data-hydrated={hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-384 overflow-x-hidden px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-384 px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
     planHref={cityViewHref}
@@ -98,7 +98,6 @@
 
   <div class="mt-6 flex min-w-0 flex-col">
     <section>
-      <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">Offer planner</p>
       <h1 class="mt-3 max-w-4xl text-display text-ink">Compare cities and salaries</h1>
       <p class="mt-4 max-w-2xl text-body text-muted">
         See what each city leaves after a typical one-bedroom rent, then weigh the trade-offs that
@@ -108,17 +107,15 @@
 
     <aside class="mt-7 min-w-0 border-t border-line-strong pt-6 md:pt-8">
       <section
-        class="grid gap-6 md:grid-cols-[minmax(14rem,0.75fr)_minmax(18rem,1fr)_minmax(12rem,0.65fr)] md:gap-8"
+        class="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.65fr)]"
       >
         <div>
-          <p class="text-meta font-semibold tracking-[0.14em] text-accent uppercase">
-            Your comparison
-          </p>
+          <p class="text-title text-ink">Your comparison</p>
           <p class="mt-2 text-sm/relaxed text-muted">
             Add up to five cities. Set a different salary for each offer in the results.
           </p>
         </div>
-        <div class="md:border-l md:border-line md:pl-8">
+        <div class="lg:border-l lg:border-line lg:pl-8">
           {#if atCapacity}
             <div class="bg-card-2 px-4 py-3">
               <p class="text-label text-ink">Five cities are ready.</p>
@@ -128,7 +125,7 @@
             <CitySearch onselect={addCity} />
           {/if}
         </div>
-        <div class="md:border-l md:border-line md:pl-8">
+        <div class="lg:border-l lg:border-line lg:pl-8">
           <p aria-live="polite" class="min-h-5 text-meta text-muted">
             {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
           </p>
@@ -151,12 +148,11 @@
           class="mt-7 grid grid-flow-dense grid-cols-1 border-t border-l border-line-strong md:grid-cols-2"
           aria-label="Comparison entries"
         >
-          {#each analysis.entries as entry, index (entry.city.name)}
+          {#each analysis.entries as entry (entry.city.name)}
             <ScenarioCard
               {entry}
               href={hrefForCity(entry.city)}
               {salaries}
-              entranceDelay={Math.min(index * 60, 180)}
               onremove={() => {
                 plan.removeComparison(entry.city.name);
                 salaries.sync(plan.comparisonEntries);
@@ -190,11 +186,6 @@
               Start with the city tied to your offer or current home. Add another place to see which
               one gives your plan more room after rent.
             </p>
-            <ul class="mt-6 space-y-2 text-sm/relaxed text-muted">
-              <li>Pick the city you are considering.</li>
-              <li>Add the place you want to weigh against it.</li>
-              <li>Use the decision brief to choose the trade-off that matters most.</li>
-            </ul>
           </div>
         </section>
       {/if}

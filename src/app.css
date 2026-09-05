@@ -137,13 +137,10 @@
   --shadow-card: var(--elevation-card);
   --shadow-pop: var(--elevation-pop);
 
-  /* Motion — the plan resolves like a ledger: search choices settle into place,
-     then a confirmed city gets one brief document refresh. All CSS-based so the
-     reduced-motion block below neutralizes it automatically. */
+  /* Interaction feedback respects the reduced-motion preference below. */
   --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pop: pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-grow-x: grow-x 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-ledger-refresh: ledger-refresh 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-overlay-settle: overlay-settle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -178,23 +175,6 @@
   }
   to {
     transform: scaleX(var(--motion-fill, 1));
-  }
-}
-
-/* A city choice changes the facts underneath a plan. The short crop-and-settle
-   makes that handoff legible without shifting the document or delaying reading. */
-@keyframes ledger-refresh {
-  from {
-    opacity: 0;
-    clip-path: inset(0 0 16% 0);
-    filter: blur(2px);
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0);
-    filter: blur(0);
-    transform: translateY(0);
   }
 }
 
@@ -318,85 +298,5 @@
       transition-duration: 0.01ms !important;
       transition-delay: 0ms !important;
     }
-  }
-}
-
-@layer components {
-  [data-editorial-hero] {
-    background:
-      linear-gradient(90deg, transparent 0 68%, color-mix(in srgb, var(--ink) 4%, transparent) 68%),
-      var(--card);
-  }
-
-  [data-editorial-hero]::before,
-  [data-editorial-hero]::after {
-    position: absolute;
-    width: 1rem;
-    height: 1rem;
-    content: '';
-    border-color: var(--ink);
-    opacity: 0.7;
-  }
-
-  [data-editorial-hero]::before {
-    top: 0.75rem;
-    right: 0.75rem;
-    border-top: 1px solid;
-    border-right: 1px solid;
-  }
-
-  [data-editorial-hero]::after {
-    bottom: 0.75rem;
-    left: 0.75rem;
-    border-bottom: 1px solid;
-    border-left: 1px solid;
-  }
-
-  [data-halftone-field] {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 34%;
-    height: 42%;
-    pointer-events: none;
-    opacity: 0.55;
-    background-image: radial-gradient(circle, var(--ink) 1.2px, transparent 1.3px);
-    background-size: 8px 8px;
-    mask-image: radial-gradient(circle at 70% 40%, black, transparent 72%);
-  }
-
-  [data-halftone-orbit] {
-    position: absolute;
-    right: -4rem;
-    bottom: -4rem;
-    width: 18rem;
-    height: 18rem;
-    border: 1px solid var(--line-strong);
-    border-radius: 50%;
-    opacity: 0.42;
-    background-image: radial-gradient(circle, var(--ink) 1px, transparent 1.15px);
-    background-size: 7px 7px;
-    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .group:hover [data-halftone-orbit] {
-    transform: scale(1.05) rotate(7deg);
-  }
-}
-
-@media (max-width: 767px) {
-  [data-editorial-hero] {
-    min-height: 38rem;
-  }
-
-  [data-halftone-field] {
-    width: 58%;
-    height: 25%;
-  }
-
-  [data-halftone-orbit] {
-    right: -12rem;
-    bottom: -12rem;
-    opacity: 0.25;
   }
 }

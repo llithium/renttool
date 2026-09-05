@@ -16,12 +16,15 @@
   } = $props();
 </script>
 
-<header class="flex items-center justify-end gap-4 border-b border-line-strong py-3 {className}">
+<header
+  class="flex items-center justify-between gap-2 border-b border-line-strong py-3 {className}"
+>
+  <a href={planHref} class="shrink-0 text-title text-ink no-underline">Rent Tool</a>
   <nav aria-label="Primary" class="flex items-center gap-1">
     <a
       href={planHref}
       aria-current={activeView === 'plan' ? 'page' : undefined}
-      class="rounded-full px-3 py-2 text-label no-underline transition-colors duration-200 active:scale-98 sm:px-4 {activeView ===
+      class="rounded-full p-2 text-label no-underline transition-colors duration-200 active:scale-98 sm:px-4 {activeView ===
       'plan'
         ? 'bg-ink text-canvas hover:bg-ink'
         : 'text-ink hover:bg-card-2'}"
@@ -31,7 +34,7 @@
     <a
       href={compareHref}
       aria-current={activeView === 'compare' ? 'page' : undefined}
-      class="flex items-center gap-1.5 rounded-full px-3 py-2 text-label no-underline transition-colors duration-200 active:scale-98 sm:px-4 {activeView ===
+      class="flex items-center gap-1.5 rounded-full p-2 text-label no-underline transition-colors duration-200 active:scale-98 sm:px-4 {activeView ===
       'compare'
         ? 'bg-ink text-canvas hover:bg-ink'
         : 'text-ink hover:bg-card-2'}"

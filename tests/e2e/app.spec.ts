@@ -209,15 +209,13 @@ test('keeps the latest salary when city navigation pushes history', async ({ pag
   expect(new URL(page.url()).search).toBe('?salary=90000&city=Austin%2C+TX');
 });
 
-test('focuses the calculator and brings it into view from the landing hero', async ({ page }) => {
+test('makes the landing controls directly accessible with unclipped focus', async ({ page }) => {
   const city = page.getByRole('combobox', { name: 'City' });
-  const before = await page.evaluate(() => window.scrollY);
-
-  await page.getByRole('button', { name: 'Build my rent plan' }).click();
+  await expect(city).toBeInViewport();
+  await city.focus();
 
   await expect(city).toBeFocused();
   await expect(city).toBeInViewport();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
 
   const clippingAncestor = await city.evaluate((input) => {
     const inputStyle = getComputedStyle(input);
@@ -753,4 +751,83 @@ test('retains actual map marker elements when salary changes', async ({ page }) 
   await expect(updated).toBeVisible();
   expect(await updated.evaluate((element, previous) => element === previous, original)).toBe(true);
   await original.dispose();
+});
+
+test('explains an empty city search and allows a new search', async ({ page }) => {
+  await page.route('**/api/city-suggest?*', (route) => route.fulfill({ json: [] }));
+  const city = page.getByRole('combobox', { name: 'City' });
+  await city.fill('zzzzzzzz');
+  await expect(page.getByRole('status')).toContainText('No matching cities');
+  await city.fill('Tampa');
+  await expect(page.getByRole('option').filter({ hasText: 'Tampa, FL' })).toBeVisible();
+  await expect(page.getByText('No matching cities')).toHaveCount(0);
+});
+
+test('keeps comparison controls and tables usable on narrow screens', async ({ page }) => {
+  await page.goto(
+    '/compare?salary=80000&city=Tampa%2C+FL&compare=Tampa%2C+FL&compare=Austin%2C+TX'
+  );
+  await waitForHydration(page);
+  for (const width of [320, 390, 768, 820, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width
+    );
+    const city = page.getByRole('combobox', { name: 'City' });
+    await city.scrollIntoViewIfNeeded();
+    await expect(city).toBeInViewport();
+  }
+  await page.setViewportSize({ width: 390, height: 900 });
+  const table = page.getByRole('region', { name: /Full city comparison/ });
+  await table.focus();
+  await expect(table).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => table.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibility.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))
+  ).toEqual([]);
+});
+
+for (const width of [686, 1440]) {
+  test(`keeps the first salary drag active at ${width}px when a city has no salary yet`, async ({
+    page
+  }) => {
+    await page.setViewportSize({ width, height: 1087 });
+    await page.goto('/?city=Milwaukee%2C+WI');
+    await waitForHydration(page);
+    const slider = page.getByRole('slider', { name: 'Annual salary slider' });
+    const original = await slider.elementHandle();
+    const bounds = (await slider.boundingBox())!;
+    await page.mouse.move(bounds.x + 12, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width * 0.35, bounds.y + bounds.height / 2, {
+      steps: 4
+    });
+    expect(await original!.evaluate((element) => element.isConnected)).toBe(true);
+    const intermediate = Number(await slider.inputValue());
+    await page.mouse.move(bounds.x + bounds.width * 0.8, bounds.y + bounds.height / 2, {
+      steps: 5
+    });
+    await page.mouse.up();
+    expect(Number(await slider.inputValue())).toBeGreaterThan(intermediate);
+    expect((await slider.boundingBox())!.y).toBeCloseTo(bounds.y, 0);
+    await expect(page.getByRole('heading', { name: 'Rent budget', exact: true })).toBeVisible();
+    await original!.dispose();
+  });
+}
+
+test('keeps salary typing focused when results appear and disappear', async ({ page }) => {
+  await page.goto('/?city=Milwaukee%2C+WI');
+  await waitForHydration(page);
+  const salary = page.getByRole('textbox', { name: 'Annual salary', exact: true });
+  await salary.focus();
+  await salary.pressSequentially('80000');
+  await expect(salary).toHaveValue('80,000');
+  await expect(salary).toBeFocused();
+  await salary.fill('');
+  await expect(salary).toBeFocused();
+  await salary.pressSequentially('90000');
+  await expect(salary).toHaveValue('90,000');
+  await expect(salary).toBeFocused();
 });

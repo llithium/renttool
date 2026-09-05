@@ -59,11 +59,11 @@
         </div>
         <dl class="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4">
           <div>
-            <dt class="text-meta text-muted">Current committed salary</dt>
+            <dt class="text-meta text-muted">Annual salary</dt>
             <dd class="mt-1 text-data text-ink tabular-nums">{entry.committedSalaryValue}/yr</dd>
           </div>
           <div>
-            <dt class="text-meta text-muted">Equivalent required salary</dt>
+            <dt class="text-meta text-muted">Equivalent salary</dt>
             <dd class="mt-1 text-data text-ink tabular-nums">
               {entry.requiredSalaryValue}{#if entry.requiredSalary != null}/yr{/if}
             </dd>
@@ -71,8 +71,6 @@
         </dl>
         {#if entry.unavailableReason}
           <p class="mt-4 text-meta text-muted" role="status">{entry.unavailableReason}</p>
-        {:else}
-          <p class="mt-4 text-meta text-muted">Estimate</p>
         {/if}
       </article>
     {/each}

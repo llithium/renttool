@@ -147,12 +147,17 @@
           </span>
           {#if rentFor(sug.label)}
             <span class="text-meta whitespace-nowrap text-muted tabular-nums">
-              {rentFor(sug.label)}
+              {rentFor(sug.label)}/mo
             </span>
           {/if}
         </li>
       {/each}
     </ul>
+  {/if}
+  {#if discoveryState.open && !discoveryState.loading && !discoveryState.suggestions.length && discoveryState.query.trim().length >= 2}
+    <p role="status" class="mt-2 text-sm text-muted">
+      No matching cities. Try the full city name and state.
+    </p>
   {/if}
   <span class="sr-only" aria-live="polite">
     {discoveryState.loading
