@@ -56,15 +56,15 @@
   >
     <!-- Cell padding and rules are uniform across the table, so they ride on the
        row and body; alignment and stickiness vary per column. -->
-    <table class="w-full min-w-170 border-collapse text-sm">
+    <table class="w-full min-w-full border-collapse text-sm">
       <thead>
         <tr
           class="[&>th]:border-b [&>th]:border-line [&>th]:px-4 [&>th]:py-3 [&>th]:align-top [&>th]:text-xs [&>th]:text-muted"
         >
           <!-- The metric column stays put while the city columns scroll sideways. -->
-          <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left">Metric</th>
+          <th class="sticky left-0 z-10 min-w-36 bg-canvas text-left sm:min-w-46">Metric</th>
           {#each analysis.entries as entry (entry.city.name)}
-            <th class="text-right">
+            <th class="min-w-44 text-right">
               <a
                 href={hrefForCity(entry.city)}
                 class="text-inherit no-underline hover:text-inherit"
@@ -80,7 +80,9 @@
       >
         {#each analysis.affordabilityMetrics as metric (metric.key)}
           <tr>
-            <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left font-semibold text-muted">
+            <th
+              class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"
+            >
               {metric.label}
             </th>
             {#each analysis.entries as entry, index (entry.city.name)}
@@ -90,7 +92,9 @@
           </tr>
         {/each}
         <tr>
-          <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left font-semibold text-muted">
+          <th
+            class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"
+          >
             Income tax context
           </th>
           {#each analysis.entries as entry (entry.city.name)}
@@ -99,7 +103,9 @@
         </tr>
         {#each analysis.cityContextMetrics as metric (metric.key)}
           <tr>
-            <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left font-semibold text-muted">
+            <th
+              class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"
+            >
               {metric.label}
             </th>
             {#each analysis.entries as entry, index (entry.city.name)}
@@ -109,7 +115,9 @@
           </tr>
         {/each}
         <tr>
-          <th class="sticky left-0 z-10 min-w-46 bg-canvas text-left font-semibold text-muted">
+          <th
+            class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"
+          >
             Rent data
           </th>
           {#each analysis.entries as entry (entry.city.name)}

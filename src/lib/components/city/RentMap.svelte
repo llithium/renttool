@@ -223,10 +223,11 @@
             map?.scrollWheelZoom.disable();
           }
         });
-        // CARTO Positron: a light, low-detail basemap so the affordability markers stand out.
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors © CARTO',
-          subdomains: 'abcd',
+        // Standard OSM tiles use normal browser caching and only load the visible map.
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          referrerPolicy: 'strict-origin-when-cross-origin',
           maxZoom: 19
         }).addTo(map);
         group = L.layerGroup().addTo(map);

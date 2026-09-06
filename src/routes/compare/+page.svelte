@@ -87,7 +87,7 @@
 <main
   id="main-content"
   data-hydrated={hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-384 px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
     planHref={cityViewHref}
@@ -105,7 +105,7 @@
       </p>
     </section>
 
-    <aside class="mt-7 min-w-0 border-t border-line-strong pt-6 md:pt-8">
+    <aside class="mt-7 min-w-0 rounded-2xl border border-line-strong bg-card p-5 md:p-7">
       <section
         class="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.65fr)]"
       >
@@ -160,6 +160,12 @@
             />
           {/each}
         </section>
+
+        {#if analysis.entries.length === 1}
+          <p class="mt-5 rounded-lg bg-card-2 p-4 text-sm text-muted">
+            Add a second city above to compare spending room and equivalent salaries.
+          </p>
+        {/if}
 
         {#if analysis.entries.length > 1}
           <CompareHighlights {analysis} {hrefForCity} />

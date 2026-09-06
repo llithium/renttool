@@ -11,7 +11,7 @@
       <CityHeadline {city} />
     </div>
   {:else}
-    <header class="max-w-3xl py-6 md:py-10">
+    <header class="max-w-3xl pt-6 pb-8 md:pt-10 md:pb-12">
       <h1 class="text-display text-ink">Know what rent fits before you move.</h1>
       <p class="mt-5 max-w-xl text-body text-muted">
         Enter your annual salary and a U.S. city to see your monthly rent target, estimated
@@ -23,7 +23,7 @@
   {@render children?.()}
 
   {#if !city}
-    <section class="mt-10 max-w-3xl pb-8" aria-labelledby="planning-heading">
+    <section class="mt-8 max-w-3xl pb-8" aria-labelledby="planning-heading">
       <h2 id="planning-heading" class="text-title">A starting point for your apartment search</h2>
       <p class="mt-3 text-body text-muted">
         Your target uses 30% of gross income. Compare it with local rents, then adjust for your

@@ -17,7 +17,7 @@ const config = {
         'img-src': [
           'self',
           'data:',
-          'https://*.basemaps.cartocdn.com',
+          'https://tile.openstreetmap.org',
           'https://images.unsplash.com'
         ],
         'connect-src': ['self', 'ws:', 'wss:', ...__impeccableLiveDev],

@@ -238,3 +238,7 @@ Push to a repo and import into Vercel (adapter-vercel is already configured), or
 
 GitHub Actions runs `bun run validate` and the Chromium end-to-end suite on pushes and pull
 requests. The app targets Node 22 on Vercel.
+
+### Map tiles
+
+The affordability map uses standard OpenStreetMap tiles with visible attribution, browser caching, and an origin referrer. Only visible tiles are requested; do not add prefetching or offline downloads. Review the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) before expanding map traffic. Browser tests block remote tiles.

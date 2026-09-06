@@ -61,7 +61,7 @@
 <main
   id="main-content"
   data-hydrated={urlSync.hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-384 px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
 >
   <AppHeader
     planHref={plan.buildHref('/')}
@@ -92,18 +92,60 @@
       {/if}
 
       {#if urlSync.hydrated && selected && budget}
-        {#if selected.r1 != null}
-          <Verdict {budget} city={selected} class="mt-7" />
-        {/if}
-        <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
-        {#key selected.name}
-          <CityImage city={selected} class="mt-7 max-w-3xl" />
-        {/key}
-        <CityFacts
-          city={selected}
-          looking={plan.looking}
-          class={selected.r1 != null ? 'mt-7 border-t border-line pt-7' : 'mt-3.5'}
-        />
+        <nav
+          aria-label="Plan sections"
+          class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur-sm md:mx-0 md:px-0"
+        >
+          <a
+            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+            href="#rent-decision">Rent decision</a
+          >
+          <a
+            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+            href="#city-details">City &amp; taxes</a
+          >
+          <a
+            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+            href="#nearby-options">Nearby options</a
+          >
+          <a
+            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+            href="#rent-map">Map</a
+          >
+          <a
+            class="ml-auto inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+            href="#plan-controls">Edit plan</a
+          >
+        </nav>
+
+        <section
+          id="rent-decision"
+          tabindex="-1"
+          aria-label="Your rent decision"
+          class="scroll-mt-28 pt-7"
+        >
+          {#if selected.r1 != null}
+            <Verdict {budget} city={selected} />
+          {/if}
+          <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
+          <SearchLinks
+            city={selected}
+            maxRent={budget.maxRent}
+            class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
+          />
+        </section>
+
+        <section
+          id="city-details"
+          tabindex="-1"
+          aria-label="City and tax details"
+          class="scroll-mt-28"
+        >
+          {#key selected.name}
+            <CityImage city={selected} class="mt-8 rounded-xl" />
+          {/key}
+          <CityFacts city={selected} looking={plan.looking} class="mt-7" />
+        </section>
 
         <!-- The two charts share one section band, split by a hairline rather
              than sitting in two boxes. They remain visible because the budget
@@ -117,19 +159,26 @@
           />
         </div>
 
-        <SearchLinks
-          city={selected}
-          maxRent={budget.maxRent}
-          class="mt-7 border-t border-line pt-7"
-        />
-
-        <NearbySuburbs presentation={plan} city={selected} class="mt-7 border-t border-line pt-7" />
+        <section
+          id="nearby-options"
+          tabindex="-1"
+          aria-label="Nearby rent options"
+          class="scroll-mt-28"
+        >
+          <NearbySuburbs
+            presentation={plan}
+            city={selected}
+            class="mt-7 border-t border-line pt-7"
+          />
+        </section>
 
         {#if plan.comparisonCities.length}
           <ComparisonTable presentation={plan} class="mt-7 border-t border-line pt-7" />
         {/if}
 
-        <RentMap presentation={plan} class="mt-7 border-t border-line pt-7" />
+        <section id="rent-map" tabindex="-1" aria-label="Rent map" class="scroll-mt-28">
+          <RentMap presentation={plan} class="mt-7 border-t border-line pt-7" />
+        </section>
       {/if}
 
       {#if urlSync.hydrated && selected && budget}

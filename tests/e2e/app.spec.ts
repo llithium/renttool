@@ -174,7 +174,7 @@ test.beforeEach(async ({ page }) => {
       body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><rect width="4" height="2" fill="black"/></svg>'
     })
   );
-  await page.route('https://*.basemaps.cartocdn.com/**', (route) => route.abort());
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
   await page.goto('/');
   await waitForHydration(page);
 });
@@ -830,4 +830,24 @@ test('keeps salary typing focused when results appear and disappear', async ({ p
   await salary.pressSequentially('90000');
   await expect(salary).toHaveValue('90,000');
   await expect(salary).toBeFocused();
+});
+
+test('section shortcuts preserve the plan and return keyboard users to editing', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?salary=80000&city=Tampa%2C+FL');
+  await waitForHydration(page);
+  const navigation = page.getByRole('navigation', { name: 'Plan sections' });
+  await navigation.getByRole('link', { name: 'Nearby options' }).click();
+  const nearby = page.getByRole('region', { name: 'Nearby rent options', exact: true });
+  await expect(nearby).toBeFocused();
+  const navBounds = (await navigation.boundingBox())!;
+  const nearbyBounds = (await nearby.boundingBox())!;
+  expect(nearbyBounds.y).toBeGreaterThanOrEqual(navBounds.y + navBounds.height);
+  await navigation.getByRole('link', { name: 'Edit plan' }).click();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('combobox', { name: 'City' })).toBeFocused();
+  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
+  expect(new URL(page.url()).searchParams.get('city')).toBe('Tampa, FL');
 });

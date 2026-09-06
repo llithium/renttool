@@ -21,12 +21,15 @@
   let budget = $derived(presentation.budget);
 </script>
 
-<!-- The controls use the same flat, ruled language as the comparison entries.
-     Inputs and their answer sit in one responsive ledger rather than a dashboard sidebar. -->
+<!-- Keep the editing surface and its column widths stable as a salary becomes valid. -->
 <aside data-testid="sidebar" class="@container min-w-0">
-  <section id="plan-controls" class="scroll-mt-6 border-y border-line-strong py-6 md:py-8">
+  <section
+    id="plan-controls"
+    tabindex="-1"
+    class="scroll-mt-28 rounded-2xl border border-line-strong bg-card p-5 md:p-7"
+  >
     <div
-      class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-10 {activeCity
+      class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-7 {activeCity
         ? '@4xl:grid-cols-[1fr_1fr_1.1fr]'
         : ''}"
     >
@@ -37,7 +40,7 @@
           pendingName={presentation.pendingName}
         />
       </div>
-      <div class="@2xl:border-l @2xl:border-line @2xl:pl-10">
+      <div class="@2xl:border-l @2xl:border-line @2xl:pl-7">
         <SalaryInput
           id="salary"
           label="Annual salary"
@@ -54,10 +57,18 @@
             onsalary(Number.parseInt((event.target as HTMLInputElement).value, 10))}
         />
       </div>
-      {#if activeCity && budget}
-        <div class="border-line @max-4xl:border-t @max-4xl:pt-7 @4xl:border-l @4xl:pl-10">
-          <BudgetCard {budget} />
-          <CityActions {presentation} cityName={activeCity.name} />
+      {#if activeCity}
+        <div class="border-line @max-4xl:border-t @max-4xl:pt-7 @4xl:border-l @4xl:pl-7">
+          {#if budget}
+            <BudgetCard {budget} />
+            <CityActions {presentation} cityName={activeCity.name} />
+          {:else}
+            <h2 class="text-title">What rent fits here?</h2>
+            <p class="mt-2 max-w-sm text-sm/relaxed text-muted">
+              Enter your annual salary to see your monthly target and how it compares with local
+              rents.
+            </p>
+          {/if}
         </div>
       {/if}
     </div>

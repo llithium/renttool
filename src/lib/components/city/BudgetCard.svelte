@@ -5,8 +5,8 @@
   let { budget }: { budget: Budget } = $props();
 </script>
 
-<!-- Lives inside the planning surface, below one dividing line — not its own card. -->
-<section class="animate-rise">
+<!-- The budget stays readable while individual values acknowledge salary changes. -->
+<section>
   <h2 class="text-label text-muted">Rent budget</h2>
   <div
     class="mt-1 text-[clamp(2.25rem,4vw,3.75rem)] leading-none font-semibold tracking-[-0.045em] text-accent tabular-nums"

@@ -2,7 +2,6 @@
   import type { City } from '$lib/types';
   import { money } from '$lib/format';
   import { buildSearchLinks } from '$lib/searchLinks';
-  import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
 
   let {
     city,
@@ -16,17 +15,14 @@
 </script>
 
 <section class={className}>
-  <SectionHeading title="Next step" />
-
-  <div class="border-y border-line py-5 sm:py-6">
+  <div class="pb-5">
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
       <div>
-        <h3 class="text-title text-ink">
+        <h2 class="text-title text-ink">
           Search listings under {money(maxRent)}
-        </h3>
+        </h2>
         <p class="mt-1.5 max-w-[58ch] text-sm/relaxed text-muted">
-          We pass your exact rent cap to Zillow. Other marketplaces are here if you want a wider
-          look; each link states whether it carries a rent cap with it.
+          Start with listings within your target. Allow room for utilities, fees, and moving costs.
         </p>
       </div>
 
@@ -54,13 +50,13 @@
   </div>
 
   {#if alternatives.length}
-    <div class="grid border-b border-line sm:grid-cols-3">
+    <div class="grid border-t border-line sm:grid-cols-3">
       {#each alternatives as link (link.provider)}
         <a
           href={link.url}
           target="_blank"
           rel="noopener"
-          class="group flex min-h-22 flex-col justify-between gap-2 border-b border-line px-0 py-4 text-sm no-underline hover:text-accent sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0 sm:last:pr-0"
+          class="group flex min-h-18 flex-col justify-between gap-2 border-line px-0 py-4 text-sm no-underline hover:text-accent sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0 sm:last:pr-0"
         >
           <span class="font-semibold text-ink group-hover:text-accent">{link.providerName}</span>
           <span class="text-meta text-muted group-hover:text-accent">
@@ -75,7 +71,6 @@
     </div>
   {/if}
   <p class="mt-3 max-w-[66ch] text-sm/relaxed text-muted">
-    Apartment budgets are planning estimates. Confirm the rent, fees, and availability before you
-    apply.
+    Confirm the rent, fees, and availability before you apply.
   </p>
 </section>
