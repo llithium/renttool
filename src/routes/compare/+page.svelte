@@ -99,13 +99,9 @@
   <div class="mt-6 flex min-w-0 flex-col">
     <section>
       <h1 class="mt-3 max-w-4xl text-display text-ink">Compare cities and salaries</h1>
-      <p class="mt-4 max-w-2xl text-body text-muted">
-        See what each city leaves after a typical one-bedroom rent, then weigh the trade-offs that
-        matter to you.
-      </p>
     </section>
 
-    <aside class="mt-7 min-w-0 rounded-2xl border border-line-strong bg-card p-5 md:p-7">
+    <aside class="mt-8 min-w-0 rounded-2xl border border-line-strong bg-card p-5 md:p-7">
       <section
         class="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.65fr)]"
       >

@@ -104,7 +104,7 @@ test('does not server-render the landing state before a saved city hydrates', as
   const response = await request.get('/?salary=80000&city=Tampa%2C+FL');
   const html = await response.text();
   expect(html).toContain('Loading saved rent plan');
-  expect(html).not.toContain('Know what rent fits before you move.');
+  expect(html).not.toContain('Enter salary and city');
 });
 
 test('restores an off-list selected city and seed comparison from a shared URL', async ({

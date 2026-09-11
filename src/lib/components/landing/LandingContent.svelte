@@ -11,12 +11,8 @@
       <CityHeadline {city} />
     </div>
   {:else}
-    <header class="max-w-3xl pt-6 pb-8 md:pt-10 md:pb-12">
-      <h1 class="text-display text-ink">Know what rent fits before you move.</h1>
-      <p class="mt-5 max-w-xl text-body text-muted">
-        Enter your annual salary and a U.S. city to see your monthly rent target, estimated
-        take-home pay, and local rent estimates.
-      </p>
+    <header class="mt-3 max-w-3xl pb-8">
+      <h1 class="text-display text-ink">Enter salary and city</h1>
     </header>
   {/if}
 

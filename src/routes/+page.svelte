@@ -49,7 +49,7 @@
     name="description"
     content="Turn a salary offer into a practical rent budget, then compare it with current rent estimates, taxes, nearby options, and apartment searches."
   />
-  <meta property="og:title" content="Know what rent fits before you move · Rent Tool" />
+  <meta property="og:title" content="Enter salary and city · Rent Tool" />
   <meta
     property="og:description"
     content="Turn a salary offer into a practical rent budget and compare it with current local estimates."
