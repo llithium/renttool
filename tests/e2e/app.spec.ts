@@ -43,8 +43,7 @@ async function waitForHydration(page: Page) {
 
 async function chartContrastRatios(page: Page): Promise<number[]> {
   return page
-    .locator('[role="img"]')
-    .first()
+    .getByRole('img', { name: /^Gross monthly/ })
     .locator(':scope > div')
     .evaluateAll((elements) => {
       function parseColor(value: string): [number, number, number] {
@@ -104,7 +103,7 @@ test('does not server-render the landing state before a saved city hydrates', as
   const response = await request.get('/?salary=80000&city=Tampa%2C+FL');
   const html = await response.text();
   expect(html).toContain('Loading saved rent plan');
-  expect(html).not.toMatch(/<h1[^>]*>\s*Enter salary and city\s*<\/h1>/);
+  expect(html).not.toMatch(/<h1[^>]*>\s*Find your next place\.\s*<\/h1>/);
 });
 
 test('restores an off-list selected city and seed comparison from a shared URL', async ({
@@ -850,4 +849,33 @@ test('section shortcuts preserve the plan and return keyboard users to editing',
   await expect(page.getByRole('combobox', { name: 'City' })).toBeFocused();
   await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
   expect(new URL(page.url()).searchParams.get('city')).toBe('Tampa, FL');
+});
+
+test('explores a gallery city before salary entry and retains the comparison set', async ({
+  page
+}) => {
+  await page.goto('/?compare=Seattle%2C+WA');
+  await waitForHydration(page);
+  await page.getByRole('link', { name: 'Explore Chicago, IL', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Chicago, IL', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Affordability map' })).toBeVisible();
+  await expect(page.getByText('Enter a salary to see what fits.', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll('compare'))
+    .toContain('Seattle, WA');
+  await page.getByLabel('Annual salary', { exact: true }).fill('85000');
+  await expect(
+    page.getByRole('button', { name: markerName('Chicago, IL', 85000), exact: true })
+  ).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Rent budget', exact: true })).toBeVisible();
+});
+
+test('keeps the affordability verdict with the salary controls', async ({ page }) => {
+  await page.goto('/?salary=85000&city=Chicago%2C+IL');
+  await waitForHydration(page);
+  const planControls = page.getByTestId('sidebar').locator('#plan-controls');
+  await expect(
+    planControls.getByRole('heading', { name: 'Fits your 30% gross-income target' })
+  ).toBeVisible();
+  await expect(planControls.locator('#rent-decision')).toHaveCount(1);
 });

@@ -35,6 +35,15 @@ describe('rent map marker lifecycle', () => {
     expect(after.ariaLabel).toContain('fits budget');
   });
 
+  it('distinguishes a missing salary from missing rent data', () => {
+    expect(markerPresentation(city('A, ZZ', 1000), null, null, palette).fit).toBe(
+      'enter salary to check budget'
+    );
+    expect(markerPresentation(city('A, ZZ', null), null, null, palette).fit).toBe(
+      'rent data unavailable'
+    );
+  });
+
   it('keeps selected marker emphasis in the presentation path', () => {
     expect(markerPresentation(city('A, ZZ', 1_000), 1_500, 'A, ZZ', palette)).toMatchObject({
       radius: 9,

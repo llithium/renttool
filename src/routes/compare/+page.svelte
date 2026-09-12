@@ -101,7 +101,7 @@
       <h1 class="mt-3 max-w-4xl text-display text-ink">Compare cities and salaries</h1>
     </section>
 
-    <aside class="mt-8 min-w-0 rounded-2xl border border-line-strong bg-card p-5 md:p-7">
+    <aside class="mt-8 min-w-0 border-y border-line py-6 md:py-7">
       <section
         class="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.65fr)]"
       >
@@ -113,7 +113,7 @@
         </div>
         <div class="lg:border-l lg:border-line lg:pl-8">
           {#if atCapacity}
-            <div class="bg-card-2 px-4 py-3">
+            <div class="border-l-2 border-accent pl-4">
               <p class="text-label text-ink">Five cities are ready.</p>
               <p class="mt-1 text-meta text-muted">Remove one from the results to add another.</p>
             </div>
@@ -141,7 +141,7 @@
     <div class="flex min-w-0 flex-col">
       {#if analysis.entries.length}
         <section
-          class="mt-7 grid grid-flow-dense grid-cols-1 border-t border-l border-line-strong md:grid-cols-2"
+          class="mt-7 grid grid-flow-dense grid-cols-1 gap-5 md:grid-cols-2"
           aria-label="Comparison entries"
         >
           {#each analysis.entries as entry (entry.city.name)}
@@ -158,7 +158,7 @@
         </section>
 
         {#if analysis.entries.length === 1}
-          <p class="mt-5 rounded-lg bg-card-2 p-4 text-sm text-muted">
+          <p class="mt-5 border-t border-line pt-4 text-sm text-muted">
             Add a second city above to compare spending room and equivalent salaries.
           </p>
         {/if}

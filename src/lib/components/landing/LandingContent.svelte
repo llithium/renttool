@@ -1,34 +1,62 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { City } from '$lib/types';
+  import CityImage from '$lib/components/city/CityImage.svelte';
   import CityHeadline from '$lib/components/city/CityHeadline.svelte';
   let { children, city }: { children?: Snippet; city: City | null } = $props();
 </script>
 
 <article aria-label="Rent plan" class="min-w-0">
   {#if city}
-    <div class="pb-6 md:pb-8">
+    <div class="city-arrival">
       <CityHeadline {city} />
+      {#key city.name}<CityImage {city} class="arrival-photo" />{/key}
     </div>
   {:else}
-    <header class="mt-3 max-w-3xl pb-8">
-      <h1 class="text-display text-ink">Enter salary and city</h1>
+    <header class="arrival-heading">
+      <h1>Find your next place.</h1>
+      <p>Explore cities. See what your salary makes possible.</p>
     </header>
   {/if}
 
   {@render children?.()}
-
-  {#if !city}
-    <section class="mt-8 max-w-3xl pb-8" aria-labelledby="planning-heading">
-      <h2 id="planning-heading" class="text-title">A starting point for your apartment search</h2>
-      <p class="mt-3 text-body text-muted">
-        Your target uses 30% of gross income. Compare it with local rents, then adjust for your
-        other expenses, savings, and moving costs.
-      </p>
-      <p class="mt-3 text-body text-muted">
-        We also estimate taxes and let you compare up to five cities with a different salary for
-        each offer.
-      </p>
-    </section>
-  {/if}
 </article>
+
+<style>
+  .arrival-heading {
+    padding: 2.5rem 0 2rem;
+    max-width: 55rem;
+  }
+  .arrival-heading h1 {
+    font-size: clamp(2.5rem, 5.5vw, 5rem);
+    font-weight: 650;
+    line-height: 1.06;
+    letter-spacing: -0.055em;
+  }
+  .arrival-heading p {
+    margin-top: 1.25rem;
+    font-size: 1.2rem;
+    color: var(--muted);
+  }
+  .city-arrival {
+    display: grid;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .city-arrival :global(.arrival-photo) {
+    border: 0;
+    border-radius: 1.25rem;
+  }
+  .city-arrival :global(.arrival-photo img) {
+    max-height: 24rem;
+    aspect-ratio: 3.5;
+  }
+  @media (max-width: 640px) {
+    .arrival-heading {
+      padding-top: 1.5rem;
+    }
+    .city-arrival :global(.arrival-photo img) {
+      aspect-ratio: 1.65;
+    }
+  }
+</style>

@@ -6,6 +6,7 @@
   import SalarySlider from './SalarySlider.svelte';
   import CityActions from './CityActions.svelte';
   import BudgetCard from './BudgetCard.svelte';
+  import Verdict from './Verdict.svelte';
 
   let {
     presentation,
@@ -23,11 +24,7 @@
 
 <!-- Keep the editing surface and its column widths stable as a salary becomes valid. -->
 <aside data-testid="sidebar" class="@container min-w-0">
-  <section
-    id="plan-controls"
-    tabindex="-1"
-    class="scroll-mt-28 rounded-2xl border border-line-strong bg-card p-5 md:p-7"
-  >
+  <section id="plan-controls" tabindex="-1" class="scroll-mt-28 border-y border-line py-6 md:py-7">
     <div
       class="grid gap-7 @2xl:grid-cols-2 @2xl:gap-7 {activeCity
         ? '@4xl:grid-cols-[1fr_1fr_1.1fr]'
@@ -72,5 +69,11 @@
         </div>
       {/if}
     </div>
+
+    {#if activeCity && budget && activeCity.r1 != null}
+      <div id="rent-decision" class="mt-7 border-t border-line pt-7">
+        <Verdict {budget} city={activeCity} />
+      </div>
+    {/if}
   </section>
 </aside>

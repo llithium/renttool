@@ -8,16 +8,14 @@
    user actually picked. Delete it only alongside the toggle. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Monochrome editorial palette — graphite, white, and a quiet range of neutral
-   surfaces. Status tokens are the only restrained color accents, preserving the
-   existing fit / over-budget signal without bringing the warm paper palette back. */
+/* Coastal wayfinding palette shared by discovery, plans, and comparisons. */
 :root {
   color-scheme: light;
 
-  --accent: #151515;
+  --accent: #245bc4;
   --accent-ink: #ffffff;
-  --accent-soft: #e7e7e7;
-  --accent-deep: #000000;
+  --accent-soft: #e4edff;
+  --accent-deep: #17449b;
   --green: #147b3b;
   --green-soft: #e4f2e8;
   --red: #b7352d;
@@ -25,14 +23,14 @@
   --amber: #ad7d22;
   --amber-ink: #151515;
 
-  --canvas: #f4f4f4;
+  --canvas: #eef4f8;
   --card: #ffffff;
-  --card-2: #ebebeb;
-  --ink: #151515;
-  --muted: #5f5f5f;
-  --faint: #8a8a8a;
-  --line: #dedede;
-  --line-strong: #b6b6b6;
+  --card-2: #e6eef5;
+  --ink: #18304b;
+  --muted: #526579;
+  --faint: #697e92;
+  --line: #d5e0ea;
+  --line-strong: #a9bdcf;
 
   --elevation-card: 0 14px 34px rgba(21, 21, 21, 0.08);
   --elevation-pop: 0 18px 42px rgba(21, 21, 21, 0.14);
@@ -41,25 +39,25 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --accent: #f3f3f3;
-  --accent-ink: #111111;
-  --accent-soft: #2c2c2c;
+  --accent: #91b8ff;
+  --accent-ink: #102238;
+  --accent-soft: #253e5f;
   --accent-deep: #ffffff;
   --green: #7fbd8c;
   --green-soft: #20342a;
   --red: #e37a68;
   --red-soft: #3b2522;
   --amber: #d7ad63;
-  --amber-ink: #111111;
+  --amber-ink: #102238;
 
-  --canvas: #0d0d0d;
-  --card: #151515;
-  --card-2: #222222;
-  --ink: #f4f4f4;
-  --muted: #a5a5a5;
-  --faint: #777777;
-  --line: #2d2d2d;
-  --line-strong: #4a4a4a;
+  --canvas: #0e1b2b;
+  --card: #16283d;
+  --card-2: #203247;
+  --ink: #edf4fc;
+  --muted: #afc0d1;
+  --faint: #8da3b9;
+  --line: #30465e;
+  --line-strong: #59718a;
 
   --elevation-card: 0 14px 34px rgba(0, 0, 0, 0.26);
   --elevation-pop: 0 18px 42px rgba(0, 0, 0, 0.38);
@@ -69,9 +67,10 @@
    variable above, so flipping [data-theme] re-colors the page at runtime. A
    non-inline @theme would freeze today's light values into the utilities. */
 @theme inline {
-  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
 
-  /* Typography roles keep the clear-ledger hierarchy stable across the city,
+  /* Typography roles keep the planning hierarchy stable across the city,
      comparison, and supporting-content surfaces. The display ramp is fluid;
      product copy remains spatially predictable. */
   --text-display: clamp(2.75rem, 2.25rem + 2vw, 3.75rem);
@@ -275,6 +274,7 @@
   h1,
   h2,
   h3 {
+    font-family: var(--font-display);
     text-wrap: balance;
   }
 

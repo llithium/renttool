@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ComparisonEntry } from '$lib/compare/decision';
   import type { CompareSalaries } from '$lib/compare/salaries.svelte';
+  import { findCityImage } from '$lib/data/city-images';
   import SalaryInput from '$lib/components/ui/SalaryInput.svelte';
 
   let {
@@ -15,13 +16,36 @@
     onremove: () => void;
   } = $props();
 
+  let image = $derived.by(() => {
+    const [city, state] = entry.city.name.split(/,\s*/);
+    return state ? findCityImage(city, state) : null;
+  });
   let result = $derived(entry.fit);
 </script>
 
-<article
-  data-testid="scenario"
-  class="min-w-0 border-r border-b border-line-strong bg-card p-5 md:p-7"
->
+<article data-testid="scenario" class="min-w-0 rounded-2xl border border-line bg-card p-5 md:p-7">
+  {#if image}
+    <figure class="mb-5">
+      <a {href} tabindex="-1" aria-hidden="true"
+        ><img
+          src={image.url}
+          alt=""
+          loading="lazy"
+          class="h-40 w-full rounded-xl object-cover"
+          onerror={(event) => {
+            if (event.currentTarget instanceof HTMLImageElement)
+              event.currentTarget.style.display = 'none';
+          }}
+        /></a
+      >
+      <figcaption class="mt-1 text-meta text-muted">
+        Photo: <a href={image.photographerUrl} target="_blank" rel="noopener" class="underline"
+          >{image.photographerName}</a
+        >
+        / <a href={image.sourceUrl} target="_blank" rel="noopener" class="underline">Unsplash</a>
+      </figcaption>
+    </figure>
+  {/if}
   <div class="flex min-h-12 items-start justify-between gap-2">
     <div>
       <h2 class="text-[clamp(1.75rem,3vw,3rem)] leading-none font-semibold tracking-[-0.045em]">

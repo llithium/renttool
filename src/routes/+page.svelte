@@ -6,8 +6,7 @@
   import { createUrlSync } from '$lib/urlSync.svelte';
 
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
-  import CityImage from '$lib/components/city/CityImage.svelte';
-  import Verdict from '$lib/components/city/Verdict.svelte';
+  import CityDiscovery from '$lib/components/landing/CityDiscovery.svelte';
   import CityFacts from '$lib/components/city/CityFacts.svelte';
   import EstimateNote from '$lib/components/city/EstimateNote.svelte';
   import SearchLinks from '$lib/components/city/SearchLinks.svelte';
@@ -91,26 +90,47 @@
         </LandingContent>
       {/if}
 
-      {#if urlSync.hydrated && selected && budget}
+      {#if urlSync.hydrated && !selected}
+        <CityDiscovery
+          onchoose={(city) => {
+            void plan.chooseCity(city);
+            document.getElementById('main-content')?.scrollIntoView({ behavior: 'instant' });
+          }}
+          hrefForCity={(name) => {
+            const params = new URLSearchParams(plan.buildHref('/').split('?')[1]);
+            params.set('city', name);
+            if (plan.salary) params.set('salary', String(plan.salary));
+            return `/?${params}`;
+          }}
+        />
+        <footer class="mt-12 border-t border-line pt-6 text-sm text-muted">
+          Rent targets use 30% of gross income. Explore local estimates, taxes, and nearby options
+          to plan your move.
+        </footer>
+      {/if}
+
+      {#if urlSync.hydrated && selected}
         <nav
           aria-label="Plan sections"
           class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur-sm md:mx-0 md:px-0"
         >
           <a
             class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#rent-decision">Rent decision</a
-          >
-          <a
-            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#city-details">City &amp; taxes</a
+            href="#rent-map">Map</a
           >
           <a
             class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
             href="#nearby-options">Nearby options</a
           >
+          {#if budget}
+            <a
+              class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+              href="#rent-decision">Rent decision</a
+            >
+          {/if}
           <a
             class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#rent-map">Map</a
+            href="#city-details">City &amp; taxes</a
           >
           <a
             class="ml-auto inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
@@ -119,45 +139,13 @@
         </nav>
 
         <section
-          id="rent-decision"
+          id="rent-map"
           tabindex="-1"
-          aria-label="Your rent decision"
-          class="scroll-mt-28 pt-7"
+          aria-label="Rent map"
+          class="scroll-mt-28 border-t border-line pt-7"
         >
-          {#if selected.r1 != null}
-            <Verdict {budget} city={selected} />
-          {/if}
-          <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
-          <SearchLinks
-            city={selected}
-            maxRent={budget.maxRent}
-            class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
-          />
+          <RentMap presentation={plan} />
         </section>
-
-        <section
-          id="city-details"
-          tabindex="-1"
-          aria-label="City and tax details"
-          class="scroll-mt-28"
-        >
-          {#key selected.name}
-            <CityImage city={selected} class="mt-8 rounded-xl" />
-          {/key}
-          <CityFacts city={selected} looking={plan.looking} class="mt-7" />
-        </section>
-
-        <!-- The two charts share one section band, split by a hairline rather
-             than sitting in two boxes. They remain visible because the budget
-             and market comparison are part of the same decision. -->
-        <div class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8">
-          <RentTrendChart city={selected} {budget} />
-          <TaxBreakdownChart
-            city={selected}
-            {budget}
-            class="border-line max-md:border-t max-md:pt-6 md:border-l md:pl-8"
-          />
-        </div>
 
         <section
           id="nearby-options"
@@ -172,16 +160,47 @@
           />
         </section>
 
-        {#if plan.comparisonCities.length}
-          <ComparisonTable presentation={plan} class="mt-7 border-t border-line pt-7" />
+        {#if budget}
+          <div class="scroll-mt-28 pt-7">
+            <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
+            <SearchLinks
+              city={selected}
+              maxRent={budget.maxRent}
+              class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
+            />
+          </div>
+        {/if}
+        <section
+          id="city-details"
+          tabindex="-1"
+          aria-label="City and tax details"
+          class="scroll-mt-28"
+        >
+          <CityFacts city={selected} looking={plan.looking} class="mt-7" />
+        </section>
+
+        {#if budget}
+          <!-- The two charts share one section band, split by a hairline rather
+             than sitting in two boxes. They remain visible because the budget
+             and market comparison are part of the same decision. -->
+          <div
+            class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8"
+          >
+            <RentTrendChart city={selected} {budget} />
+            <TaxBreakdownChart
+              city={selected}
+              {budget}
+              class="border-line max-md:border-t max-md:pt-6 md:border-l md:pl-8"
+            />
+          </div>
         {/if}
 
-        <section id="rent-map" tabindex="-1" aria-label="Rent map" class="scroll-mt-28">
-          <RentMap presentation={plan} class="mt-7 border-t border-line pt-7" />
-        </section>
+        {#if budget && plan.comparisonCities.length}
+          <ComparisonTable presentation={plan} class="mt-7 border-t border-line pt-7" />
+        {/if}
       {/if}
 
-      {#if urlSync.hydrated && selected && budget}
+      {#if urlSync.hydrated && selected}
         <SourcesFooter class="mt-7 border-t border-line pt-7" />
       {/if}
     </div>

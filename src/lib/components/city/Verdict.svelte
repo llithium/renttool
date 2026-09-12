@@ -31,10 +31,7 @@
 </script>
 
 {#if city.r1 != null && cushion != null}
-  <section
-    aria-labelledby="affordability-heading"
-    class="border-b border-line-strong pt-0 pb-6 md:pb-8 {className}"
-  >
+  <section aria-labelledby="affordability-heading" class="pt-0 pb-1 {className}">
     <div class="flex items-start gap-4">
       <!-- No delay and no fill-mode: the status icon must be visible whether or
            not the animation ever runs. -->

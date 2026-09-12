@@ -17,7 +17,7 @@ export type MarkerPresentation = Readonly<{
   color: string;
   fillColor: string;
   fillOpacity: number;
-  fit: 'fits budget' | 'over budget' | 'rent data unavailable';
+  fit: 'fits budget' | 'over budget' | 'rent data unavailable' | 'enter salary to check budget';
   tooltipDetail: string;
   ariaLabel: string;
 }>;
@@ -59,7 +59,14 @@ export function markerPresentation(
   const selected = city.name === selectedName;
   const hasBudgetAndRent = maxRent != null && city.r1 != null;
   const fits = maxRent != null && city.r1 != null ? city.r1 <= maxRent : false;
-  const fit = !hasBudgetAndRent ? 'rent data unavailable' : fits ? 'fits budget' : 'over budget';
+  const fit =
+    city.r1 == null
+      ? 'rent data unavailable'
+      : maxRent == null
+        ? 'enter salary to check budget'
+        : fits
+          ? 'fits budget'
+          : 'over budget';
 
   return {
     radius: selected ? 9 : 5.5,

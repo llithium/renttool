@@ -68,7 +68,12 @@ export default ts.config(
         {
           // The map container is tagged so RentMap's scoped <style> can reach
           // Leaflet's own DOM, which never passes through our markup.
-          ignore: ['^leaflet-', '^motion-']
+          // Discovery uses scoped CSS for its photographic layout.
+          ignore: [
+            '^leaflet-',
+            '^motion-',
+            '^(discovery|discovery-heading|city-gallery|destination|destination-link|destination-photo|destination-name|destination-rent|photo-credit|city-arrival|arrival-photo|arrival-heading)$'
+          ]
         }
       ]
       // enforce-consistent-class-order / enforce-consistent-line-wrapping are

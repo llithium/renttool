@@ -294,12 +294,16 @@
             {selectedName}
           </span>
         {/if}
-        <span class="inline-flex items-center gap-1.5">
-          <i class="inline-block size-2.5 rounded-full bg-green"></i> fits budget
-        </span>
-        <span class="inline-flex items-center gap-1.5">
-          <i class="inline-block size-2.5 rounded-full bg-red"></i> over budget
-        </span>
+        {#if maxRent != null}
+          <span class="inline-flex items-center gap-1.5">
+            <i class="inline-block size-2.5 rounded-full bg-green"></i> fits budget
+          </span>
+          <span class="inline-flex items-center gap-1.5">
+            <i class="inline-block size-2.5 rounded-full bg-red"></i> over budget
+          </span>
+        {:else}
+          <span>Enter a salary to see what fits.</span>
+        {/if}
       </div>
     </div>
   </SectionHeading>
