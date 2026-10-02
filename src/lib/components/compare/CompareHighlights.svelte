@@ -5,6 +5,7 @@
     type DecisionCriterion
   } from '$lib/compare/decision';
   import type { ComparisonCity } from '$lib/compare/comparisonModel';
+  import { housingShortLabel } from '$lib/planning';
 
   let {
     analysis,
@@ -34,11 +35,17 @@
             ? 'border-accent bg-accent text-accent-ink'
             : 'border-line-strong bg-card text-ink hover:border-accent hover:text-accent'}"
         >
-          {option.label}
+          {option.label.replace('1BR', housingShortLabel(analysis.options.housing))}
         </button>
       {/each}
     </div>
   </div>
+
+  {#if analysis.qualification}
+    <p class="mt-5 rounded-lg border border-line-strong bg-card-2 p-4 text-sm text-muted">
+      {analysis.qualification}
+    </p>
+  {/if}
 
   {#key `${criterion}-${decision.leaders.map((leader) => leader.city.name).join('|')}-${decision.detail}`}
     <div

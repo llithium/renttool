@@ -17,6 +17,8 @@
     <h1 class="max-w-5xl text-display text-ink">
       {city.name}
     </h1>
-    <span class="pb-2 text-meta text-muted">{SOURCE_LABEL[city.source]}</span>
+    <span class="pb-2 text-meta text-muted"
+      >{SOURCE_LABEL[city.source]}{city.rentYear ? ` · ${city.rentYear}` : ''}</span
+    >
   </div>
 </header>

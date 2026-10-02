@@ -19,6 +19,7 @@
   let maxRent = $derived(presentation.rentTarget);
   let selectedName = $derived(presentation.selectedName);
   let focusRequest = $derived(presentation.mapFocusRequest);
+  let housing = $derived(presentation.options.housing);
 
   let el: HTMLDivElement;
   let map: LMap | undefined;
@@ -71,7 +72,7 @@
   }
 
   function createMarker(city: LocatedCity, palette: MarkerPalette, targetGroup: LayerGroup) {
-    const initial = markerPresentation(city, null, null, palette);
+    const initial = markerPresentation(city, null, null, palette, housing);
     const marker = L.circleMarker([city.lat, city.lng], {
       radius: initial.radius,
       weight: initial.weight,
@@ -105,7 +106,7 @@
   }
 
   function applyMarkerPresentation(city: City, marker: CircleMarker, palette: MarkerPalette) {
-    const next = markerPresentation(city, maxRent, selectedName, palette);
+    const next = markerPresentation(city, maxRent, selectedName, palette, housing);
     marker.setRadius(next.radius);
     marker.setStyle({
       weight: next.weight,
@@ -260,6 +261,7 @@
     void ready;
     void cities;
     void maxRent;
+    void housing;
     void selectedName;
     updateMarkerPresentation();
   });

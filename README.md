@@ -3,9 +3,17 @@
 A SvelteKit web app: pick a city, enter an offered salary, and get your 30%-rule rent
 budget, current rent estimates, city facts, an affordability map, take-home charts, and
 pre-filtered apartment searches. The `/compare` view compares up to five cities with an
-independent salary for each comparison entry.
+independent salary and optional entered take-home pay for each comparison entry.
 
-Your city, salary, and comparison list sync to the URL, so any view is a shareable deep
+Choose a one-bedroom, two-bedroom, or shared two-bedroom (an equal split between two
+people). The housing choice applies to rent decisions, the map, comparisons, equivalent
+salaries, and listing searches. Shared housing searches use the whole apartment ceiling,
+twice your personal rent target; Zillow also carries the selected bedroom count.
+Optional recurring expenses and a savings target show the money left after rent and goals.
+They apply across the comparison set. Entered take-home pay belongs to its city and salary
+and clears when either changes; estimated tax figures remain visible separately.
+
+Your city, salary, housing choice, personal costs, entered take-home pay, and comparison list sync to the URL, so any view is a shareable deep
 link (the **Copy link** button copies it) that restores on reload or on another device.
 
 Rebuilt from the original single-file `reference/rent-city-artifact.html` into a deployable
@@ -22,7 +30,7 @@ Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run format` / `bun run format:check` (Prettier, with the Svelte and Tailwind plugins),
 `bun run lint` / `bun run lint:fix` (ESLint flat config), `bun run check` (type-check),
 `bun run test` (Vitest unit tests; use this rather than bare `bun test`), `bun run test:data` (network-free Python data-builder tests),
-`bun run data:update` (refresh rents and realign dependent city facts),
+`bun run data:update` (refresh Apartment List and HUD rents and realign dependent city facts),
 `bun run data:check` (report whether those bundles are current and aligned),
 `bun run test:e2e:install` (download Chromium), and
 `bun run test:e2e` (browser/accessibility tests), and `bun run images:refresh` (maintainer-only
@@ -75,10 +83,10 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | ------------------------------------------- | ------------------- | ---------- | ------------------------------------------------ |
 | **Photon** (OSM)                            | `/api/city-suggest` | none       | City autocomplete + coordinates                  |
 | **Apartment List Rent Estimates** (bundled) | none                | none       | Monthly city 1BR/2BR estimates                   |
-| **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 632 Census places           |
+| **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 606 Census places           |
 | **Unsplash**                                | bundled             | none       | Curated credited city header image               |
 | **FCC Area API**                            | `/api/geocode`      | none       | Coords → county FIPS                             |
-| **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2026 Fair Market Rents for **every US county** |
+| **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2027 Fair Market Rents for **every US county** |
 | **SimpleMaps places** (bundled)             | `/api/nearby`       | none       | Nearby towns/suburbs around a point              |
 | **SimpleMaps places** (bundled)             | `/api/population`   | none       | Population for a coordinate                      |
 | **SimpleMaps places** (bundled)             | `/api/coordinates`  | none       | Exact city/state coordinate fallback             |
@@ -86,8 +94,8 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 - `UNSPLASH_ACCESS_KEY` is only needed by maintainers running `bun run images:refresh`; it is not
   needed by the deployed app.
 
-The app **degrades gracefully** and needs **no keys at all**: 632 cities use the bundled
-August 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
+The app **degrades gracefully** and needs **no keys at all**: 606 cities use the bundled
+September 2026 Apartment List snapshot, and cities outside that snapshot resolve through the
 bundled county-level HUD Fair Market Rents table
 (`src/lib/data/fmr-county.json`, ~3,200 counties). HUD lookups require no runtime network
 request or API key.
@@ -143,7 +151,7 @@ python3 scripts/build-apartment-list-data.py /path/to/file.csv --period YYYY_MM
 
 The generator keeps city-level 1BR/2BR estimates, calculates 1BR year-over-year change,
 and refuses to write a snapshot with fewer than 600 cities. The downloaded source is temporary;
-commit only `src/lib/data/apartment-list-rents.json` after running the test commands below.
+commit the updated rent bundles and any rebuilt city facts after running the test commands below.
 
 Data from Apartment List Rent Estimates, © Apartment List, Inc. Use of the data is subject
 to the [Apartment List Terms of Service](https://www.apartmentlist.com/about/terms). This
@@ -167,7 +175,17 @@ city membership after a rebuild and fails if any cities remain missing or extra.
 the reported match count and sample values before committing
 `src/lib/data/acs-city-facts.json`.
 
-### Annual HUD data refresh
+### HUD data refresh
+
+`bun run data:update` discovers the latest official county-level HUD workbook, including
+recognized revised releases. `bun run data:check` compares its full generated contents
+with the bundle, so revisions within the same fiscal year are detected without writing
+files. HUD-only operations are also available:
+
+```bash
+python3 scripts/build-fmr-data.py --latest
+python3 scripts/build-fmr-data.py --check
+```
 
 When HUD publishes or revises its county-level Fair Market Rent workbook, regenerate the
 bundle with an explicit fiscal-year label and either the official URL or a downloaded file.
@@ -179,7 +197,7 @@ python3 scripts/build-fmr-data.py --year FY2027 --url https://www.huduser.gov/po
 python3 scripts/build-fmr-data.py --year FY2027 --input /path/to/FY27_FMRs.xlsx
 ```
 
-Running the script without arguments rebuilds the currently bundled FY2026 release. A different
+Running the script without arguments rebuilds the currently bundled FY2027 release. A different
 year requires an explicit source. The
 generator refuses to overwrite the bundle when fewer than 3,000 counties are parsed and
 prints the final county count and file size. Review the metadata and sample counties, then run:
@@ -189,7 +207,7 @@ bun run check
 bun run test
 bun run build
 bun run test:e2e
-git add src/lib/data/fmr-county.json
+git add src/lib/data/fmr-county.json src/lib/data/fmr-meta.json
 ```
 
 Commit the regenerated JSON together with the fiscal-year documentation update.
@@ -209,6 +227,9 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   behind the same public workspace seam.
   URL synchronization uses SvelteKit shallow routing so canonical links and city-level Back/Forward
   history stay aligned with the client router.
+- `src/lib/planning.ts` — shared housing, monthly expenses, savings, paycheck validation,
+  and qualifications for mixed-source comparisons; `cityDiscovery.ts` filters the bundled
+  cities by rent target, state, and population.
 - `src/lib/compare/` — the compare view's logic: `comparisonModel.ts` (shared comparison input and
   view types), `decision.ts` (metric view model, fit status, and decision briefs),
   `salaryEquivalence.ts` (equivalent-salary analysis), `links.ts` (city navigation links),

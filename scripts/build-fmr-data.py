@@ -5,8 +5,10 @@ Usage:
   python3 scripts/build-fmr-data.py
   python3 scripts/build-fmr-data.py --year FY2027 --url https://example/FY27_FMRs.xlsx
   python3 scripts/build-fmr-data.py --year FY2027 --input /path/to/FY27_FMRs.xlsx
+  python3 scripts/build-fmr-data.py --latest
+  python3 scripts/build-fmr-data.py --check
 
-With no arguments, downloads the currently bundled FY2026 file from huduser.gov (needs a browser
+With no arguments, downloads the currently bundled FY2027 file from huduser.gov (needs a browser
 User-Agent — plain curl gets a 202 bot-challenge). Stdlib only; the xlsx is read
 with zipfile + minimal XML parsing, no openpyxl required.
 
@@ -26,12 +28,17 @@ import zipfile
 from collections.abc import Iterable
 from collections import defaultdict
 from pathlib import Path
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree
 from data_output import write_json_atomically
 
-DEFAULT_YEAR = "FY2026"
-DEFAULT_URL = "https://www.huduser.gov/portal/datasets/fmr/fmr2026/FY26_FMRs.xlsx"
+DEFAULT_YEAR = "FY2027"
+DEFAULT_URL = "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx"
+DATA_PAGE_URL = "https://www.huduser.gov/portal/datasets/fmr.html"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 OUT = Path(__file__).resolve().parent.parent / "src" / "lib" / "data" / "fmr-county.json"
+META_OUT = OUT.with_name("fmr-meta.json")
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 MIN_COUNTIES = 3_000
 
@@ -50,6 +57,8 @@ def parse_args() -> argparse.Namespace:
         help=f"HUD county-level XLSX URL (default: {DEFAULT_URL})",
     )
     source.add_argument("--input", type=Path, help="local HUD county-level XLSX")
+    source.add_argument("--latest", action="store_true", help="discover and refresh the newest official county workbook")
+    source.add_argument("--check", action="store_true", help="compare the newest official workbook without writing files")
     return parser.parse_args()
 
 
@@ -59,7 +68,7 @@ def validate_args(args: argparse.Namespace) -> argparse.Namespace:
     if args.year != DEFAULT_YEAR and args.url is None and args.input is None:
         raise ValueError("--year requires an explicit --url or --input source")
     if args.url is not None:
-        match = re.search(r"/FY(\d{2,4})_FMRs\.xlsx$", args.url, re.IGNORECASE)
+        match = re.search(r"/FY(\d{2,4})_FMRs(?:_revised)?\.xlsx$", args.url, re.IGNORECASE)
         if match:
             source_year = int(match.group(1))
             if source_year < 100:
@@ -71,14 +80,49 @@ def validate_args(args: argparse.Namespace) -> argparse.Namespace:
     return args
 
 
+class CountyWorkbookParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.sources: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        href = dict(attrs).get("href") if tag == "a" else None
+        if not href:
+            return
+        url = urljoin(DATA_PAGE_URL, href)
+        parsed = urlparse(url)
+        match = re.fullmatch(r"/portal/datasets/fmr/fmr(\d{4})/FY(\d{2})_FMRs(?:_revised)?\.xlsx", parsed.path, re.IGNORECASE)
+        if parsed.scheme == "https" and parsed.hostname == "www.huduser.gov" and match:
+            if int(match.group(1)) % 100 == int(match.group(2)):
+                self.sources.append((f"FY{match.group(1)}", url))
+
+
+def discover_source(page: str) -> tuple[str, str]:
+    parser = CountyWorkbookParser()
+    parser.feed(page)
+    if not parser.sources:
+        raise ValueError("HUD data page did not list a supported county-level FMR workbook")
+    return max(parser.sources, key=lambda source: (source[0], "_revised" in source[1].lower()))
+
+
+def latest_source() -> tuple[str, str]:
+    request = urllib.request.Request(DATA_PAGE_URL, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return discover_source(response.read().decode("utf-8"))
+
+
+def require_current(payload: dict[str, object], bundled: dict[str, object]) -> None:
+    if payload != bundled:
+        raise ValueError(f"HUD snapshot is stale — refresh {payload['meta']['year']} county rents with --latest")
+
+
 def download(url: str, directory: Path) -> Path:
     dest = directory / url.rsplit("/", 1)[-1]
     print(f"Downloading {url} …")
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            "User-Agent": USER_AGENT
         },
     )
     with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:
@@ -163,14 +207,23 @@ def build_payload(
 
 def main() -> None:
     args = validate_args(parse_args())
+    year, url = latest_source() if args.latest or args.check else (args.year, args.url or DEFAULT_URL)
     if args.input is not None:
         payload = build_payload(read_rows(args.input), args.year)
     else:
         with tempfile.TemporaryDirectory(prefix="rent-tool-fmr-") as directory:
-            xlsx = download(args.url or DEFAULT_URL, Path(directory))
-            payload = build_payload(read_rows(xlsx), args.year)
+            xlsx = download(url, Path(directory))
+            payload = build_payload(read_rows(xlsx), year)
+
+    if args.check:
+        require_current(payload, json.loads(OUT.read_text()))
+        if json.loads(META_OUT.read_text()) != payload["meta"]:
+            raise ValueError("HUD release metadata is stale — refresh with --latest")
+        print(f"HUD county rents are current — {year}", flush=True)
+        return
 
     write_json_atomically(OUT, payload)
+    write_json_atomically(META_OUT, payload["meta"])
     print(f"Wrote {OUT} — {len(payload['counties'])} counties ({OUT.stat().st_size / 1024:.0f} KB)")
 
 

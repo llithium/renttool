@@ -3,6 +3,13 @@ import { money } from '$lib/format';
 import { MAX_SALARY } from '$lib/salary';
 import type { City } from '$lib/types';
 import {
+  computeSpendingRoom,
+  DEFAULT_PLANNING_OPTIONS,
+  housingRent,
+  housingShortLabel,
+  type PlanningOptions
+} from '$lib/planning';
+import {
   toComparisonCity,
   type ComparisonCity,
   type ComparisonEntryInput
@@ -23,6 +30,9 @@ export interface SalaryEquivalenceView {
   targetMonthly: number | null;
   targetMonthlyValue: string;
   entries: readonly SalaryEquivalenceEntry[];
+  housingLabel: string;
+  hasPersonalCosts: boolean;
+  usesActualReference: boolean;
 }
 
 function finiteOrNull(value: number | null | undefined): number | null {
@@ -38,13 +48,17 @@ function monthlyDisplay(value: number | null | undefined): string {
   return display === '—' ? display : `${display}/mo`;
 }
 
-function minimumSalaryForTarget(targetMonthly: number, city: City): number | null {
-  const rent = finiteOrNull(city.r1);
+function minimumSalaryForTarget(
+  targetMonthly: number,
+  city: City,
+  options: PlanningOptions
+): number | null {
+  const rent = housingRent(city, options.housing);
   if (rent == null || !Number.isFinite(targetMonthly)) return null;
 
   const leavesAfterRent = (salary: number): number => {
-    const takeHome = computeBudget(salary, city).takeHomeMonthly;
-    return Number.isFinite(takeHome) ? takeHome - rent : Number.NEGATIVE_INFINITY;
+    const available = computeSpendingRoom(computeBudget(salary, city), city, options).available;
+    return available != null && Number.isFinite(available) ? available : Number.NEGATIVE_INFINITY;
   };
 
   if (leavesAfterRent(MAX_SALARY) < targetMonthly) return null;
@@ -61,11 +75,12 @@ function minimumSalaryForTarget(targetMonthly: number, city: City): number | nul
 
 /**
  * Compare the salary needed in each city to leave the reference entry's
- * estimated monthly spending room after a typical one-bedroom rent.
+ * monthly spending room using the chosen housing, expenses, and savings.
  */
 export function analyzeSalaryEquivalence(
   inputs: readonly ComparisonEntryInput[],
-  requestedReferenceName?: string | null
+  requestedReferenceName?: string | null,
+  options: PlanningOptions = DEFAULT_PLANNING_OPTIONS
 ): SalaryEquivalenceView {
   const reference =
     inputs.find(
@@ -75,22 +90,32 @@ export function analyzeSalaryEquivalence(
     ) ?? inputs[0];
   const referenceName = reference?.city.name ?? null;
   const referenceSalary = finiteOrNull(reference?.salary);
-  const referenceRent = finiteOrNull(reference?.city.r1);
+  const referenceRent = reference ? housingRent(reference.city, options.housing) : null;
   const targetMonthly =
     reference && referenceSalary != null && referenceRent != null
-      ? finiteOrNull(computeBudget(referenceSalary, reference.city).takeHomeMonthly - referenceRent)
+      ? finiteOrNull(
+          computeSpendingRoom(
+            computeBudget(referenceSalary, reference.city),
+            reference.city,
+            options,
+            reference.actualTakeHomeMonthly
+          ).available
+        )
       : null;
   const baseReason = !reference
     ? 'No comparison entries are available.'
     : referenceSalary == null
       ? 'The reference salary is unavailable.'
       : referenceRent == null
-        ? 'The reference 1BR rent is unavailable.'
+        ? `The reference ${housingShortLabel(options.housing)} rent is unavailable.`
         : targetMonthly == null
           ? 'The reference spending room is unavailable.'
           : null;
 
   return {
+    housingLabel: housingShortLabel(options.housing),
+    hasPersonalCosts: options.monthlyExpenses + options.monthlySavings > 0,
+    usesActualReference: reference?.actualTakeHomeMonthly != null,
     referenceName,
     targetMonthly,
     targetMonthlyValue: monthlyDisplay(targetMonthly),
@@ -99,13 +124,13 @@ export function analyzeSalaryEquivalence(
       const requiredSalary =
         baseReason != null
           ? null
-          : isReference
+          : isReference && reference.actualTakeHomeMonthly == null
             ? input.salary
-            : minimumSalaryForTarget(targetMonthly as number, input.city);
+            : minimumSalaryForTarget(targetMonthly as number, input.city, options);
       const unavailableReason =
         baseReason ??
-        (finiteOrNull(input.city.r1) == null
-          ? 'The target city’s 1BR rent is unavailable.'
+        (housingRent(input.city, options.housing) == null
+          ? `The target city’s ${housingShortLabel(options.housing)} rent is unavailable.`
           : requiredSalary == null
             ? 'No salary up to the modeled maximum reaches this spending room.'
             : null);

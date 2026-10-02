@@ -19,8 +19,11 @@
     <div class="max-w-2xl">
       <h2 id="salary-equivalence-heading" class="text-title">Equivalent salary by city</h2>
       <p class="mt-2 text-sm/relaxed text-muted">
-        Match each city's estimated monthly take-home after a typical 1BR using the existing
-        single-filer tax assumptions.
+        Match monthly spending room after {analysis.housingLabel} rent{analysis.hasPersonalCosts
+          ? ', expenses, and savings'
+          : ''}. Required salaries use the single-filer tax estimates{analysis.usesActualReference
+          ? '; your reference uses entered take-home pay'
+          : ''}.
       </p>
     </div>
     <div class="flex w-full max-w-sm flex-col gap-2 md:items-end">
@@ -77,6 +80,7 @@
   </div>
 
   <p class="mt-4 max-w-3xl text-meta text-muted">
-    Estimates do not model utilities, benefits, debt, or moving costs.
+    Include utilities, benefits, debt, or moving costs in your expenses when relevant. Actual
+    paycheck deductions are captured when you enter take-home pay.
   </p>
 </section>

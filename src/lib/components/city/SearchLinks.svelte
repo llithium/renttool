@@ -2,14 +2,17 @@
   import type { City } from '$lib/types';
   import { money } from '$lib/format';
   import { buildSearchLinks } from '$lib/searchLinks';
+  import { housingSearchBudget, type HousingChoice } from '$lib/planning';
 
   let {
     city,
     maxRent,
+    housing = '1br',
     class: className = ''
-  }: { city: City; maxRent: number; class?: string } = $props();
+  }: { city: City; maxRent: number; housing?: HousingChoice; class?: string } = $props();
 
-  let links = $derived(buildSearchLinks(city, maxRent));
+  let listingCap = $derived(housingSearchBudget(maxRent, housing));
+  let links = $derived(buildSearchLinks(city, maxRent, housing));
   let recommended = $derived(links.find((link) => link.provider === 'zillow'));
   let alternatives = $derived(links.filter((link) => link !== recommended));
 </script>
@@ -19,10 +22,13 @@
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
       <div>
         <h2 class="text-title text-ink">
-          Search listings under {money(maxRent)}
+          Search listings under {money(listingCap)}
         </h2>
         <p class="mt-1.5 max-w-[58ch] text-sm/relaxed text-muted">
-          Start with listings within your target. Allow room for utilities, fees, and moving costs.
+          {#if housing === 'shared-2br'}A two-bedroom up to {money(listingCap)} keeps your half within
+            {money(maxRent)}/mo.
+          {:else}Start with {housing === '1br' ? 'one' : 'two'}-bedroom listings within your target.{/if}
+          Allow room for utilities, fees, and moving costs.
         </p>
       </div>
 
@@ -33,7 +39,7 @@
           rel="noopener"
           class="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-ink no-underline shadow-card transition duration-200 hover:-translate-y-px hover:bg-accent-deep hover:shadow-pop active:translate-y-0 active:shadow-card"
         >
-          <span>Search Zillow under {money(maxRent)}</span>
+          <span>Search Zillow under {money(listingCap)}</span>
           <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
               d="M3.25 12.75 12.75 3.25M6 3.25h6.75V10"
@@ -61,9 +67,9 @@
           <span class="font-semibold text-ink group-hover:text-accent">{link.providerName}</span>
           <span class="text-meta text-muted group-hover:text-accent">
             {#if link.prefiltered && link.capDescription}
-              Shows listings {link.capDescription}
+              Listings {link.capDescription} — set bedrooms
             {:else}
-              Browse listings — set your max rent
+              Set bedrooms and max rent
             {/if}
           </span>
         </a>

@@ -2,6 +2,7 @@ import { computeBudget } from '$lib/budget';
 import { RentPlanWorkspace, type ComparisonResult } from '$lib/appState.svelte';
 import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
 import type { Budget, City, CitySuggestion } from '$lib/types';
+import { computeSpendingRoom, type PlanningOptions } from '$lib/planning';
 
 /**
  * Presentation seam for the primary rent-planning flow.
@@ -21,6 +22,32 @@ export class RentPlanPresentation {
 
   get salary(): number | null {
     return this.workspace.salary;
+  }
+
+  get options(): PlanningOptions {
+    return this.workspace.options;
+  }
+
+  get actualTakeHomeMonthly(): number | null {
+    return this.workspace.actualTakeHomeMonthly;
+  }
+
+  get spendingRoom() {
+    return this.budget && this.activeCity
+      ? computeSpendingRoom(this.budget, this.activeCity, this.options, this.actualTakeHomeMonthly)
+      : null;
+  }
+
+  setOptions(options: PlanningOptions): void {
+    this.workspace.setOptions(options);
+  }
+
+  setActualTakeHome(value: number | null): void {
+    this.workspace.setActualTakeHome(value);
+  }
+
+  setComparisonActualTakeHome(name: string, value: number | null): boolean {
+    return this.workspace.setComparisonActualTakeHome(name, value);
   }
 
   get activeCity(): City | null {

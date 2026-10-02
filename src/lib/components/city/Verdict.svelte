@@ -2,20 +2,29 @@
   import type { Budget, City } from '$lib/types';
   import { money, rentMetricLabel, sentenceLabel } from '$lib/format';
   import { salaryForRent } from '$lib/budget';
+  import { housingRent, housingRentLabel, type HousingChoice } from '$lib/planning';
 
   let {
     budget,
     city,
+    housing = '1br',
+    actualTakeHomeMonthly = null,
     class: className = ''
-  }: { budget: Budget; city: City; class?: string } = $props();
+  }: {
+    budget: Budget;
+    city: City;
+    housing?: HousingChoice;
+    actualTakeHomeMonthly?: number | null;
+    class?: string;
+  } = $props();
 
-  let cushion = $derived(city.r1 != null ? budget.maxRent - city.r1 : null);
+  let rent = $derived(housingRent(city, housing));
+  let takeHome = $derived(actualTakeHomeMonthly ?? budget.takeHomeMonthly);
+  let cushion = $derived(rent != null ? budget.maxRent - rent : null);
   let good = $derived(cushion != null && cushion >= 0);
-  let rentLabel = $derived(sentenceLabel(rentMetricLabel(city.rentMetric, '1BR')));
+  let rentLabel = $derived(sentenceLabel(housingRentLabel(city, housing)));
   let rentLabel2 = $derived(sentenceLabel(rentMetricLabel(city.rentMetric, '2BR')));
-  let rentShare = $derived(
-    city.r1 != null && budget.takeHomeMonthly > 0 ? (city.r1 / budget.takeHomeMonthly) * 100 : null
-  );
+  let rentShare = $derived(rent != null && takeHome > 0 ? (rent / takeHome) * 100 : null);
   let cushionLabel = $derived(
     cushion == null ? '—' : cushion >= 0 ? `${money(cushion)} under` : `${money(-cushion)} over`
   );
@@ -24,13 +33,13 @@
   // a space and the "else" branch with none, which template whitespace can't
   // express reliably.
   let twoBrClause = $derived(
-    city.r2 != null && budget.maxRent >= city.r2
+    housing === '1br' && city.r2 != null && budget.maxRent >= city.r2
       ? ` — it even covers the ${rentLabel2} (${money(city.r2)}).`
       : '.'
   );
 </script>
 
-{#if city.r1 != null && cushion != null}
+{#if rent != null && cushion != null}
   <section aria-labelledby="affordability-heading" class="pt-0 pb-1 {className}">
     <div class="flex items-start gap-4">
       <!-- No delay and no fill-mode: the status icon must be visible whether or
@@ -65,12 +74,16 @@
         {#key `${good}-${cushion}`}
           <div class="motion-copy max-w-2xl text-body text-ink">
             {#if good}
-              Your {money(budget.maxRent)} target covers the {rentLabel} ({money(city.r1)}) with
+              Your {money(budget.maxRent)} target covers {housing === 'shared-2br'
+                ? rentLabel
+                : `the ${rentLabel}`} ({money(rent)}) with
               {money(cushion)}/mo under the target{twoBrClause}
             {:else}
-              The {rentLabel} ({money(city.r1)}) runs {money(-cushion)}/mo over your 30% target.
-              You’d want roughly {money(salaryForRent(city.r1))}/yr for it — consider below-median
-              units, a roommate, or nearby suburbs.
+              {housing === 'shared-2br' ? housingRentLabel(city, housing) : `The ${rentLabel}`} ({money(
+                rent
+              )}) runs {money(-cushion)}/mo over your 30% target. You’d want roughly {money(
+                salaryForRent(rent)
+              )}/yr for it — consider lower-rent units, a roommate, or nearby suburbs.
             {/if}
           </div>
         {/key}
@@ -86,7 +99,7 @@
       </div>
       <div>
         <dt class="text-meta text-muted">{rentLabel}</dt>
-        <dd class="mt-1 text-data tabular-nums">{money(city.r1)}</dd>
+        <dd class="mt-1 text-data tabular-nums">{money(rent)}</dd>
       </div>
       <div>
         <dt class="text-meta text-muted">Market rent vs target</dt>
@@ -104,4 +117,9 @@
       </div>
     </dl>
   </section>
+{:else}
+  <p class="text-sm text-muted">
+    No rent estimate is available for this housing setup. You can still search listings within your
+    target.
+  </p>
 {/if}

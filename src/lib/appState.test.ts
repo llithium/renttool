@@ -64,6 +64,50 @@ const hudRent: LookupResult = {
 };
 
 describe('RentPlanWorkspace', () => {
+  it('restores personal settings and paychecks without leaking them into another offer', () => {
+    const { dependency } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+    plan.setSalary(80000);
+    plan.selectCity('Austin, TX');
+    plan.setOptions({ housing: 'shared-2br', monthlyExpenses: 1200, monthlySavings: 500 });
+    plan.setActualTakeHome(4200);
+    plan.addComparison('Austin, TX');
+    plan.flushPersistence();
+    const restored = new RentPlanWorkspace(dependency);
+    expect(restored.hydrateFromSearch(new URLSearchParams())).toBe(false);
+    restored.restoreSession();
+    expect(restored.options).toEqual(plan.options);
+    expect(restored.actualTakeHomeMonthly).toBe(4200);
+    expect(restored.compareEntries[0].actualTakeHomeMonthly).toBe(4200);
+    restored.setSalary(81000);
+    expect(restored.actualTakeHomeMonthly).toBeNull();
+    restored.setActualTakeHome(4300);
+    restored.selectCity('Tampa, FL');
+    expect(restored.actualTakeHomeMonthly).toBeNull();
+    expect(restored.compareEntries[0].actualTakeHomeMonthly).toBe(4200);
+  });
+
+  it('refreshes a stored off-list HUD city from an older release', async () => {
+    const currentRent = { ...hudRent, rentYear: 'FY2027', r1: 1400 };
+    const dependency = adapters(currentRent);
+    const plan = new RentPlanWorkspace(dependency);
+    await plan.chooseCity(suggestion('Stored Town, ZZ'));
+    plan.addComparison('Stored Town, ZZ');
+    plan.flushPersistence();
+    const raw = dependency.readStorage('rentToolLast.v3')!;
+    const record = JSON.parse(raw);
+    record.custom[0].rentYear = 'FY2026';
+    record.custom[0].r1 = 1100;
+    dependency.writeStorage('rentToolLast.v3', JSON.stringify(record));
+    const comparisons = JSON.parse(dependency.readStorage(COMPARISON_STORAGE_KEY)!);
+    comparisons.entries[0].city.rentYear = 'FY2026';
+    comparisons.entries[0].city.r1 = 1100;
+    dependency.writeStorage(COMPARISON_STORAGE_KEY, JSON.stringify(comparisons));
+    const restored = new RentPlanWorkspace(dependency);
+    restored.restoreSession();
+    await vi.waitFor(() => expect(restored.selected?.rentYear).toBe('FY2027'));
+    expect(restored.compareEntries[0].city.r1).toBe(1400);
+  });
   afterEach(() => {
     vi.useRealTimers();
   });

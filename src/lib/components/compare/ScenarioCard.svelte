@@ -3,16 +3,22 @@
   import type { CompareSalaries } from '$lib/compare/salaries.svelte';
   import { findCityImage } from '$lib/data/city-images';
   import SalaryInput from '$lib/components/ui/SalaryInput.svelte';
+  import MonthlyAmountInput from '$lib/components/ui/MonthlyAmountInput.svelte';
+  import { housingShortLabel, type HousingChoice } from '$lib/planning';
 
   let {
     entry,
     href,
     salaries,
+    housing,
+    ontakehome,
     onremove
   }: {
     entry: ComparisonEntry;
     href: string;
     salaries: CompareSalaries;
+    housing: HousingChoice;
+    ontakehome: (value: number | null) => void;
     onremove: () => void;
   } = $props();
 
@@ -31,7 +37,7 @@
           src={image.url}
           alt=""
           loading="lazy"
-          class="h-40 w-full rounded-xl object-cover"
+          class="h-20 w-full rounded-xl object-cover"
           onerror={(event) => {
             if (event.currentTarget instanceof HTMLImageElement)
               event.currentTarget.style.display = 'none';
@@ -81,11 +87,24 @@
     class="mt-4"
   />
 
+  <details class="mt-3">
+    <summary class="min-h-11 cursor-pointer text-meta font-semibold text-muted"
+      >Use actual take-home pay</summary
+    >
+    <MonthlyAmountInput
+      id={`take-home-${entry.city.name.replace(/[^a-z0-9]+/gi, '-')}`}
+      label={`Monthly take-home in ${entry.city.name}`}
+      value={entry.actualTakeHomeMonthly ?? null}
+      onchange={ontakehome}
+      hint="Leave blank to estimate taxes. Applies to this salary only."
+    />
+  </details>
+
   <div class="mt-8 grid grid-cols-2 gap-4 border-t border-line-strong pt-5">
     <div class="min-w-0">
-      <span class="block text-meta text-muted">1BR rent</span>
+      <span class="block text-meta text-muted">{housingShortLabel(housing)} rent</span>
       <strong class="mt-0.5 block text-data tabular-nums">
-        {entry.metrics.rent1.value}
+        {entry.metrics.selectedRent.value}
       </strong>
     </div>
     <div class="min-w-0">
@@ -98,6 +117,14 @@
     </div>
   </div>
 
+  <p class="mt-4 text-sm tabular-nums">
+    <span class="text-muted">Available after rent &amp; goals</span>
+    <strong class="ml-2 text-ink">{entry.metrics.after.value}</strong>
+  </p>
+  <p class="mt-1 text-meta text-muted">
+    {entry.actualTakeHomeMonthly != null ? 'Entered take-home pay' : 'Estimated take-home pay'} · {entry.rentProvenance}
+  </p>
+
   <div
     class="mt-4 border-t-2 pt-3 text-sm font-semibold {result.tone === 'good'
       ? 'border-green text-green'
@@ -109,9 +136,9 @@
       <span class="motion-copy inline-block">{result.label}</span>
     {/key}
   </div>
-  {#if entry.rent.oneBedroom == null}
+  {#if entry.rent.amount == null}
     <p class="mt-2 text-meta text-muted">
-      We could not match a current 1BR estimate for this city. Open the city name above for
+      We could not match a rent estimate for this housing setup. Open the city name above for
       available rent context and alternatives.
     </p>
   {/if}

@@ -257,8 +257,25 @@ class AcsBuilderTests(unittest.TestCase):
 
 
 class FmrBuilderTests(unittest.TestCase):
+    def test_discovers_latest_county_workbook_and_rejects_unrelated_links(self) -> None:
+        page = '''<a href="/portal/datasets/fmr/fmr2026/FY26_FMRs.xlsx">old</a>
+          <a href="/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx">current</a>
+          <a href="/portal/datasets/fmr/fmr2027/FY27_FMRs_revised.xlsx">revised</a>
+          <a href="/portal/datasets/fmr/fmr2027/FY26_FMRs_revised.xlsx">mislabeled</a>
+          <a href="https://example.com/portal/datasets/fmr/fmr2028/FY28_FMRs.xlsx">foreign</a>
+          <a href="/portal/datasets/fmr/fmr2028/hypothetical_FY28_FMRs.xlsx">hypothetical</a>'''
+        self.assertEqual(fmr.discover_source(page), ("FY2027", "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs_revised.xlsx"))
+        with self.assertRaisesRegex(ValueError, "did not list"):
+            fmr.discover_source('<a href="/portal/datasets/fmr/fmr2027/FY27_safmrs.xlsx">small areas</a>')
+
+    def test_freshness_detects_revisions_within_the_same_release(self) -> None:
+        payload = {"meta": {"year": "FY2027", "source": "HUD Fair Market Rents"}, "counties": {"12057": [1500, 1800]}}
+        fmr.require_current(payload, payload)
+        with self.assertRaisesRegex(ValueError, "stale"):
+            fmr.require_current(payload, {**payload, "counties": {"12057": [1400, 1800]}})
+
     def test_non_default_year_requires_explicit_source(self) -> None:
-        with patch.object(sys, "argv", ["build-fmr-data.py", "--year", "FY2027"]):
+        with patch.object(sys, "argv", ["build-fmr-data.py", "--year", "FY2028"]):
             with self.assertRaisesRegex(ValueError, "explicit --url or --input"):
                 fmr.validate_args(fmr.parse_args())
 

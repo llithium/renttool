@@ -55,6 +55,7 @@ def main() -> None:
     options = parse_args()
     rent_builder = "scripts/build-apartment-list-data.py"
     run(rent_builder, *(["--check"] if options.check else []))
+    run("scripts/build-fmr-data.py", "--check" if options.check else "--latest")
 
     rent = load(RENT)
     acs = load(ACS)

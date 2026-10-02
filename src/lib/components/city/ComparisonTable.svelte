@@ -3,6 +3,7 @@
   import { money, pctTrend } from '$lib/format';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import { comparisonQualification, housingRent, housingShortLabel } from '$lib/planning';
 
   let {
     presentation,
@@ -16,7 +17,8 @@
   let maxRent = $derived(presentation.rentTarget ?? 0);
 
   function cushion(c: City): number | null {
-    return c.r1 != null ? maxRent - c.r1 : null;
+    const rent = housingRent(c, presentation.options.housing);
+    return rent != null ? maxRent - rent : null;
   }
 </script>
 
@@ -59,7 +61,7 @@
           <th class="text-right">1BR</th>
           <th class="text-right">2BR</th>
           <th class="text-right">Trend</th>
-          <th class="text-center">Fits?</th>
+          <th class="text-center">{housingShortLabel(presentation.options.housing)} fits?</th>
           <th class="text-left">Income tax</th>
           <th aria-label="Remove"></th>
         </tr>
@@ -135,4 +137,7 @@
       </tbody>
     </table>
   </div>
+  {#if comparisonQualification(cities)}
+    <p class="mt-3 text-meta text-muted">{comparisonQualification(cities)}</p>
+  {/if}
 </section>

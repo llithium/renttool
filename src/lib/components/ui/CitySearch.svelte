@@ -4,21 +4,25 @@
   import { findSeedCity } from '$lib/data/cities';
   import { money } from '$lib/format';
   import { createCitySearchDiscovery } from './citySearchDiscovery';
+  import { housingRent, type HousingChoice } from '$lib/planning';
 
-  /** Median 1BR rent for a suggestion, when it maps to a known city. */
+  /** Chosen housing rent for a suggestion, when it maps to a known city. */
   function rentFor(label: string): string {
     const seed = findSeedCity(label);
-    return seed?.r1 != null ? money(seed.r1) : '';
+    const rent = seed ? housingRent(seed, housing) : null;
+    return rent != null ? money(rent) : '';
   }
 
   let {
     onselect,
     selectedName = null,
-    pendingName = null
+    pendingName = null,
+    housing = '1br'
   }: {
     onselect: (sug: CitySuggestion) => void;
     selectedName?: string | null;
     pendingName?: string | null;
+    housing?: HousingChoice;
   } = $props();
 
   const discovery = createCitySearchDiscovery();

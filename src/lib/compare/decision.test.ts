@@ -7,6 +7,30 @@ function entry(name: string, salary: number, r1: number | null) {
 }
 
 describe('comparison decision', () => {
+  it('ranks selected housing using independent entered paychecks and personal goals', () => {
+    const alpha = {
+      city: { ...city('Alpha, TX', 1200), r2: 2000 },
+      salary: 80000,
+      actualTakeHomeMonthly: 4000
+    };
+    const beta = {
+      city: { ...city('Beta, TX', 1000), r2: 2400 },
+      salary: 80000,
+      actualTakeHomeMonthly: 4500
+    };
+    const view = analyzeComparison([alpha, beta], {
+      housing: 'shared-2br',
+      monthlyExpenses: 1000,
+      monthlySavings: 500
+    });
+    expect(view.entries[0].rent.amount).toBe(1000);
+    expect(view.entries[0].metrics.after.number).toBe(1500);
+    expect(view.briefs.rent.leaders[0].city.name).toBe('Alpha, TX');
+    expect(view.briefs.afterRent.leaders[0].city.name).toBe('Beta, TX');
+    expect(view.affordabilityMetrics.find((metric) => metric.key === 'after')?.label).toContain(
+      'savings'
+    );
+  });
   it('excludes missing facts from ranking while displaying genuine zero values', () => {
     const missing = city('Missing, ZZ', 1200);
     const zero = city('Zero, ZZ', 1200);

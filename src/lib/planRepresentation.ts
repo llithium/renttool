@@ -6,6 +6,11 @@ import { isValidCoordinates } from '$lib/geo';
 import { normalizeSalary } from '$lib/salary';
 import { cityIdentity } from '$lib/cityIdentity';
 import type { RentSource } from '$lib/types';
+import {
+  normalizePlanningOptions,
+  normalizeMonthlyAmount,
+  type PlanningOptions
+} from '$lib/planning';
 
 export const COMPARISON_SALARY_PARAM = 'compare-salary';
 
@@ -19,12 +24,15 @@ export interface PlanCityInput {
 export interface PlanComparisonInput {
   readonly city: PlanCityInput;
   readonly salary?: number | null;
+  readonly actualTakeHomeMonthly?: number;
 }
 
 export interface RentPlanRepresentationInput {
   readonly salary?: number | null;
   readonly selected?: PlanCityInput | null;
   readonly comparisons?: readonly PlanComparisonInput[];
+  readonly options?: PlanningOptions;
+  readonly actualTakeHomeMonthly?: number | null;
 }
 
 export interface RestoredPlanCity {
@@ -37,6 +45,7 @@ export interface RestoredPlanCity {
 export interface RestoredComparisonEntry {
   readonly city: RestoredPlanCity;
   readonly salary: number;
+  readonly actualTakeHomeMonthly?: number;
 }
 
 export interface RestoredRentPlan {
@@ -45,6 +54,8 @@ export interface RestoredRentPlan {
   readonly comparisons: readonly RestoredComparisonEntry[];
   /** True when the URL contains comparison state, even if every value is invalid. */
   readonly hasComparisonState: boolean;
+  readonly options?: PlanningOptions;
+  readonly actualTakeHomeMonthly?: number;
 }
 
 type EncodedCityKind = 'bundled' | 'off-list';
@@ -113,6 +124,9 @@ export function appendComparisonParameters(
     if (salary != null) {
       search.append(COMPARISON_SALARY_PARAM, comparisonSalaryLink(city.name, salary));
     }
+    const actual = normalizeMonthlyAmount(input.actualTakeHomeMonthly);
+    if (actual != null)
+      search.append('compare-take-home', JSON.stringify({ name: city.name, monthly: actual }));
     count += 1;
   }
 }
@@ -135,6 +149,12 @@ export function serializeRentPlan(input: RentPlanRepresentationInput): string {
   }
 
   appendComparisonParameters(search, input.comparisons ?? []);
+  const options = normalizePlanningOptions(input.options);
+  if (options.housing !== '1br') search.set('housing', options.housing);
+  if (options.monthlyExpenses > 0) search.set('expenses', String(options.monthlyExpenses));
+  if (options.monthlySavings > 0) search.set('savings', String(options.monthlySavings));
+  const actual = normalizeMonthlyAmount(input.actualTakeHomeMonthly);
+  if (salary != null && selected && actual != null) search.set('take-home', String(actual));
   return search.toString();
 }
 
@@ -231,6 +251,19 @@ function comparisonSalaries(search: URLSearchParams): {
 /** Restore and validate the canonical or issue #9-compatible URL representation. */
 export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
   const salaries = comparisonSalaries(search);
+  const takeHomes = new Map<string, number>();
+  for (const raw of search.getAll('compare-take-home')) {
+    try {
+      const value: unknown = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const record = value as Record<string, unknown>;
+      const monthly = normalizeMonthlyAmount(record.monthly);
+      if (validName(record.name) && monthly != null)
+        takeHomes.set(cityIdentity(record.name), monthly);
+    } catch {
+      /* Ignore malformed optional inputs. */
+    }
+  }
   const comparisons: RestoredComparisonEntry[] = [];
   const seen = new Set<string>();
   let entryIndex = 0;
@@ -257,7 +290,8 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
         inlineSalary ??
         salaries.positional[entryIndex] ??
         parseSalary(search.get('salary')) ??
-        DEFAULT_COMPARISON_SALARY
+        DEFAULT_COMPARISON_SALARY,
+      ...(takeHomes.has(identity) ? { actualTakeHomeMonthly: takeHomes.get(identity)! } : {})
     });
     entryIndex += 1;
   }
@@ -267,7 +301,21 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
     selected: parseSelected(search),
     comparisons,
     hasComparisonState:
-      search.has('compare') || search.has('compare-offlist') || search.has(COMPARISON_SALARY_PARAM)
+      search.has('compare') || search.has('compare-offlist') || search.has(COMPARISON_SALARY_PARAM),
+    ...(search.has('housing') || search.has('expenses') || search.has('savings')
+      ? {
+          options: normalizePlanningOptions({
+            housing: search.get('housing'),
+            monthlyExpenses: parseNumeric(search.get('expenses')),
+            monthlySavings: parseNumeric(search.get('savings'))
+          })
+        }
+      : {}),
+    ...(parseSalary(search.get('salary')) != null &&
+    parseSelected(search) != null &&
+    normalizeMonthlyAmount(parseNumeric(search.get('take-home'))) != null
+      ? { actualTakeHomeMonthly: normalizeMonthlyAmount(parseNumeric(search.get('take-home')))! }
+      : {})
   };
 }
 
@@ -283,7 +331,15 @@ export function canonicalizeRentPlanSearch(search: URLSearchParams): string {
   const selected = restored.selected ? restoredCityInput(restored.selected) : null;
   const comparisons = restored.comparisons.flatMap((entry) => {
     const city = restoredCityInput(entry.city);
-    return city ? [{ city, salary: entry.salary }] : [];
+    return city
+      ? [{ city, salary: entry.salary, actualTakeHomeMonthly: entry.actualTakeHomeMonthly }]
+      : [];
   });
-  return serializeRentPlan({ salary: restored.salary, selected, comparisons });
+  return serializeRentPlan({
+    salary: restored.salary,
+    selected,
+    comparisons,
+    options: restored.options,
+    actualTakeHomeMonthly: restored.actualTakeHomeMonthly
+  });
 }

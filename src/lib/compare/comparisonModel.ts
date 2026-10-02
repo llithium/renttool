@@ -4,6 +4,7 @@ import type { City } from '$lib/types';
 export interface ComparisonEntryInput {
   city: City;
   salary: number;
+  actualTakeHomeMonthly?: number;
 }
 
 /** City identity and navigation fields safe for comparison views to expose. */

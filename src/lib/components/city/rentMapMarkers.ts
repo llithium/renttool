@@ -1,5 +1,6 @@
 import { money } from '$lib/format';
 import type { City } from '$lib/types';
+import { housingRent, type HousingChoice } from '$lib/planning';
 
 export type RentMapCity = Pick<City, 'name' | 'r1' | 'lat' | 'lng'>;
 
@@ -51,16 +52,25 @@ export function reconcileMarkerKeys(
 
 /** Calculate every visual and accessible value for one retained marker. */
 export function markerPresentation(
-  city: Pick<City, 'name' | 'r1'>,
+  city: Pick<City, 'name' | 'r1'> & Partial<Pick<City, 'r2'>>,
   maxRent: number | null,
   selectedName: string | null,
-  palette: MarkerPalette
+  palette: MarkerPalette,
+  housing: HousingChoice = '1br'
 ): MarkerPresentation {
+  const rent = housingRent({ r1: city.r1, r2: city.r2 ?? null }, housing);
+  const rentLabel = housing === '1br' ? '1BR' : housing === '2br' ? '2BR' : 'Half a 2BR';
+  const accessibleLabel =
+    housing === '1br'
+      ? '1 bedroom'
+      : housing === '2br'
+        ? '2 bedrooms'
+        : 'half of a shared 2 bedroom';
   const selected = city.name === selectedName;
-  const hasBudgetAndRent = maxRent != null && city.r1 != null;
-  const fits = maxRent != null && city.r1 != null ? city.r1 <= maxRent : false;
+  const hasBudgetAndRent = maxRent != null && rent != null;
+  const fits = maxRent != null && rent != null ? rent <= maxRent : false;
   const fit =
-    city.r1 == null
+    rent == null
       ? 'rent data unavailable'
       : maxRent == null
         ? 'enter salary to check budget'
@@ -75,7 +85,7 @@ export function markerPresentation(
     fillColor: !hasBudgetAndRent ? palette.neutral : fits ? palette.fits : palette.over,
     fillOpacity: 0.9,
     fit,
-    tooltipDetail: `1BR ${money(city.r1)} · ${fit}`,
-    ariaLabel: `${city.name}, 1 bedroom ${money(city.r1)}, ${fit}`
+    tooltipDetail: `${rentLabel} ${money(rent)} · ${fit}`,
+    ariaLabel: `${city.name}, ${accessibleLabel} ${money(rent)}, ${fit}`
   };
 }

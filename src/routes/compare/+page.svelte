@@ -15,6 +15,8 @@
   import CompareHighlights from '$lib/components/compare/CompareHighlights.svelte';
   import SalaryEquivalence from '$lib/components/compare/SalaryEquivalence.svelte';
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
+  import HousingSelector from '$lib/components/ui/HousingSelector.svelte';
+  import PersonalCosts from '$lib/components/ui/PersonalCosts.svelte';
 
   const salaries = createCompareSalaries((name, salary) => plan.setComparisonSalary(name, salary));
   const urlSync = createUrlSync(plan);
@@ -26,16 +28,25 @@
     return plan.buildHref('/');
   });
 
-  let analysis = $derived.by(() => analyzeComparison(plan.comparisonEntries));
+  let analysis = $derived.by(() => analyzeComparison(plan.comparisonEntries, plan.options));
   let equivalenceReference = $state<string | null>(null);
   let salaryEquivalence = $derived.by(() =>
-    analyzeSalaryEquivalence(plan.comparisonEntries, equivalenceReference)
+    analyzeSalaryEquivalence(plan.comparisonEntries, equivalenceReference, plan.options)
   );
 
   let atCapacity = $derived(plan.comparisonFull);
 
   function hrefForCity(city: ComparisonCity): string {
-    return cityHref({ city }, { salary: plan.salary, comparisons: plan.comparisonEntries });
+    return cityHref(
+      { city },
+      {
+        salary: plan.salary,
+        comparisons: plan.comparisonEntries,
+        options: plan.options,
+        selectedName: plan.selectedName,
+        actualTakeHomeMonthly: plan.actualTakeHomeMonthly
+      }
+    );
   }
 
   async function addCity(suggestion: CitySuggestion) {
@@ -118,7 +129,7 @@
               <p class="mt-1 text-meta text-muted">Remove one from the results to add another.</p>
             </div>
           {:else}
-            <CitySearch onselect={addCity} />
+            <CitySearch onselect={addCity} housing={plan.options.housing} />
           {/if}
         </div>
         <div class="lg:border-l lg:border-line lg:pl-8">
@@ -136,6 +147,20 @@
           {/if}
         </div>
       </section>
+      <div class="mt-6 max-w-2xl border-t border-line pt-5">
+        <div class="max-w-sm">
+          <HousingSelector
+            value={plan.options.housing}
+            onchange={(housing) => plan.setOptions({ ...plan.options, housing })}
+            id="compare-housing"
+          />
+        </div>
+        <PersonalCosts
+          options={plan.options}
+          onoptions={(options) => plan.setOptions(options)}
+          id="compare"
+        />
+      </div>
     </aside>
 
     <div class="flex min-w-0 flex-col">
@@ -149,6 +174,8 @@
               {entry}
               href={hrefForCity(entry.city)}
               {salaries}
+              housing={plan.options.housing}
+              ontakehome={(value) => plan.setComparisonActualTakeHome(entry.city.name, value)}
               onremove={() => {
                 plan.removeComparison(entry.city.name);
                 salaries.sync(plan.comparisonEntries);

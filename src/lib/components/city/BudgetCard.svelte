@@ -2,7 +2,10 @@
   import type { Budget } from '$lib/types';
   import { money } from '$lib/format';
 
-  let { budget }: { budget: Budget } = $props();
+  let {
+    budget,
+    actualTakeHomeMonthly = null
+  }: { budget: Budget; actualTakeHomeMonthly?: number | null } = $props();
 </script>
 
 <!-- The budget stays readable while individual values acknowledge salary changes. -->
@@ -27,9 +30,13 @@
       </dd>
     </div>
     <div>
-      <dt class="text-meta text-muted">Take-home · ~{(budget.effRate * 100).toFixed(0)}% tax</dt>
+      <dt class="text-meta text-muted">
+        {actualTakeHomeMonthly != null
+          ? 'Take-home · entered'
+          : `Take-home · ~${(budget.effRate * 100).toFixed(0)}% tax`}
+      </dt>
       <dd class="mt-0.5 text-data tabular-nums">
-        {money(budget.takeHomeMonthly)}
+        {money(actualTakeHomeMonthly ?? budget.takeHomeMonthly)}
       </dd>
     </div>
   </dl>

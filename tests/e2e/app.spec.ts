@@ -879,3 +879,121 @@ test('keeps the affordability verdict with the salary controls', async ({ page }
   ).toBeVisible();
   await expect(planControls.locator('#rent-decision')).toHaveCount(1);
 });
+
+test('shares housing and personal costs across the plan, map, searches, and comparison', async ({
+  page
+}) => {
+  const chicago = (rentData.cities as Record<string, { r1: number; r2: number }>)['Chicago, IL'];
+  await page.goto('/?salary=80000&city=Chicago%2C+IL');
+  await waitForHydration(page);
+  await page.getByLabel('Housing setup', { exact: true }).selectOption('shared-2br');
+  await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
+  await page.getByLabel('Actual monthly take-home', { exact: true }).fill('4200');
+  await page.getByLabel('Recurring monthly expenses').fill('1200');
+  await page.getByLabel('Monthly savings target').fill('500');
+  await expect(page.getByTestId('spending-room')).toContainText(
+    `${dollars(Math.round(4200 - chicago.r2 / 2 - 1700))}/mo`
+  );
+  await expect(
+    page.getByRole('button', {
+      name: `Chicago, IL, half of a shared 2 bedroom ${dollars(Math.round(chicago.r2 / 2))}, fits budget`,
+      exact: true
+    })
+  ).toHaveCount(1);
+  const listing = page.getByRole('link', {
+    name: 'Search Zillow under $4,000 (opens in a new tab)',
+    exact: true
+  });
+  const query = new URL((await listing.getAttribute('href'))!).searchParams.get(
+    'searchQueryState'
+  )!;
+  expect(JSON.parse(query).filterState).toMatchObject({
+    mp: { max: 4000 },
+    beds: { min: 2, max: 2 }
+  });
+  await page.getByRole('button', { name: '+ Compare', exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('take-home')).toBe('4200');
+  await page.reload();
+  await waitForHydration(page);
+  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveValue('shared-2br');
+  await expect(page.getByTestId('spending-room')).toContainText(
+    `${dollars(Math.round(4200 - chicago.r2 / 2 - 1700))}/mo`
+  );
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: /^Compare/ })
+    .click();
+  await waitForHydration(page);
+  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveValue('shared-2br');
+  const citySearch = page.getByRole('combobox', { name: 'City', exact: true });
+  await citySearch.fill('Seattle');
+  const seattle = (rentData.cities as Record<string, { r2: number }>)['Seattle, WA'];
+  await expect(page.getByRole('option').filter({ hasText: 'Seattle, WA' })).toContainText(
+    `${dollars(Math.round(seattle.r2 / 2))}/mo`
+  );
+  await citySearch.press('Escape');
+  const card = page.getByTestId('scenario').filter({ hasText: 'Chicago, IL' });
+  await expect(card).toContainText('Entered take-home pay');
+  await card.getByText('Use actual take-home pay', { exact: true }).click();
+  await expect(page.getByLabel('Monthly take-home in Chicago, IL')).toHaveValue('4200');
+  await page.getByLabel('Annual salary in Chicago, IL').fill('81000');
+  await page.getByLabel('Annual salary in Chicago, IL').press('Tab');
+  await expect(page.getByLabel('Monthly take-home in Chicago, IL')).toHaveValue('');
+});
+
+test('filters discovered cities by salary, state, and population and adds a comparison', async ({
+  page
+}) => {
+  await page.getByLabel('Annual salary', { exact: true }).fill('60000');
+  const gallery = page.getByRole('region', { name: 'Cities within your rent target' });
+  await gallery.getByLabel('State', { exact: true }).selectOption('TX');
+  await gallery.getByLabel('Population').selectOption('500k+');
+  const expected = Object.entries(rentData.cities).filter(
+    ([name, rent]) =>
+      name.endsWith(', TX') &&
+      rent.r1 <= 1500 &&
+      (acsData.cities as Record<string, { population: number }>)[name].population >= 500000
+  );
+  expect(expected.length).toBeGreaterThan(0);
+  await expect(gallery.getByRole('link', { name: /^Explore / })).toHaveCount(expected.length);
+  await gallery.getByRole('button', { name: 'Add to comparison', exact: true }).first().click();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('compare').length).toBe(1);
+  await gallery.getByLabel('State', { exact: true }).selectOption('AK');
+  await expect(
+    gallery.getByText('No cities match these filters and rent target.', { exact: false })
+  ).toBeVisible();
+});
+
+test('shows nearby rent prices and places the rent decision and searches before photography', async ({
+  page
+}) => {
+  await page.goto('/?salary=80000&city=Chicago%2C+IL');
+  await waitForHydration(page);
+  const nearby = page.locator('#nearby-options');
+  await expect(nearby.getByText(/\/mo/).first()).toBeVisible();
+  await expect(
+    nearby.getByText(/Within your rent target|Above your rent target/).first()
+  ).toBeVisible();
+  const positions = await page.evaluate(() => {
+    const result = document.querySelector('#rent-decision')!;
+    const search = document.querySelector('#listing-search')!;
+    const photo = document.querySelector('a[aria-label="View photo of Chicago, IL"]')!;
+    return {
+      resultBeforeSearch: Boolean(
+        result.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      searchBeforePhoto: Boolean(
+        search.compareDocumentPosition(photo) & Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    };
+  });
+  expect(positions).toEqual({ resultBeforeSearch: true, searchBeforePhoto: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === 'serious' || violation.impact === 'critical'
+    )
+  ).toEqual([]);
+});

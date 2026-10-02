@@ -1,6 +1,14 @@
 import { computeBudget, salaryForRent } from '$lib/budget';
-import { money, pctTrend, rentMetricLabel } from '$lib/format';
+import { money, pctTrend } from '$lib/format';
 import type { Budget, City } from '$lib/types';
+import {
+  comparisonQualification,
+  computeSpendingRoom,
+  DEFAULT_PLANNING_OPTIONS,
+  housingRentLabel,
+  housingShortLabel,
+  type PlanningOptions
+} from '$lib/planning';
 import {
   toComparisonCity,
   type ComparisonCity,
@@ -10,7 +18,7 @@ import {
 export type { ComparisonCity, ComparisonEntryInput } from './comparisonModel';
 
 export interface ComparisonRent {
-  oneBedroom: number | null;
+  amount: number | null;
   metricLabel: string;
 }
 
@@ -40,6 +48,7 @@ export interface FitStatus {
 export interface ComparisonEntry {
   city: ComparisonCity;
   salary: number;
+  actualTakeHomeMonthly?: number;
   rent: ComparisonRent;
   rentProvenance: string;
   taxContext: string;
@@ -57,7 +66,7 @@ export interface DecisionCriterionDefinition {
   key: DecisionCriterion;
   label: string;
   title: string;
-  metricKey: 'after' | 'rent1' | 'takehome';
+  metricKey: 'after' | 'selectedRent' | 'takehome';
 }
 
 /** Fixed product criteria keep the external interface small and stable. */
@@ -70,7 +79,7 @@ const CRITERIA = {
   rent: {
     label: 'Lowest 1BR rent',
     title: 'Lowest typical 1BR rent',
-    metricKey: 'rent1'
+    metricKey: 'selectedRent'
   },
   takeHome: {
     label: 'Highest take-home',
@@ -100,12 +109,18 @@ export interface ComparisonView {
   affordabilityMetrics: readonly ComparisonMetric[];
   cityContextMetrics: readonly ComparisonMetric[];
   briefs: Readonly<Record<DecisionCriterion, DecisionBrief>>;
+  options: PlanningOptions;
+  qualification: string | null;
 }
 
 interface ComparisonEntryBase {
   city: City;
   salary: number;
   budget: Budget;
+  options: PlanningOptions;
+  actualTakeHomeMonthly?: number;
+  rentAmount: number | null;
+  takeHomeMonthly: number;
   rentGap: number | null;
   afterRent: number | null;
 }
@@ -151,13 +166,13 @@ const METRIC_DEFINITIONS = {
     label: 'Est. take-home',
     direction: 'high',
     group: 'affordability',
-    read: (entry) => finiteOrNull(entry.budget.takeHomeMonthly),
+    read: (entry) => finiteOrNull(entry.takeHomeMonthly),
     format: monthlyMoney,
     bestLabel: 'Highest',
     worstLabel: 'Lowest'
   },
   tax: {
-    label: 'Effective tax rate',
+    label: 'Est. effective tax rate',
     direction: 'low',
     group: 'affordability',
     read: (entry) => finiteOrNull(entry.budget.effRate),
@@ -192,6 +207,15 @@ const METRIC_DEFINITIONS = {
     bestLabel: 'Lowest',
     worstLabel: 'Highest'
   },
+  selectedRent: {
+    label: 'Selected housing rent',
+    direction: 'low',
+    group: 'affordability',
+    read: (entry) => entry.rentAmount,
+    format: monthlyMoney,
+    bestLabel: 'Lowest',
+    worstLabel: 'Highest'
+  },
   after: {
     label: 'Take-home after 1BR',
     direction: 'high',
@@ -206,7 +230,7 @@ const METRIC_DEFINITIONS = {
     direction: 'low',
     group: 'affordability',
     read: (entry) => {
-      const rent = finiteOrNull(entry.city.r1);
+      const rent = entry.rentAmount;
       return rent == null ? null : finiteOrNull(salaryForRent(rent));
     },
     format: (value) => money(value),
@@ -318,10 +342,10 @@ function buildMetrics(
   ) as Record<MetricKey, MetricCell>;
 }
 
-function comparisonRent(city: City): ComparisonRent {
+function comparisonRent(base: ComparisonEntryBase): ComparisonRent {
   return {
-    oneBedroom: finiteOrNull(city.r1),
-    metricLabel: rentMetricLabel(city.rentMetric)
+    amount: base.rentAmount,
+    metricLabel: housingRentLabel(base.city, base.options.housing)
   };
 }
 
@@ -337,7 +361,8 @@ function viewEntry(
   return {
     city: toComparisonCity(base.city),
     salary: base.salary,
-    rent: comparisonRent(base.city),
+    actualTakeHomeMonthly: base.actualTakeHomeMonthly,
+    rent: comparisonRent(base),
     rentProvenance: rentProvenance(base.city),
     taxContext: base.city.tax,
     rentBudget: {
@@ -366,9 +391,12 @@ function leaderDetail(
       ? `${names} are tied at ${money(value)}/mo for a typical 1BR.`
       : `${money(value)}/mo for a typical 1BR.`;
   }
+  const payContext = leaders.some((leader) => leader.base.actualTakeHomeMonthly != null)
+    ? 'take-home pay'
+    : 'after estimated taxes';
   return leaders.length > 1
-    ? `${names} are tied at ${money(value)}/mo after estimated taxes.`
-    : `${money(value)}/mo after estimated taxes.`;
+    ? `${names} are tied at ${money(value)}/mo ${payContext}.`
+    : `${money(value)}/mo ${payContext}.`;
 }
 
 function noDataDetail(definition: DecisionCriterionDefinition): string {
@@ -379,8 +407,17 @@ function noDataDetail(definition: DecisionCriterionDefinition): string {
   return 'Add cities with salary estimates to identify a leading option.';
 }
 
-function buildBrief(entries: readonly ComputedEntry[], key: DecisionCriterion): DecisionBrief {
-  const definition = { ...CRITERIA[key], key };
+function buildBrief(
+  entries: readonly ComputedEntry[],
+  key: DecisionCriterion,
+  options: PlanningOptions
+): DecisionBrief {
+  const housing = housingShortLabel(options.housing);
+  const definition = { ...CRITERIA[key], title: CRITERIA[key].title.replace('1BR', housing), key };
+  if (key === 'afterRent' && options.monthlyExpenses + options.monthlySavings > 0)
+    definition.title = 'Most room after rent, expenses & savings';
+  if (key === 'takeHome' && entries.some((entry) => entry.base.actualTakeHomeMonthly != null))
+    definition.title = 'Highest take-home pay';
   const metric: MetricDefinition = METRIC_DEFINITIONS[definition.metricKey];
 
   const eligible = entries.filter((entry) => metric.read(entry.base) != null);
@@ -391,7 +428,7 @@ function buildBrief(entries: readonly ComputedEntry[], key: DecisionCriterion): 
       leaders: [],
       eligibleCount: 0,
       status: 'not-enough-data',
-      detail: noDataDetail(definition)
+      detail: noDataDetail(definition).replace('1BR', housing)
     };
   }
 
@@ -406,18 +443,33 @@ function buildBrief(entries: readonly ComputedEntry[], key: DecisionCriterion): 
     leaders: leaders.map((entry) => entry.view),
     eligibleCount: eligible.length,
     status: leaders.length > 1 ? 'tie' : 'decided',
-    detail: leaderDetail(definition, metric, leaders)
+    detail: leaderDetail(definition, metric, leaders).replace(
+      'a typical 1BR',
+      options.monthlyExpenses + options.monthlySavings > 0 && key === 'afterRent'
+        ? 'rent, expenses & savings'
+        : options.housing === 'shared-2br'
+          ? 'your half of a typical 2BR'
+          : `a typical ${housing}`
+    )
   };
 }
 
-function baseEntry({ city, salary }: ComparisonEntryInput): ComparisonEntryBase {
+function baseEntry(
+  { city, salary, actualTakeHomeMonthly }: ComparisonEntryInput,
+  options: PlanningOptions
+): ComparisonEntryBase {
   const budget = computeBudget(salary, city);
+  const spending = computeSpendingRoom(budget, city, options, actualTakeHomeMonthly);
   return {
     city,
     salary,
     budget,
-    rentGap: city.r1 == null ? null : finiteOrNull(budget.maxRent - city.r1),
-    afterRent: city.r1 == null ? null : finiteOrNull(budget.takeHomeMonthly - city.r1)
+    options,
+    actualTakeHomeMonthly,
+    rentAmount: spending.rent,
+    takeHomeMonthly: spending.takeHomeMonthly,
+    rentGap: spending.rent == null ? null : finiteOrNull(budget.maxRent - spending.rent),
+    afterRent: finiteOrNull(spending.available)
   };
 }
 
@@ -429,18 +481,40 @@ function baseEntry({ city, salary }: ComparisonEntryInput): ComparisonEntryBase 
  * criteria. Callers only supply city salary entries and arrange the returned
  * view model.
  */
-export function analyzeComparison(inputs: readonly ComparisonEntryInput[]): ComparisonView {
-  const bases = inputs.map(baseEntry);
+export function analyzeComparison(
+  inputs: readonly ComparisonEntryInput[],
+  options: PlanningOptions = DEFAULT_PLANNING_OPTIONS
+): ComparisonView {
+  const bases = inputs.map((input) => baseEntry(input, options));
   const entries = bases.map((base) => ({ base, view: viewEntry(base, bases) }));
 
   return {
     entries: entries.map((entry) => entry.view),
-    affordabilityMetrics: AFFORDABILITY_METRICS,
+    options,
+    qualification: comparisonQualification(inputs.map((input) => input.city)),
+    affordabilityMetrics: AFFORDABILITY_METRICS.filter(
+      (metric) => metric.key !== 'selectedRent' || options.housing === 'shared-2br'
+    ).map((metric) => ({
+      ...metric,
+      label:
+        metric.key === 'selectedRent'
+          ? `${housingShortLabel(options.housing)} rent`
+          : metric.key === 'after'
+            ? options.monthlyExpenses + options.monthlySavings > 0
+              ? 'After rent, expenses & savings'
+              : `Take-home after ${housingShortLabel(options.housing)}`
+            : metric.key === 'needed'
+              ? `Salary needed for ${housingShortLabel(options.housing)}`
+              : metric.key === 'takehome' &&
+                  inputs.some((input) => input.actualTakeHomeMonthly != null)
+                ? 'Take-home (entered or estimated)'
+                : metric.label
+    })),
     cityContextMetrics: CITY_CONTEXT_METRICS,
     briefs: {
-      afterRent: buildBrief(entries, 'afterRent'),
-      rent: buildBrief(entries, 'rent'),
-      takeHome: buildBrief(entries, 'takeHome')
+      afterRent: buildBrief(entries, 'afterRent', options),
+      rent: buildBrief(entries, 'rent', options),
+      takeHome: buildBrief(entries, 'takeHome', options)
     }
   };
 }

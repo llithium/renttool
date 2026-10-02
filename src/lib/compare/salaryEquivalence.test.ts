@@ -8,6 +8,21 @@ function entry(name: string, salary: number, r1: number | null) {
 }
 
 describe('salary equivalence', () => {
+  it('solves modeled salaries against an entered reference paycheck with shared housing and goals', () => {
+    const inputs = [
+      { ...entry('Austin, TX', 80000, 1200), actualTakeHomeMonthly: 4000 },
+      entry('Dallas, TX', 90000, 1500)
+    ];
+    const options = { housing: 'shared-2br', monthlyExpenses: 1000, monthlySavings: 500 } as const;
+    const view = analyzeSalaryEquivalence(inputs, 'Austin, TX', options);
+    expect(view.targetMonthly).toBe(1750);
+    expect(view.usesActualReference).toBe(true);
+    const salary = view.entries[1].requiredSalary!;
+    const available = (value: number) =>
+      computeBudget(value, inputs[1].city).takeHomeMonthly - inputs[1].city.r2! / 2 - 1500;
+    expect(available(salary)).toBeGreaterThanOrEqual(1750);
+    expect(available(salary - 1)).toBeLessThan(1750);
+  });
   it('uses the committed salary exactly for the reference entry', () => {
     const view = analyzeSalaryEquivalence(
       [entry('Alpha, ZZ', 80_000, 1_200), entry('Beta, ZZ', 90_000, 1_500)],

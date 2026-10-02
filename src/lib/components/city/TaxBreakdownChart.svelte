@@ -1,13 +1,22 @@
 <script lang="ts">
   import type { Budget, City } from '$lib/types';
-  import { money, rentMetricLabel, sentenceLabel } from '$lib/format';
+  import { money, sentenceLabel } from '$lib/format';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import { housingRent, housingRentLabel, type HousingChoice } from '$lib/planning';
 
   let {
     city,
     budget,
+    housing = '1br',
+    actualTakeHomeMonthly = null,
     class: className = ''
-  }: { city: City; budget: Budget; class?: string } = $props();
+  }: {
+    city: City;
+    budget: Budget;
+    housing?: HousingChoice;
+    actualTakeHomeMonthly?: number | null;
+    class?: string;
+  } = $props();
 
   function pct(part: number, whole: number): number {
     return whole > 0 ? (part / whole) * 100 : 0;
@@ -22,13 +31,15 @@
   let statePct = $derived(pct(budget.stateMonthly, budget.grossMonthly));
   let localPct = $derived(pct(budget.localMonthly, budget.grossMonthly));
   let takePct = $derived(pct(budget.takeHomeMonthly, budget.grossMonthly));
-  // Row 2: take-home = rent (median 1BR) + remaining
-  let rent = $derived(city.r1 ?? 0);
-  let remaining = $derived(Math.max(0, budget.takeHomeMonthly - rent));
-  let rentShare = $derived(budget.takeHomeMonthly > 0 ? (rent / budget.takeHomeMonthly) * 100 : 0);
-  let rentPct = $derived(Math.min(100, pct(rent, budget.takeHomeMonthly)));
-  let leftPct = $derived(pct(remaining, budget.takeHomeMonthly));
-  let rentLabel = $derived(sentenceLabel(rentMetricLabel(city.rentMetric, '1BR')));
+  // Row 2 uses the entered paycheck when present; the tax model above remains estimated.
+  let takeHome = $derived(actualTakeHomeMonthly ?? budget.takeHomeMonthly);
+  let rentAmount = $derived(housingRent(city, housing));
+  let rent = $derived(rentAmount ?? 0);
+  let remaining = $derived(Math.max(0, takeHome - rent));
+  let rentShare = $derived(takeHome > 0 ? (rent / takeHome) * 100 : 0);
+  let rentPct = $derived(Math.min(100, pct(rent, takeHome)));
+  let leftPct = $derived(pct(remaining, takeHome));
+  let rentLabel = $derived(sentenceLabel(housingRentLabel(city, housing)));
 </script>
 
 <!-- Local snippets rather than extra components: the segment and swatch are used
@@ -52,7 +63,9 @@
   <SectionHeading title="Where the money goes" />
 
   <div class="mb-1 text-meta text-muted">
-    Gross monthly {money(budget.grossMonthly)}{taxAmt > 0 ? ` · taxes ${money(taxAmt)}` : ''}
+    Gross monthly {money(budget.grossMonthly)}{taxAmt > 0
+      ? ` · estimated taxes ${money(taxAmt)}`
+      : ''}
   </div>
   <div
     role="img"
@@ -108,8 +121,10 @@
     {/if}
   </div>
 
-  {#if city.r1 != null}
-    <div class="mb-1 text-meta text-muted">Take-home split</div>
+  {#if rentAmount != null}
+    <div class="mb-1 text-meta text-muted">
+      Take-home split{actualTakeHomeMonthly != null ? ' · entered pay' : ' · estimated pay'}
+    </div>
     <div
       role="img"
       aria-label={`Take-home split: ${money(rent)} rent, ${money(remaining)} left`}
@@ -126,11 +141,15 @@
       {/if}
     </div>
     <p class="mt-1 text-sm text-ink">
-      The {rentLabel} is
-      <strong class="font-bold {rentShare > 30 ? 'text-red' : 'text-green'}">
-        {rentShare.toFixed(0)}%
-      </strong>
-      of your take-home pay.
+      {#if takeHome > 0}
+        {housing === 'shared-2br' ? housingRentLabel(city, housing) : `The ${rentLabel}`} is
+        <strong class="font-bold {rentShare > 30 ? 'text-red' : 'text-green'}">
+          {rentShare.toFixed(0)}%
+        </strong>
+        of your take-home pay.
+      {:else}
+        Rent is {money(rent)}/mo; entered take-home pay is $0.
+      {/if}
     </p>
   {/if}
 

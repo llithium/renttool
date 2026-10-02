@@ -7,6 +7,39 @@ import {
 } from './planRepresentation';
 
 describe('rent-plan representation', () => {
+  it('round-trips housing, expenses, savings, and independent entered paychecks', () => {
+    const input = {
+      salary: 80000,
+      selected: { name: 'Austin, TX', source: 'apartment-list' },
+      options: { housing: 'shared-2br', monthlyExpenses: 1200, monthlySavings: 500 },
+      actualTakeHomeMonthly: 4200,
+      comparisons: [
+        {
+          city: { name: 'Austin, TX', source: 'apartment-list' },
+          salary: 80000,
+          actualTakeHomeMonthly: 4200
+        },
+        {
+          city: { name: 'Tampa, FL', source: 'apartment-list' },
+          salary: 90000,
+          actualTakeHomeMonthly: 5000
+        }
+      ]
+    } as const;
+    const query = serializeRentPlan(input);
+    const restored = restoreRentPlan(new URLSearchParams(query));
+    expect(restored.options).toEqual(input.options);
+    expect(restored.actualTakeHomeMonthly).toBe(4200);
+    expect(restored.comparisons.map((entry) => entry.actualTakeHomeMonthly)).toEqual([4200, 5000]);
+    expect(canonicalizeRentPlanSearch(new URLSearchParams(query))).toBe(query);
+    const invalid = restoreRentPlan(
+      new URLSearchParams(
+        'housing=studio&expenses=-5&savings=Infinity&take-home=NaN&compare-take-home=broken'
+      )
+    );
+    expect(invalid.options).toEqual({ housing: '1br', monthlyExpenses: 0, monthlySavings: 0 });
+    expect(invalid.actualTakeHomeMonthly).toBeUndefined();
+  });
   it('builds route paths without a dangling query and canonicalizes legacy ordering', () => {
     const href = rentPlanHref('/compare', {
       salary: 80_000,

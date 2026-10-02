@@ -2,6 +2,7 @@ import { restoreCity } from '$lib/cityCatalog.svelte';
 import { cityIdentity } from '$lib/cityIdentity';
 import { normalizeSalary } from '$lib/salary';
 import type { City } from '$lib/types';
+import { normalizeMonthlyAmount } from '$lib/planning';
 
 export const DEFAULT_COMPARISON_SALARY = 80_000;
 export const MAX_COMPARISON_ENTRIES = 5;
@@ -13,6 +14,7 @@ export const LEGACY_SALARIES_STORAGE_KEY = 'rentToolCompareSalaries.v1';
 export interface ComparisonEntry {
   readonly city: City;
   readonly salary: number;
+  readonly actualTakeHomeMonthly?: number;
 }
 
 export interface ComparisonStorage {
@@ -71,13 +73,19 @@ export const browserComparisonStorage: ComparisonStorage = {
 };
 
 function cloneEntry(entry: ComparisonEntry): ComparisonEntry {
-  return { city: { ...entry.city }, salary: entry.salary };
+  const actual = normalizeMonthlyAmount(entry.actualTakeHomeMonthly);
+  return {
+    city: { ...entry.city },
+    salary: entry.salary,
+    ...(actual != null ? { actualTakeHomeMonthly: actual } : {})
+  };
 }
 
 function validEntry(value: unknown): value is {
   city?: unknown;
   salary: unknown;
   name?: unknown;
+  actualTakeHomeMonthly?: unknown;
 } {
   return Boolean(value && typeof value === 'object' && 'salary' in value);
 }
@@ -143,7 +151,8 @@ function currentEntries(
       (typeof candidate.name === 'string' ? resolveCity?.(candidate.name) : null);
     if (!city || seen.has(cityIdentity(city.name))) continue;
     seen.add(cityIdentity(city.name));
-    entries.push({ city, salary });
+    const actual = normalizeMonthlyAmount(candidate.actualTakeHomeMonthly);
+    entries.push({ city, salary, ...(actual != null ? { actualTakeHomeMonthly: actual } : {}) });
     if (entries.length >= MAX_COMPARISON_ENTRIES) break;
   }
   return entries;
@@ -181,7 +190,11 @@ export class ComparisonSet {
     return this.entriesValue.some((entry) => cityIdentity(entry.city.name) === cityIdentity(name));
   }
 
-  add(city: City, initialSalary: number | null): ComparisonAddResult {
+  add(
+    city: City,
+    initialSalary: number | null,
+    actualTakeHomeMonthly?: number | null
+  ): ComparisonAddResult {
     const existing = this.entriesValue.find(
       (entry) => cityIdentity(entry.city.name) === cityIdentity(city.name)
     );
@@ -197,9 +210,11 @@ export class ComparisonSet {
       return { status: 'full', name: city.name };
     }
 
+    const actual = normalizeMonthlyAmount(actualTakeHomeMonthly);
     const entry: ComparisonEntry = {
       city: { ...city },
-      salary: committedSalary(initialSalary)
+      salary: committedSalary(initialSalary),
+      ...(actual != null ? { actualTakeHomeMonthly: actual } : {})
     };
     this.entriesValue = [...this.entriesValue, entry];
     this.persist();
@@ -221,7 +236,27 @@ export class ComparisonSet {
     );
     if (index < 0) return false;
     const next = [...this.entriesValue];
-    next[index] = { ...next[index], salary };
+    if (next[index].salary === salary) return true;
+    next[index] = { city: next[index].city, salary };
+    this.entriesValue = next;
+    this.persist();
+    return true;
+  }
+
+  setActualTakeHome(name: string, value: number | null): boolean {
+    const actual = normalizeMonthlyAmount(value);
+    if (value != null && actual == null) return false;
+    const index = this.entriesValue.findIndex(
+      (entry) => cityIdentity(entry.city.name) === cityIdentity(name)
+    );
+    if (index < 0) return false;
+    const entry = this.entriesValue[index];
+    const next = [...this.entriesValue];
+    next[index] = {
+      city: entry.city,
+      salary: entry.salary,
+      ...(actual != null ? { actualTakeHomeMonthly: actual } : {})
+    };
     this.entriesValue = next;
     this.persist();
     return true;
@@ -328,7 +363,10 @@ export class ComparisonSet {
         version: 1,
         entries: this.entriesValue.map((entry) => ({
           city: entry.city,
-          salary: entry.salary
+          salary: entry.salary,
+          ...(entry.actualTakeHomeMonthly != null
+            ? { actualTakeHomeMonthly: entry.actualTakeHomeMonthly }
+            : {})
         }))
       });
       return this.storage.write(COMPARISON_STORAGE_KEY, value) !== false;

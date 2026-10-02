@@ -3,6 +3,8 @@
   import { fetchNearby } from '$lib/api';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import { money } from '$lib/format';
+  import { housingRent, housingRentLabel } from '$lib/planning';
 
   let {
     presentation,
@@ -97,6 +99,16 @@
         {#each visiblePlaces as p (p.label)}
           {@const pending = presentation.isComparisonPending(p.label)}
           {@const compared = presentation.isComparing(p.label)}
+          {@const known = presentation.cityByName(p.label)}
+          {@const rent = known ? housingRent(known, presentation.options.housing) : null}
+          {@const activeRent = housingRent(city, presentation.options.housing)}
+          {@const difference =
+            rent != null &&
+            activeRent != null &&
+            known?.rentMetric === city.rentMetric &&
+            known?.rentYear === city.rentYear
+              ? rent - activeRent
+              : null}
           <li
             class="grid gap-3 border-b border-line px-0 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
           >
@@ -106,6 +118,32 @@
                 {#if p.pop != null}{fmtPop(p.pop)} population ·
                 {/if}{p.miles} mi away
               </p>
+              {#if rent != null && known}
+                <p class="mt-2 text-sm tabular-nums">
+                  <strong>{money(rent)}/mo</strong> · {housingRentLabel(
+                    known,
+                    presentation.options.housing
+                  )}
+                </p>
+                <p class="mt-1 text-meta text-muted">
+                  {#if presentation.rentTarget != null}<span
+                      class={rent <= presentation.rentTarget ? 'text-green' : 'text-red'}
+                      >{rent <= presentation.rentTarget
+                        ? 'Within your rent target'
+                        : 'Above your rent target'}</span
+                    > ·
+                  {/if}
+                  {#if difference != null}{difference === 0
+                      ? 'Same estimate as'
+                      : `${money(Math.abs(difference))}/mo ${difference < 0 ? 'less' : 'more'} than`}
+                    {city.city}
+                  {:else}{known.rentArea} · {known.rentYear}{/if}
+                </p>
+              {:else}
+                <p class="mt-2 text-meta text-muted">
+                  Rent estimate unavailable. Add to comparison to check area-level rents.
+                </p>
+              {/if}
             </div>
             <button
               disabled={pending || (!compared && compareFull)}

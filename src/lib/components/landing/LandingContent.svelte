@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { City } from '$lib/types';
-  import CityImage from '$lib/components/city/CityImage.svelte';
   import CityHeadline from '$lib/components/city/CityHeadline.svelte';
   let { children, city }: { children?: Snippet; city: City | null } = $props();
 </script>
@@ -10,7 +9,6 @@
   {#if city}
     <div class="city-arrival">
       <CityHeadline {city} />
-      {#key city.name}<CityImage {city} class="arrival-photo" />{/key}
     </div>
   {:else}
     <header class="arrival-heading">
@@ -43,20 +41,9 @@
     gap: 1.5rem;
     margin: 1.5rem 0;
   }
-  .city-arrival :global(.arrival-photo) {
-    border: 0;
-    border-radius: 1.25rem;
-  }
-  .city-arrival :global(.arrival-photo img) {
-    max-height: 24rem;
-    aspect-ratio: 3.5;
-  }
   @media (max-width: 640px) {
     .arrival-heading {
       padding-top: 1.5rem;
-    }
-    .city-arrival :global(.arrival-photo img) {
-      aspect-ratio: 1.65;
     }
   }
 </style>

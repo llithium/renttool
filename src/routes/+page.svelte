@@ -8,6 +8,7 @@
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
   import CityDiscovery from '$lib/components/landing/CityDiscovery.svelte';
   import CityFacts from '$lib/components/city/CityFacts.svelte';
+  import CityImage from '$lib/components/city/CityImage.svelte';
   import EstimateNote from '$lib/components/city/EstimateNote.svelte';
   import SearchLinks from '$lib/components/city/SearchLinks.svelte';
   import NearbySuburbs from '$lib/components/city/NearbySuburbs.svelte';
@@ -92,6 +93,7 @@
 
       {#if urlSync.hydrated && !selected}
         <CityDiscovery
+          presentation={plan}
           onchoose={(city) => {
             void plan.chooseCity(city);
             document.getElementById('main-content')?.scrollIntoView({ behavior: 'instant' });
@@ -114,6 +116,10 @@
           aria-label="Plan sections"
           class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur-sm md:mx-0 md:px-0"
         >
+          {#if budget}<a
+              class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
+              href="#listing-search">Listings</a
+            >{/if}
           <a
             class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
             href="#rent-map">Map</a
@@ -138,15 +144,21 @@
           >
         </nav>
 
-        <section
-          id="rent-map"
-          tabindex="-1"
-          aria-label="Rent map"
-          class="scroll-mt-28 border-t border-line pt-7"
-        >
-          <RentMap presentation={plan} />
-        </section>
-
+        {#if budget}
+          <section id="listing-search" aria-label="Apartment searches" class="scroll-mt-28 pt-7">
+            <EstimateNote
+              city={selected}
+              housing={plan.options.housing}
+              class="mt-3 max-w-[74ch]"
+            />
+            <SearchLinks
+              city={selected}
+              maxRent={budget.maxRent}
+              housing={plan.options.housing}
+              class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
+            />
+          </section>
+        {/if}
         <section
           id="nearby-options"
           tabindex="-1"
@@ -160,16 +172,15 @@
           />
         </section>
 
-        {#if budget}
-          <div class="scroll-mt-28 pt-7">
-            <EstimateNote city={selected} class="mt-3 max-w-[74ch]" />
-            <SearchLinks
-              city={selected}
-              maxRent={budget.maxRent}
-              class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
-            />
-          </div>
-        {/if}
+        <section
+          id="rent-map"
+          tabindex="-1"
+          aria-label="Rent map"
+          class="scroll-mt-28 border-t border-line pt-7"
+        >
+          <RentMap presentation={plan} />
+        </section>
+
         <section
           id="city-details"
           tabindex="-1"
@@ -177,6 +188,7 @@
           class="scroll-mt-28"
         >
           <CityFacts city={selected} looking={plan.looking} class="mt-7" />
+          {#key selected.name}<CityImage city={selected} class="mt-7" />{/key}
         </section>
 
         {#if budget}
@@ -186,10 +198,12 @@
           <div
             class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8"
           >
-            <RentTrendChart city={selected} {budget} />
+            <RentTrendChart city={selected} {budget} housing={plan.options.housing} />
             <TaxBreakdownChart
               city={selected}
               {budget}
+              housing={plan.options.housing}
+              actualTakeHomeMonthly={plan.actualTakeHomeMonthly}
               class="border-line max-md:border-t max-md:pt-6 md:border-l md:pl-8"
             />
           </div>

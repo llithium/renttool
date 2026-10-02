@@ -1,4 +1,5 @@
 import { money } from './format';
+import { housingSearchBudget, type HousingChoice } from './planning';
 
 export type SearchProvider = 'apartments' | 'zillow' | 'zumper' | 'hotpads';
 
@@ -13,8 +14,10 @@ export interface SearchLink {
 /** Build apartment-search links and describe which providers support a rent cap. */
 export function buildSearchLinks(
   city: { city: string; state: string },
-  maxRent: number
+  rentTarget: number,
+  housing: HousingChoice = '1br'
 ): SearchLink[] {
+  const maxRent = housingSearchBudget(rentTarget, housing);
   const parts = {
     city: city.city,
     state: city.state.toUpperCase(),
@@ -36,6 +39,7 @@ export function buildSearchLinks(
       cmsn: { value: false },
       auc: { value: false },
       fore: { value: false },
+      beds: { min: housing === '1br' ? 1 : 2, max: housing === '1br' ? 1 : 2 },
       mp: { min: null, max: Math.round(maxRent) }
     },
     isListVisible: true

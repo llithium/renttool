@@ -102,7 +102,9 @@ export function restoreCity(value: unknown): City | null {
   )
     return null;
   const canonical = findSeedCity(city.name);
-  const population = restorePopulation(city.pop) ?? canonical?.pop ?? null;
+  if (canonical)
+    return { ...canonical, lat: canonical.lat ?? city.lat, lng: canonical.lng ?? city.lng };
+  const population = restorePopulation(city.pop);
   return {
     name: city.name,
     city: city.city,
@@ -114,7 +116,7 @@ export function restoreCity(value: unknown): City | null {
     pop: population,
     populationSource: ['acs', 'apartment-list', 'simplemaps'].includes(city.populationSource ?? '')
       ? (city.populationSource as City['populationSource'])
-      : (canonical?.populationSource ?? null),
+      : null,
     citySnapshot: restoreCitySnapshot(city.citySnapshot),
     lat: city.lat ?? undefined,
     lng: city.lng ?? undefined,

@@ -31,3 +31,18 @@ _Avoid_: scenario, row
 **Decision brief**:
 A concise comparison result that names the leading city for a chosen criterion and explains the relevant trade-off.
 _Avoid_: winner, recommendation
+
+**Housing setup**:
+One-bedroom, two-bedroom, or shared two-bedroom. Shared housing assumes two people
+split the two-bedroom rent equally. The setup applies across the rent plan and comparison set.
+
+**Available spending room**:
+Monthly take-home pay less the selected housing rent, recurring expenses, and savings target.
+A negative value remains visible as a shortfall. Expenses and savings apply to every comparison entry.
+The gross-income rent target remains a separate planning rule.
+
+**Entered take-home pay**:
+An optional monthly paycheck amount for one city and salary offer. Each comparison entry
+can retain its own amount. Changing that offer's salary clears the entered amount; changing
+the active city clears the active plan's amount. Equivalent salary calculations use the
+reference's entered pay when available and modeled taxes for the required salaries.

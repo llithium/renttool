@@ -28,6 +28,12 @@ import {
 } from '$lib/rentLookupCoordinator';
 import type { City, LookupResult } from '$lib/types';
 import { fetchCoordinates, fetchPopulation, lookupRent } from '$lib/api';
+import {
+  normalizeMonthlyAmount,
+  normalizePlanningOptions,
+  type PlanningOptions
+} from '$lib/planning';
+import fmrMeta from '$lib/data/fmr-meta.json';
 
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
 const LEGACY_KEY = LEGACY_PLAN_V2_STORAGE_KEY;
@@ -86,6 +92,12 @@ const browserAdapters: RentPlanAdapters = {
  */
 export class RentPlanWorkspace {
   private salaryValue = $state<number | null>(null);
+  private optionsValue = $state<PlanningOptions>(normalizePlanningOptions(null));
+  private actualTakeHomeValue = $state<{
+    cityName: string;
+    salary: number;
+    monthly: number;
+  } | null>(null);
   private selectedNameValue = $state<string | null>(null);
   /** The active-city lane and comparison lane have independent pending state. */
   private pendingNameValue = $state<string | null>(null);
@@ -124,6 +136,32 @@ export class RentPlanWorkspace {
 
   get salary(): number | null {
     return this.salaryValue;
+  }
+
+  get options(): PlanningOptions {
+    return this.optionsValue;
+  }
+
+  get actualTakeHomeMonthly(): number | null {
+    const actual = this.actualTakeHomeValue;
+    return actual && actual.cityName === this.selectedName && actual.salary === this.salary
+      ? actual.monthly
+      : null;
+  }
+
+  setOptions(options: PlanningOptions): void {
+    this.optionsValue = normalizePlanningOptions(options);
+    this.schedulePersistence();
+  }
+
+  setActualTakeHome(value: number | null): void {
+    const monthly = normalizeMonthlyAmount(value);
+    if (value != null && monthly == null) return;
+    this.actualTakeHomeValue =
+      monthly != null && this.selectedName && this.salary != null
+        ? { cityName: this.selectedName, salary: this.salary, monthly }
+        : null;
+    this.schedulePersistence();
   }
 
   get cities(): City[] {
@@ -173,7 +211,9 @@ export class RentPlanWorkspace {
 
   /** Set the offer salary and queue the new plan for persistence. Invalid input clears it. */
   setSalary(value: number | null) {
-    this.salaryValue = normalizeSalary(value);
+    const salary = normalizeSalary(value);
+    if (salary !== this.salaryValue) this.actualTakeHomeValue = null;
+    this.salaryValue = salary;
     this.schedulePersistence();
   }
 
@@ -276,6 +316,7 @@ export class RentPlanWorkspace {
 
   private commitSelection(name: string): boolean {
     if (!this.cityByName(name)) return false;
+    if (this.actualTakeHomeValue?.cityName !== name) this.actualTakeHomeValue = null;
     this.selectedNameValue = name;
     this.persistImmediately();
     void this.ensureCoordinates(name);
@@ -348,7 +389,11 @@ export class RentPlanWorkspace {
   private commitComparison(name: string): ComparisonResult {
     const city = this.cityByName(name);
     if (!city) return { status: 'not-found', name };
-    const result = this.comparisonSet.add(city, this.salary);
+    const result = this.comparisonSet.add(
+      city,
+      this.salary,
+      city.name === this.selectedName ? this.actualTakeHomeMonthly : null
+    );
     this.persistImmediately();
     return result;
   }
@@ -419,6 +464,10 @@ export class RentPlanWorkspace {
   setComparisonSalary(name: string, value: number): boolean {
     this.flushPersistence();
     return this.comparisonSet.setSalary(name, value);
+  }
+
+  setComparisonActualTakeHome(name: string, value: number | null): boolean {
+    return this.comparisonSet.setActualTakeHome(name, value);
   }
 
   isComparing(name: string): boolean {
@@ -577,6 +626,8 @@ export class RentPlanWorkspace {
         JSON.stringify({
           salary: this.salaryValue,
           selected: this.selectedNameValue,
+          options: this.optionsValue,
+          actualTakeHomeMonthly: this.actualTakeHomeMonthly,
           custom
         })
       );
@@ -596,7 +647,9 @@ export class RentPlanWorkspace {
     return {
       salary,
       selected: this.selected,
-      comparisons: this.compareEntries
+      comparisons: this.compareEntries,
+      options: this.options,
+      actualTakeHomeMonthly: salary === this.salary ? this.actualTakeHomeMonthly : null
     };
   }
 
@@ -675,7 +728,11 @@ export class RentPlanWorkspace {
       const cityKey = cityIdentity(city.name);
       if (seen.has(cityKey)) continue;
       seen.add(cityKey);
-      entries.push({ city, salary: restored.salary });
+      entries.push({
+        city,
+        salary: restored.salary,
+        actualTakeHomeMonthly: restored.actualTakeHomeMonthly
+      });
       if (suggestion && city.source !== 'apartment-list' && city.r1 == null) {
         scheduleLookup(suggestion, false);
       }
@@ -713,16 +770,34 @@ export class RentPlanWorkspace {
     const scheduleLookup = (suggestion: PlanSuggestion, select: boolean) =>
       this.scheduleLookup(suggestion, select);
     const selectedCity = this.applySelectedReference(representation.selected, scheduleLookup);
-    const hasLinkState = selectedCity || representation.hasComparisonState;
+    const hasLinkState =
+      selectedCity || representation.hasComparisonState || representation.options != null;
     // A salary-only link may still fall back to session storage; once the URL
     // names plan state, an invalid salary must not leak an older local value.
     if (hasLinkState && search.has('salary') && representation.salary == null) {
       this.salaryValue = null;
     }
-    if (hasLinkState) this.applyComparisonSearch(representation, scheduleLookup);
-    this.persistImmediately();
+    if (hasLinkState) {
+      this.optionsValue = normalizePlanningOptions(representation.options);
+      this.restoreActualTakeHome(representation);
+      this.applyComparisonSearch(representation, scheduleLookup);
+    }
+    if (hasLinkState) this.persistImmediately();
 
     return hasLinkState;
+  }
+
+  private restoreActualTakeHome(representation: RestoredRentPlan): void {
+    this.actualTakeHomeValue =
+      representation.actualTakeHomeMonthly != null &&
+      representation.selected &&
+      representation.salary != null
+        ? {
+            cityName: representation.selected.name,
+            salary: representation.salary,
+            monthly: representation.actualTakeHomeMonthly
+          }
+        : null;
   }
 
   /** Apply URL params on browser back/forward navigation. URL state is the sole
@@ -731,10 +806,12 @@ export class RentPlanWorkspace {
     this.cancelAllResolutions();
     const representation = restoreRentPlan(search);
     this.salaryValue = representation.salary;
+    this.optionsValue = normalizePlanningOptions(representation.options);
     this.selectedNameValue = null;
     const scheduleLookup = (suggestion: PlanSuggestion, select: boolean) =>
       this.scheduleLookup(suggestion, select);
     this.applySelectedReference(representation.selected, scheduleLookup);
+    this.restoreActualTakeHome(representation);
     this.applyComparisonSearch(representation, scheduleLookup);
     this.persistImmediately();
   }
@@ -757,6 +834,7 @@ export class RentPlanWorkspace {
       if (restoredPlan) {
         const restoredSalary = normalizeSalary(restoredPlan.salary);
         if (restoredSalary != null) this.salaryValue = restoredSalary;
+        this.optionsValue = normalizePlanningOptions(restoredPlan.options);
         if (Array.isArray(restoredPlan.custom)) {
           const valid = restoredPlan.custom
             .map(restoreCity)
@@ -767,11 +845,34 @@ export class RentPlanWorkspace {
           this.selectedNameValue = restoredPlan.selected;
           void this.ensureCoordinates(restoredPlan.selected);
           void this.ensurePopulation(restoredPlan.selected);
+          const monthly = normalizeMonthlyAmount(restoredPlan.actualTakeHomeMonthly);
+          if (monthly != null && this.salary != null)
+            this.actualTakeHomeValue = {
+              cityName: restoredPlan.selected,
+              salary: this.salary,
+              monthly
+            };
         }
       }
 
       this.comparisonSet.restore({ resolveCity: (name) => this.cityByName(name) });
       this.cityCatalog.addMissing(this.comparisonSet.entries.map((entry) => entry.city));
+
+      // Stored off-list rents belong to a release; resolve them again after a HUD refresh.
+      const referenced = new Map(
+        [...(this.selected ? [this.selected] : []), ...this.compareCities].map((city) => [
+          city.name,
+          city
+        ])
+      );
+      for (const city of referenced.values()) {
+        if (city.source !== 'hud-fmr' || city.rentYear === fmrMeta.year) continue;
+        this.cityCatalog.patch(city.name, { r1: null, r2: null, yoy: null });
+        this.scheduleLookup(
+          { label: city.name, city: city.city, state: city.state, lat: city.lat, lng: city.lng },
+          city.name === this.selectedName
+        );
+      }
 
       if (!this.adapters.readStorage(LAST_KEY) && raw) this.persistImmediately();
     } catch {

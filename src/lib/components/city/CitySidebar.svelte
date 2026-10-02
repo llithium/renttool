@@ -7,6 +7,9 @@
   import CityActions from './CityActions.svelte';
   import BudgetCard from './BudgetCard.svelte';
   import Verdict from './Verdict.svelte';
+  import HousingSelector from '$lib/components/ui/HousingSelector.svelte';
+  import PersonalCosts from '$lib/components/ui/PersonalCosts.svelte';
+  import { money } from '$lib/format';
 
   let {
     presentation,
@@ -35,7 +38,14 @@
           onselect={(suggestion) => void presentation.chooseCity(suggestion)}
           selectedName={presentation.selectedName}
           pendingName={presentation.pendingName}
+          housing={presentation.options.housing}
         />
+        <div class="mt-5">
+          <HousingSelector
+            value={presentation.options.housing}
+            onchange={(housing) => presentation.setOptions({ ...presentation.options, housing })}
+          />
+        </div>
       </div>
       <div class="@2xl:border-l @2xl:border-line @2xl:pl-7">
         <SalaryInput
@@ -57,7 +67,7 @@
       {#if activeCity}
         <div class="border-line @max-4xl:border-t @max-4xl:pt-7 @4xl:border-l @4xl:pl-7">
           {#if budget}
-            <BudgetCard {budget} />
+            <BudgetCard {budget} actualTakeHomeMonthly={presentation.actualTakeHomeMonthly} />
             <CityActions {presentation} cityName={activeCity.name} />
           {:else}
             <h2 class="text-title">What rent fits here?</h2>
@@ -70,9 +80,44 @@
       {/if}
     </div>
 
-    {#if activeCity && budget && activeCity.r1 != null}
+    {#if activeCity && budget}
       <div id="rent-decision" class="mt-7 border-t border-line pt-7">
-        <Verdict {budget} city={activeCity} />
+        <Verdict
+          {budget}
+          city={activeCity}
+          housing={presentation.options.housing}
+          actualTakeHomeMonthly={presentation.actualTakeHomeMonthly}
+        />
+        {#if presentation.spendingRoom?.available != null}
+          <div
+            class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-card-2 p-4"
+            data-testid="spending-room"
+          >
+            <div>
+              <p class="text-label text-muted">Available after rent, expenses &amp; savings</p>
+              <p class="mt-1 text-meta text-muted">
+                {presentation.actualTakeHomeMonthly != null
+                  ? 'Using your entered take-home pay'
+                  : 'Using estimated take-home pay'}
+              </p>
+            </div>
+            <strong
+              class="text-data whitespace-nowrap tabular-nums {presentation.spendingRoom.available <
+              0
+                ? 'text-red'
+                : 'text-ink'}"
+              >{money(presentation.spendingRoom.available)}<span
+                class="ml-1 text-sm font-medium tracking-normal text-muted">/mo</span
+              ></strong
+            >
+          </div>
+        {/if}
+        <PersonalCosts
+          options={presentation.options}
+          onoptions={(options) => presentation.setOptions(options)}
+          actualTakeHomeMonthly={presentation.actualTakeHomeMonthly}
+          ontakehome={(value) => presentation.setActualTakeHome(value)}
+        />
       </div>
     {/if}
   </section>

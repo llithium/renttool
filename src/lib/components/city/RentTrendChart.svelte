@@ -2,12 +2,14 @@
   import type { Budget, City } from '$lib/types';
   import { money, pctTrend, rentMetricLabel } from '$lib/format';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import { housingRent, housingRentLabel, type HousingChoice } from '$lib/planning';
 
   let {
     city,
     budget,
+    housing = '1br',
     class: className = ''
-  }: { city: City; budget: Budget; class?: string } = $props();
+  }: { city: City; budget: Budget; housing?: HousingChoice; class?: string } = $props();
 
   interface Bar {
     label: string;
@@ -29,6 +31,11 @@
         value: city.r2,
         kind: 'rent'
       });
+    if (housing === 'shared-2br') {
+      const rent = housingRent(city, housing);
+      if (rent != null)
+        out.push({ label: housingRentLabel(city, housing), value: rent, kind: 'rent' });
+    }
     out.push({ label: 'Your max (30% gross)', value: budget.maxRent, kind: 'budget' });
     return out;
   });
