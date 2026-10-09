@@ -1,7 +1,7 @@
 import { computeBudget } from '$lib/budget';
 import { RentPlanWorkspace, type ComparisonResult } from '$lib/appState.svelte';
 import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
-import type { Budget, City, CitySuggestion } from '$lib/types';
+import type { Budget, City, CitySuggestion, NearbyPlace } from '$lib/types';
 import { computeSpendingRoom, type PlanningOptions } from '$lib/planning';
 
 /**
@@ -158,6 +158,10 @@ export class RentPlanPresentation {
 
   cityByName(name: string): City | null {
     return this.workspace.cityByName(name);
+  }
+
+  checkRent(place: Omit<NearbyPlace, 'miles'>, signal: AbortSignal): Promise<void> {
+    return this.workspace.checkRent(place, signal);
   }
 
   buildSearch(salaryOverride?: number | null): string {

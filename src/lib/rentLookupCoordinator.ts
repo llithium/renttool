@@ -55,8 +55,8 @@ function unavailableLookup(): LookupResult {
  * Coordinates the network side of city resolution without owning plan state.
  *
  * Coordinate requests are shared by city identity. Rent requests are shared by
- * canonical city name and stay alive while at least one active or comparison
- * intent holds a lease; the last release aborts the request.
+ * canonical city name and stay alive while at least one selection, comparison,
+ * or background check holds a lease; the last release aborts the request.
  */
 export function createRentLookupCoordinator(
   adapters: RentLookupAdapters,

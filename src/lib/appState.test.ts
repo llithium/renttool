@@ -4,7 +4,7 @@ import {
   COMPARISON_STORAGE_KEY,
   DEFAULT_COMPARISON_SALARY
 } from '$lib/compare/comparisonSet.svelte';
-import type { CitySuggestion, LookupResult } from '$lib/types';
+import type { CitySuggestion, LookupResult, NearbyPlace } from '$lib/types';
 
 function adapters(
   result: LookupResult,
@@ -64,6 +64,80 @@ const hudRent: LookupResult = {
 };
 
 describe('RentPlanWorkspace', () => {
+  const nearby: NearbyPlace = {
+    label: 'Nearby Town, ZZ',
+    city: 'Nearby Town',
+    state: 'ZZ',
+    lat: 40,
+    lng: -74,
+    pop: 10000,
+    miles: 5
+  };
+
+  it('fills nearby rents without changing the active plan and reuses the result', async () => {
+    const dependency = adapters(hudRent);
+    const plan = new RentPlanWorkspace(dependency);
+    plan.selectCity('Tampa, FL');
+    const search = plan.buildSearch();
+
+    await plan.checkRent(nearby, new AbortController().signal);
+    await plan.checkRent(nearby, new AbortController().signal);
+    await plan.checkRent({ ...nearby, label: 'Austin, TX' }, new AbortController().signal);
+
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(1);
+    expect(dependency.fetchPopulation).not.toHaveBeenCalled();
+    expect(plan.cityByName(nearby.label)).toMatchObject({ ...hudRent, pop: 10000 });
+    expect(plan.selectedName).toBe('Tampa, FL');
+    expect(plan.compareNames).toEqual([]);
+    expect(plan.looking).toBe(false);
+    expect(plan.pendingComparisonNames).toEqual([]);
+    expect(plan.buildSearch()).toBe(search);
+  });
+
+  it('shares a nearby lookup with a comparison even when background work is cancelled', async () => {
+    const result = deferred<LookupResult>();
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn(() => result.promise);
+    const plan = new RentPlanWorkspace(dependency);
+    plan.selectCity('Tampa, FL');
+    const controller = new AbortController();
+    const background = plan.checkRent(nearby, controller.signal);
+    const comparison = plan.addComparison(nearby);
+    controller.abort();
+
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dependency.lookupRent).mock.calls[0][2]?.aborted).toBe(false);
+    result.resolve(hudRent);
+    await background;
+    expect(await comparison).toMatchObject({ status: 'added', rentAvailable: true });
+    expect(plan.selectedName).toBe('Tampa, FL');
+  });
+
+  it('aborts an unneeded nearby lookup and ignores its late result', async () => {
+    const result = deferred<LookupResult>();
+    const dependency = adapters(hudRent);
+    dependency.lookupRent = vi.fn(() => result.promise);
+    const plan = new RentPlanWorkspace(dependency);
+    const controller = new AbortController();
+    const background = plan.checkRent(nearby, controller.signal);
+    controller.abort();
+
+    expect(vi.mocked(dependency.lookupRent).mock.calls[0][2]?.aborted).toBe(true);
+    result.resolve(hudRent);
+    await background;
+    expect(plan.cityByName(nearby.label)?.r1).toBeNull();
+  });
+
+  it('remembers unavailable discovery results while allowing an explicit comparison to retry', async () => {
+    const dependency = adapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+    await plan.checkRent(nearby, new AbortController().signal);
+    await plan.checkRent(nearby, new AbortController().signal);
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(1);
+    await plan.addComparison(nearby);
+    expect(dependency.lookupRent).toHaveBeenCalledTimes(2);
+  });
+
   it('restores personal settings and paychecks without leaking them into another offer', () => {
     const { dependency } = trackedAdapters(unavailableRent);
     const plan = new RentPlanWorkspace(dependency);

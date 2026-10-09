@@ -52,4 +52,14 @@ describe('rent map marker lifecycle', () => {
       fillColor: 'fits'
     });
   });
+
+  it('updates a pending marker to its resolved affordability without changing its emphasis', () => {
+    const pending = markerPresentation(city('A, ZZ', null), 1500, 'A, ZZ', palette, '1br', true);
+    const resolved = markerPresentation(city('A, ZZ', 1250), 1500, 'A, ZZ', palette);
+    expect(pending.ariaLabel).toContain('checking area-level rent');
+    expect(pending.fillColor).toBe('neutral');
+    expect(resolved.ariaLabel).toContain('$1,250, fits budget');
+    expect(resolved.fillColor).toBe('fits');
+    expect(resolved.radius).toBe(pending.radius);
+  });
 });

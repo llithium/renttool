@@ -1,6 +1,6 @@
 <script lang="ts">
   import 'leaflet/dist/leaflet.css';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { City } from '$lib/types';
   import type { Map as LMap, LayerGroup, CircleMarker } from 'leaflet';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
@@ -29,6 +29,9 @@
   let centeredName: string | null = null;
   let handledFocusRequest = 0;
   let disposed = false;
+  const rentCheckController = new AbortController();
+  const attemptedRentChecks = new Set<string>();
+  let pendingRentNames = $state<string[]>([]);
 
   const markers = new Map<string, CircleMarker>();
   const tooltipParts = new Map<string, { title: HTMLElement; detail: Text }>();
@@ -61,14 +64,49 @@
       return;
     }
 
-    map.setView([selectedCity.lat, selectedCity.lng], 8, { animate: false });
     centeredName = selectedCity.name;
+    map.setView([selectedCity.lat, selectedCity.lng], 8, { animate: false });
   }
 
   type LocatedCity = City & { lat: number; lng: number };
 
   function hasCoordinates(city: City): city is LocatedCity {
     return city.lat != null && city.lng != null;
+  }
+
+  function checkMissingRents() {
+    if (!ready || !map || disposed || (selectedName && centeredName !== selectedName)) return;
+    const bounds = map.getBounds();
+    for (const city of cities) {
+      if (
+        !hasCoordinates(city) ||
+        city.source === 'apartment-list' ||
+        city.r1 != null ||
+        city.r2 != null ||
+        !bounds.contains([city.lat, city.lng])
+      )
+        continue;
+      const key = `${city.name}:${city.lat}:${city.lng}`;
+      if (attemptedRentChecks.has(key)) continue;
+      attemptedRentChecks.add(key);
+      pendingRentNames = [...pendingRentNames, city.name];
+      void presentation
+        .checkRent(
+          {
+            label: city.name,
+            city: city.city,
+            state: city.state,
+            lat: city.lat,
+            lng: city.lng,
+            pop: city.pop
+          },
+          rentCheckController.signal
+        )
+        .finally(() => {
+          if (disposed) return;
+          pendingRentNames = pendingRentNames.filter((name) => name !== city.name);
+        });
+    }
   }
 
   function createMarker(city: LocatedCity, palette: MarkerPalette, targetGroup: LayerGroup) {
@@ -106,7 +144,14 @@
   }
 
   function applyMarkerPresentation(city: City, marker: CircleMarker, palette: MarkerPalette) {
-    const next = markerPresentation(city, maxRent, selectedName, palette, housing);
+    const next = markerPresentation(
+      city,
+      maxRent,
+      selectedName,
+      palette,
+      housing,
+      pendingRentNames.includes(city.name)
+    );
     marker.setRadius(next.radius);
     marker.setStyle({
       weight: next.weight,
@@ -232,6 +277,7 @@
           maxZoom: 19
         }).addTo(map);
         group = L.layerGroup().addTo(map);
+        map.on('moveend', checkMissingRents);
         ready = true;
         reconcileMarkers();
         updateMarkerPresentation();
@@ -243,6 +289,7 @@
 
     return () => {
       disposed = true;
+      rentCheckController.abort();
       map?.remove();
     };
   });
@@ -282,6 +329,13 @@
     if (!ready || focusRequest === handledFocusRequest) return;
     handledFocusRequest = focusRequest;
     recenterOnSelectedCity(true);
+  });
+
+  // Check visible markers after initial centering and when new cities arrive.
+  $effect(() => {
+    void ready;
+    void cities;
+    untrack(checkMissingRents);
   });
 </script>
 

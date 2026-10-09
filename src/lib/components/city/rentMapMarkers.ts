@@ -18,7 +18,12 @@ export type MarkerPresentation = Readonly<{
   color: string;
   fillColor: string;
   fillOpacity: number;
-  fit: 'fits budget' | 'over budget' | 'rent data unavailable' | 'enter salary to check budget';
+  fit:
+    | 'fits budget'
+    | 'over budget'
+    | 'rent data unavailable'
+    | 'checking area-level rent'
+    | 'enter salary to check budget';
   tooltipDetail: string;
   ariaLabel: string;
 }>;
@@ -56,7 +61,8 @@ export function markerPresentation(
   maxRent: number | null,
   selectedName: string | null,
   palette: MarkerPalette,
-  housing: HousingChoice = '1br'
+  housing: HousingChoice = '1br',
+  checkingRent = false
 ): MarkerPresentation {
   const rent = housingRent({ r1: city.r1, r2: city.r2 ?? null }, housing);
   const rentLabel = housing === '1br' ? '1BR' : housing === '2br' ? '2BR' : 'Half a 2BR';
@@ -71,7 +77,9 @@ export function markerPresentation(
   const fits = maxRent != null && rent != null ? rent <= maxRent : false;
   const fit =
     rent == null
-      ? 'rent data unavailable'
+      ? checkingRent
+        ? 'checking area-level rent'
+        : 'rent data unavailable'
       : maxRent == null
         ? 'enter salary to check budget'
         : fits

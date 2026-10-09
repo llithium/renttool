@@ -23,6 +23,7 @@
   let loading = $state(false);
   let expanded = $state(false);
   let status = $state('');
+  let pendingRentNames = $state<string[]>([]);
   let visiblePlaces = $derived(expanded ? places : places.slice(0, 4));
   let compareFull = $derived(presentation.comparisonFull);
 
@@ -57,6 +58,7 @@
   // Refetch whenever the selected city (or its coords) changes; abort stale requests.
   $effect(() => {
     const { lat, lng, city: cityName, state } = city;
+    pendingRentNames = [];
     if (lat == null || lng == null) {
       places = [];
       loading = false;
@@ -72,6 +74,19 @@
       places = res;
       expanded = false;
       loading = false;
+      const missingRents = res.filter((place) => {
+        const known = presentation.cityByName(place.label);
+        return (
+          !known || (known.r1 == null && known.r2 == null && known.source !== 'apartment-list')
+        );
+      });
+      pendingRentNames = missingRents.map((place) => place.label);
+      for (const place of missingRents) {
+        void presentation.checkRent(place, controller.signal).finally(() => {
+          if (controller.signal.aborted) return;
+          pendingRentNames = pendingRentNames.filter((name) => name !== place.label);
+        });
+      }
     });
     return () => controller.abort();
   });
@@ -140,8 +155,10 @@
                   {:else}{known.rentArea} · {known.rentYear}{/if}
                 </p>
               {:else}
-                <p class="mt-2 text-meta text-muted">
-                  Rent estimate unavailable. Add to comparison to check area-level rents.
+                <p class="mt-2 text-meta text-muted" aria-live="polite">
+                  {pendingRentNames.includes(p.label)
+                    ? 'Checking area-level rent…'
+                    : 'Rent estimate unavailable.'}
                 </p>
               {/if}
             </div>

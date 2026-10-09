@@ -26,7 +26,7 @@ import {
   type RentLookupAdapters,
   type RentLookupCoordinator
 } from '$lib/rentLookupCoordinator';
-import type { City, LookupResult } from '$lib/types';
+import type { City, LookupResult, NearbyPlace } from '$lib/types';
 import { fetchCoordinates, fetchPopulation, lookupRent } from '$lib/api';
 import {
   normalizeMonthlyAmount,
@@ -106,6 +106,7 @@ export class RentPlanWorkspace {
   private readonly comparisonSet: ComparisonSet;
   private readonly cityCatalog: CityCatalog;
   private readonly lookupCoordinator: RentLookupCoordinator;
+  private readonly checkedRentLocations = new Set<string>();
   private activeOperation: ResolutionOperation | null = null;
   private readonly comparisonTasks = new Map<string, ComparisonTask>();
   private readonly comparisonRestoreOperations = new Map<string, ResolutionOperation>();
@@ -207,6 +208,34 @@ export class RentPlanWorkspace {
 
   cityByName(name: string): City | null {
     return this.cityCatalog.byName(name);
+  }
+
+  /** Enrich discovery results without selecting a city or adding a comparison. */
+  async checkRent(place: Omit<NearbyPlace, 'miles'>, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return;
+    const known = this.cityByName(place.label);
+    if (known && (known.source === 'apartment-list' || known.r1 != null || known.r2 != null))
+      return;
+
+    const key = `${cityIdentity(place.label)}:${place.lat}:${place.lng}`;
+    // Remember unavailable results too, so separate views do not retry a failed
+    // check. An explicit selection or comparison can still request rent again.
+    if (this.checkedRentLocations.has(key)) return;
+
+    const city = this.cityCatalog.ensurePlaceholder(place);
+    const lease = this.lookupCoordinator.acquireRent({
+      name: city.name,
+      lat: place.lat,
+      lng: place.lng
+    });
+    signal.addEventListener('abort', lease.release, { once: true });
+    try {
+      await lease.promise;
+      if (!signal.aborted) this.checkedRentLocations.add(key);
+    } finally {
+      signal.removeEventListener('abort', lease.release);
+      lease.release();
+    }
   }
 
   /** Set the offer salary and queue the new plan for persistence. Invalid input clears it. */
