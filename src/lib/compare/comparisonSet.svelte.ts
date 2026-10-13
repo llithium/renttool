@@ -15,6 +15,7 @@ export interface ComparisonEntry {
   readonly city: City;
   readonly salary: number;
   readonly actualTakeHomeMonthly?: number;
+  readonly monthlyExpenses?: number;
 }
 
 export interface ComparisonStorage {
@@ -74,10 +75,12 @@ export const browserComparisonStorage: ComparisonStorage = {
 
 function cloneEntry(entry: ComparisonEntry): ComparisonEntry {
   const actual = normalizeMonthlyAmount(entry.actualTakeHomeMonthly);
+  const expenses = normalizeMonthlyAmount(entry.monthlyExpenses);
   return {
     city: { ...entry.city },
     salary: entry.salary,
-    ...(actual != null ? { actualTakeHomeMonthly: actual } : {})
+    ...(actual != null ? { actualTakeHomeMonthly: actual } : {}),
+    ...(expenses != null ? { monthlyExpenses: expenses } : {})
   };
 }
 
@@ -86,6 +89,7 @@ function validEntry(value: unknown): value is {
   salary: unknown;
   name?: unknown;
   actualTakeHomeMonthly?: unknown;
+  monthlyExpenses?: unknown;
 } {
   return Boolean(value && typeof value === 'object' && 'salary' in value);
 }
@@ -152,7 +156,16 @@ function currentEntries(
     if (!city || seen.has(cityIdentity(city.name))) continue;
     seen.add(cityIdentity(city.name));
     const actual = normalizeMonthlyAmount(candidate.actualTakeHomeMonthly);
-    entries.push({ city, salary, ...(actual != null ? { actualTakeHomeMonthly: actual } : {}) });
+    entries.push(
+      cloneEntry({
+        city,
+        salary,
+        ...(actual != null ? { actualTakeHomeMonthly: actual } : {}),
+        ...(normalizeMonthlyAmount(candidate.monthlyExpenses) != null
+          ? { monthlyExpenses: Number(candidate.monthlyExpenses) }
+          : {})
+      })
+    );
     if (entries.length >= MAX_COMPARISON_ENTRIES) break;
   }
   return entries;
@@ -237,7 +250,13 @@ export class ComparisonSet {
     if (index < 0) return false;
     const next = [...this.entriesValue];
     if (next[index].salary === salary) return true;
-    next[index] = { city: next[index].city, salary };
+    next[index] = {
+      city: next[index].city,
+      salary,
+      ...(next[index].monthlyExpenses != null
+        ? { monthlyExpenses: next[index].monthlyExpenses }
+        : {})
+    };
     this.entriesValue = next;
     this.persist();
     return true;
@@ -255,8 +274,25 @@ export class ComparisonSet {
     next[index] = {
       city: entry.city,
       salary: entry.salary,
+      ...(entry.monthlyExpenses != null ? { monthlyExpenses: entry.monthlyExpenses } : {}),
       ...(actual != null ? { actualTakeHomeMonthly: actual } : {})
     };
+    this.entriesValue = next;
+    this.persist();
+    return true;
+  }
+
+  setMonthlyExpenses(name: string, value: number | null): boolean {
+    const monthly = normalizeMonthlyAmount(value);
+    if (value != null && monthly == null) return false;
+    const index = this.entriesValue.findIndex(
+      (entry) => cityIdentity(entry.city.name) === cityIdentity(name)
+    );
+    if (index < 0) return false;
+    const next = [...this.entriesValue];
+    const entry = { ...next[index] };
+    delete entry.monthlyExpenses;
+    next[index] = { ...entry, ...(monthly != null ? { monthlyExpenses: monthly } : {}) };
     this.entriesValue = next;
     this.persist();
     return true;
@@ -364,6 +400,7 @@ export class ComparisonSet {
         entries: this.entriesValue.map((entry) => ({
           city: entry.city,
           salary: entry.salary,
+          ...(entry.monthlyExpenses != null ? { monthlyExpenses: entry.monthlyExpenses } : {}),
           ...(entry.actualTakeHomeMonthly != null
             ? { actualTakeHomeMonthly: entry.actualTakeHomeMonthly }
             : {})

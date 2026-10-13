@@ -13,8 +13,27 @@ Optional recurring expenses and a savings target show the money left after rent 
 They apply across the comparison set. Entered take-home pay belongs to its city and salary
 and clears when either changes; estimated tax figures remain visible separately.
 
-Your city, salary, housing choice, personal costs, entered take-home pay, and comparison list sync to the URL, so any view is a shareable deep
-link (the **Copy link** button copies it) that restores on reload or on another device.
+The default personal rent ceiling reserves expenses, savings, and a monthly buffer from
+entered or estimated take-home pay, capped at the 30%-of-gross-income benchmark.
+Choose the gross-income benchmark alone in personal expenses if preferred. Listings,
+map markers, nearby options, and comparisons use the chosen ceiling; cities without an
+entered paycheck use their own modeled taxes. Each comparison can override monthly
+expenses independently, including an explicit zero, and equivalent salaries account
+for those overrides.
+
+The apartment check accepts your share of quoted rent, utilities, parking, recurring
+fees, deposit, and moving costs. It shows total monthly housing, remaining spending
+room, and first-month move-in cash. Inputs are temporary, reset with city/housing changes,
+and are excluded from links. Avoid also entering the same costs under recurring expenses.
+
+Discovery supports lowest rent, most spending room, rent closest to ceiling, and
+straight-line distance from a bundled reference city. Filters persist in session storage
+when returning from a city page or reloading the same browser tab.
+
+Your plan syncs to the URL for restoration. **Share plan** defaults to **Share cities only**,
+which excludes all financial fields. **Share full plan** includes salaries, housing,
+personal costs, buffer, entered paychecks, and comparison expense overrides. Copying the
+address bar directly carries the full plan.
 
 Rebuilt from the original single-file `reference/rent-city-artifact.html` into a deployable
 app with serverless endpoints for search and location lookups.

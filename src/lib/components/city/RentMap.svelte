@@ -144,9 +144,10 @@
   }
 
   function applyMarkerPresentation(city: City, marker: CircleMarker, palette: MarkerPalette) {
+    void maxRent;
     const next = markerPresentation(
       city,
-      maxRent,
+      presentation.rentTargetForCity(city),
       selectedName,
       palette,
       housing,
@@ -368,7 +369,8 @@
     class="leaflet-theme h-100 w-full overflow-hidden rounded-xl border border-line bg-card-2"
   ></div>
   <p class="mt-3 text-xs/relaxed text-muted">
-    Your current plan stays centered and labelled. Select another marker to load that city.
+    Select a marker to load that city. Other cities use estimated take-home pay for your current
+    salary and goals.
   </p>
 </section>
 

@@ -9,31 +9,32 @@
     city,
     housing = '1br',
     actualTakeHomeMonthly = null,
+    target = budget.maxRent,
+    personal = false,
     class: className = ''
   }: {
     budget: Budget;
     city: City;
     housing?: HousingChoice;
     actualTakeHomeMonthly?: number | null;
+    target?: number;
+    personal?: boolean;
     class?: string;
   } = $props();
 
   let rent = $derived(housingRent(city, housing));
   let takeHome = $derived(actualTakeHomeMonthly ?? budget.takeHomeMonthly);
-  let cushion = $derived(rent != null ? budget.maxRent - rent : null);
+  let cushion = $derived(rent != null ? target - rent : null);
   let good = $derived(cushion != null && cushion >= 0);
   let rentLabel = $derived(sentenceLabel(housingRentLabel(city, housing)));
   let rentLabel2 = $derived(sentenceLabel(rentMetricLabel(city.rentMetric, '2BR')));
   let rentShare = $derived(rent != null && takeHome > 0 ? (rent / takeHome) * 100 : null);
-  let cushionLabel = $derived(
-    cushion == null ? '—' : cushion >= 0 ? `${money(cushion)} under` : `${money(-cushion)} over`
-  );
 
   // Built as one string rather than an inline {#if}: the clause has to start with
   // a space and the "else" branch with none, which template whitespace can't
   // express reliably.
   let twoBrClause = $derived(
-    housing === '1br' && city.r2 != null && budget.maxRent >= city.r2
+    housing === '1br' && city.r2 != null && target >= city.r2
       ? ` — it even covers the ${rentLabel2} (${money(city.r2)}).`
       : '.'
   );
@@ -69,53 +70,41 @@
       </span>
       <div>
         <h2 id="affordability-heading" class="mb-2 text-title {good ? 'text-green' : 'text-red'}">
-          {good ? 'Fits your 30% gross-income target' : 'Above your gross-income target'}
+          {good
+            ? personal
+              ? 'Fits your personal rent ceiling'
+              : 'Fits your 30% gross-income target'
+            : personal
+              ? 'Above your personal rent ceiling'
+              : 'Above your gross-income target'}
         </h2>
         {#key `${good}-${cushion}`}
           <div class="motion-copy max-w-2xl text-body text-ink">
             {#if good}
-              Your {money(budget.maxRent)} target covers {housing === 'shared-2br'
+              Your {money(target)}
+              {personal ? 'ceiling' : '30% gross-income target'} covers {housing === 'shared-2br'
                 ? rentLabel
                 : `the ${rentLabel}`} ({money(rent)}) with
               {money(cushion)}/mo under the target{twoBrClause}
             {:else}
               {housing === 'shared-2br' ? housingRentLabel(city, housing) : `The ${rentLabel}`} ({money(
                 rent
-              )}) runs {money(-cushion)}/mo over your 30% target. You’d want roughly {money(
-                salaryForRent(rent)
-              )}/yr for it — consider lower-rent units, a roommate, or nearby suburbs.
+              )}) runs {money(-cushion)}/mo over your {personal
+                ? 'ceiling'
+                : '30% gross-income target'}. Consider lower-rent units, a roommate, or nearby
+              suburbs. The 30% rule alone would require roughly {money(salaryForRent(rent))}/yr
+              before personal costs.
             {/if}
           </div>
         {/key}
       </div>
     </div>
 
-    <dl class="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
-      <div>
-        <dt class="text-meta text-muted">Monthly target</dt>
-        <dd class="mt-1 text-data tabular-nums">
-          {money(budget.maxRent)}
-        </dd>
-      </div>
-      <div>
-        <dt class="text-meta text-muted">{rentLabel}</dt>
-        <dd class="mt-1 text-data tabular-nums">{money(rent)}</dd>
-      </div>
-      <div>
-        <dt class="text-meta text-muted">Market rent vs target</dt>
-        <dd class="mt-1 text-data tabular-nums">{cushionLabel}</dd>
-      </div>
-      <div>
-        <dt class="text-meta text-muted">Rent share of take-home</dt>
-        <dd
-          class="mt-1 text-data tabular-nums {rentShare != null && rentShare > 30
-            ? 'text-red'
-            : 'text-green'}"
-        >
-          {rentShare != null ? `${rentShare.toFixed(0)}%` : '—'}
-        </dd>
-      </div>
-    </dl>
+    <p class="mt-3 text-sm text-muted">
+      {rentShare != null
+        ? `${rentShare.toFixed(0)}% of ${actualTakeHomeMonthly != null ? 'entered' : 'estimated'} take-home pay goes to this rent estimate.`
+        : 'Enter take-home pay to check its rent share.'}
+    </p>
   </section>
 {:else}
   <p class="text-sm text-muted">

@@ -39,6 +39,39 @@ function presentation(result = rent): RentPlanPresentation {
 }
 
 describe('RentPlanPresentation', () => {
+  it('shares cities by default and financial details only in a full link', async () => {
+    const plan = presentation();
+    plan.setSalary(80000);
+    await plan.chooseCity(suggestion('Private, ZZ'));
+    plan.setOptions({
+      housing: 'shared-2br',
+      monthlyExpenses: 1000,
+      monthlySavings: 500,
+      monthlyBuffer: 300
+    });
+    plan.setActualTakeHome(4000);
+    plan.addComparison('Tampa, FL');
+    plan.setComparisonExpenses('Tampa, FL', 0);
+    plan.setComparisonActualTakeHome('Tampa, FL', 4100);
+    const publicLink = new URL(plan.buildShareUrl('https://rent.test'));
+    expect([...publicLink.searchParams.keys()]).toEqual([
+      'city',
+      'lat',
+      'lng',
+      'compare',
+      'housing'
+    ]);
+    const full = new URL(plan.buildShareUrl('https://rent.test', 'full', '/compare'));
+    expect(full.pathname).toBe('/compare');
+    expect(full.searchParams.get('take-home')).toBe('4000');
+    expect(full.searchParams.get('buffer')).toBe('300');
+    expect(JSON.parse(full.searchParams.get('compare-expenses')!)).toMatchObject({ monthly: 0 });
+    plan.exploreCities();
+    expect(plan.activeCity).toBeNull();
+    expect(plan.comparisonNames).toEqual(['Tampa, FL']);
+    expect(plan.salary).toBe(80000);
+  });
+
   it('presents the active city and rent target through the planning intents', async () => {
     const plan = presentation();
 

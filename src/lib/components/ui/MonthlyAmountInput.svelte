@@ -6,7 +6,8 @@
     value,
     onchange,
     placeholder = 'Optional',
-    hint
+    hint,
+    monthly = true
   }: {
     id: string;
     label: string;
@@ -14,6 +15,7 @@
     onchange: (value: number | null) => void;
     placeholder?: string;
     hint?: string;
+    monthly?: boolean;
   } = $props();
   let error = $state('');
   function input(event: Event) {
@@ -49,7 +51,7 @@
       aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
       class="min-w-0 flex-1 bg-transparent py-2 text-sm text-ink tabular-nums outline-none"
     />
-    <span class="text-meta text-muted">/mo</span>
+    {#if monthly}<span class="text-meta text-muted">/mo</span>{/if}
   </div>
   {#if error}<p id={`${id}-error`} role="status" class="mt-1 text-meta text-red">{error}</p>
   {:else if hint}<p id={`${id}-hint`} class="mt-1 text-meta text-muted">{hint}</p>{/if}

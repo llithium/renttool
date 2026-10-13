@@ -12,6 +12,8 @@ export interface PlanningOptions {
   housing: HousingChoice;
   monthlyExpenses: number;
   monthlySavings: number;
+  monthlyBuffer?: number;
+  budgetMode?: 'personal' | 'gross';
 }
 
 export const DEFAULT_PLANNING_OPTIONS: Readonly<PlanningOptions> = {
@@ -28,13 +30,70 @@ export function normalizeMonthlyAmount(value: unknown): number | null {
 
 export function normalizePlanningOptions(value: unknown): PlanningOptions {
   const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const monthlyBuffer = normalizeMonthlyAmount(record.monthlyBuffer);
   return {
     housing:
       typeof record.housing === 'string' && Object.hasOwn(HOUSING_CHOICES, record.housing)
         ? (record.housing as HousingChoice)
         : '1br',
     monthlyExpenses: normalizeMonthlyAmount(record.monthlyExpenses) ?? 0,
-    monthlySavings: normalizeMonthlyAmount(record.monthlySavings) ?? 0
+    monthlySavings: normalizeMonthlyAmount(record.monthlySavings) ?? 0,
+    ...(monthlyBuffer != null && monthlyBuffer > 0 ? { monthlyBuffer } : {}),
+    ...(record.budgetMode === 'gross' ? { budgetMode: 'gross' as const } : {})
+  };
+}
+
+/** The personal ceiling reserves goals and a buffer without exceeding the gross benchmark. */
+export function rentCeiling(
+  budget: Budget,
+  options: PlanningOptions,
+  actualTakeHomeMonthly?: number | null
+): number {
+  if (options.budgetMode === 'gross') return budget.maxRent;
+  const takeHome = normalizeMonthlyAmount(actualTakeHomeMonthly) ?? budget.takeHomeMonthly;
+  return Math.min(
+    budget.maxRent,
+    Math.max(
+      0,
+      takeHome - options.monthlyExpenses - options.monthlySavings - (options.monthlyBuffer ?? 0)
+    )
+  );
+}
+
+export function optionsForExpenses(
+  options: PlanningOptions,
+  monthlyExpenses?: number
+): PlanningOptions {
+  return monthlyExpenses == null ? options : { ...options, monthlyExpenses };
+}
+
+export interface ApartmentCosts {
+  rent: number | null;
+  utilities: number | null;
+  parking: number | null;
+  fees: number | null;
+  deposit: number | null;
+  moving: number | null;
+}
+
+export function checkApartment(
+  budget: Budget,
+  options: PlanningOptions,
+  costs: ApartmentCosts,
+  actualTakeHomeMonthly?: number | null
+) {
+  const rent = normalizeMonthlyAmount(costs.rent);
+  if (rent == null) return null;
+  const amount = (value: number | null) => normalizeMonthlyAmount(value) ?? 0;
+  const monthly = rent + amount(costs.utilities) + amount(costs.parking) + amount(costs.fees);
+  const takeHome = normalizeMonthlyAmount(actualTakeHomeMonthly) ?? budget.takeHomeMonthly;
+  const available = takeHome - monthly - options.monthlyExpenses - options.monthlySavings;
+  return {
+    monthly,
+    available,
+    afterBuffer: available - (options.monthlyBuffer ?? 0),
+    upfront: monthly + amount(costs.deposit) + amount(costs.moving),
+    withinCeiling: monthly <= rentCeiling(budget, options, actualTakeHomeMonthly)
   };
 }
 

@@ -8,8 +8,15 @@
     city,
     budget,
     housing = '1br',
+    target = budget.maxRent,
     class: className = ''
-  }: { city: City; budget: Budget; housing?: HousingChoice; class?: string } = $props();
+  }: {
+    city: City;
+    budget: Budget;
+    housing?: HousingChoice;
+    target?: number;
+    class?: string;
+  } = $props();
 
   interface Bar {
     label: string;
@@ -36,7 +43,7 @@
       if (rent != null)
         out.push({ label: housingRentLabel(city, housing), value: rent, kind: 'rent' });
     }
-    out.push({ label: 'Your max (30% gross)', value: budget.maxRent, kind: 'budget' });
+    out.push({ label: 'Your rent ceiling', value: target, kind: 'budget' });
     return out;
   });
 
@@ -44,7 +51,7 @@
 
   function barTone(b: Bar): string {
     if (b.kind === 'budget') return 'bg-accent';
-    return b.value <= budget.maxRent ? 'bg-green' : 'bg-red';
+    return b.value <= target ? 'bg-green' : 'bg-red';
   }
 </script>
 

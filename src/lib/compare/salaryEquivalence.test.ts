@@ -139,3 +139,13 @@ describe('salary equivalence', () => {
     }
   });
 });
+
+it('accounts for each city’s expenses when matching spending room', () => {
+  const base = entry('Same, TX', 80000, 1000);
+  const view = analyzeSalaryEquivalence(
+    [base, { ...entry('Other, TX', 80000, 1000), monthlyExpenses: 2000 }],
+    null,
+    { housing: '1br', monthlyExpenses: 1000, monthlySavings: 500 }
+  );
+  expect(view.entries[1].requiredSalary).toBeGreaterThan(80000);
+});

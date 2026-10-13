@@ -14,11 +14,11 @@
   } = $props();
 
   let cities = $derived(presentation.comparisonCities);
-  let maxRent = $derived(presentation.rentTarget ?? 0);
 
   function cushion(c: City): number | null {
     const rent = housingRent(c, presentation.options.housing);
-    return rent != null ? maxRent - rent : null;
+    const target = presentation.rentTargetForCity(c);
+    return rent != null && target != null ? target - rent : null;
   }
 </script>
 
@@ -38,8 +38,9 @@
   </SectionHeading>
   <p class="-mt-1.5 mb-3.5 max-w-[64ch] text-sm/normal text-muted">
     {#if presentation.salary}
-      Fit measured against <strong class="font-semibold text-ink">{money(maxRent)}/mo</strong> — the same
-      30% budget applies to every city, since the rule uses gross income.
+      Fit uses your current salary and goals with each city’s estimated take-home pay; entered pay
+      applies to the active city only. Open the detailed comparison to use different salaries or
+      expenses.
     {/if}
   </p>
 

@@ -12,6 +12,8 @@
     salaries,
     housing,
     ontakehome,
+    defaultExpenses,
+    onexpenses,
     onremove
   }: {
     entry: ComparisonEntry;
@@ -19,6 +21,8 @@
     salaries: CompareSalaries;
     housing: HousingChoice;
     ontakehome: (value: number | null) => void;
+    defaultExpenses: number;
+    onexpenses: (value: number | null) => void;
     onremove: () => void;
   } = $props();
 
@@ -100,6 +104,18 @@
     />
   </details>
 
+  <details class="mt-3">
+    <summary class="min-h-11 cursor-pointer text-meta font-semibold text-muted"
+      >Expenses for this city{entry.monthlyExpenses != null ? ' · customized' : ''}</summary
+    >
+    <MonthlyAmountInput
+      id={`expenses-${entry.city.name.replace(/[^a-z0-9]+/gi, '-')}`}
+      label={`Monthly expenses in ${entry.city.name}`}
+      value={entry.monthlyExpenses ?? null}
+      onchange={onexpenses}
+      hint={`Leave blank to use the shared default ($${defaultExpenses.toLocaleString()}/mo). Enter 0 for no expenses.`}
+    />
+  </details>
   <div class="mt-8 grid grid-cols-2 gap-4 border-t border-line-strong pt-5">
     <div class="min-w-0">
       <span class="block text-meta text-muted">{housingShortLabel(housing)} rent</span>
@@ -108,7 +124,7 @@
       </strong>
     </div>
     <div class="min-w-0">
-      <span class="block text-meta text-muted">Rent budget</span>
+      <span class="block text-meta text-muted">Rent ceiling</span>
       {#key entry.rentBudget.amount}
         <strong class="motion-value mt-0.5 block text-data tabular-nums">
           {entry.rentBudget.value}

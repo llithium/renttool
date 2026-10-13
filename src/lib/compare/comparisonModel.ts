@@ -5,6 +5,7 @@ export interface ComparisonEntryInput {
   city: City;
   salary: number;
   actualTakeHomeMonthly?: number;
+  monthlyExpenses?: number;
 }
 
 /** City identity and navigation fields safe for comparison views to expose. */

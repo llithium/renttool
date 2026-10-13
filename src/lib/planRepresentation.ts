@@ -25,6 +25,7 @@ export interface PlanComparisonInput {
   readonly city: PlanCityInput;
   readonly salary?: number | null;
   readonly actualTakeHomeMonthly?: number;
+  readonly monthlyExpenses?: number;
 }
 
 export interface RentPlanRepresentationInput {
@@ -46,6 +47,7 @@ export interface RestoredComparisonEntry {
   readonly city: RestoredPlanCity;
   readonly salary: number;
   readonly actualTakeHomeMonthly?: number;
+  readonly monthlyExpenses?: number;
 }
 
 export interface RestoredRentPlan {
@@ -127,6 +129,9 @@ export function appendComparisonParameters(
     const actual = normalizeMonthlyAmount(input.actualTakeHomeMonthly);
     if (actual != null)
       search.append('compare-take-home', JSON.stringify({ name: city.name, monthly: actual }));
+    const expenses = normalizeMonthlyAmount(input.monthlyExpenses);
+    if (expenses != null)
+      search.append('compare-expenses', JSON.stringify({ name: city.name, monthly: expenses }));
     count += 1;
   }
 }
@@ -153,6 +158,8 @@ export function serializeRentPlan(input: RentPlanRepresentationInput): string {
   if (options.housing !== '1br') search.set('housing', options.housing);
   if (options.monthlyExpenses > 0) search.set('expenses', String(options.monthlyExpenses));
   if (options.monthlySavings > 0) search.set('savings', String(options.monthlySavings));
+  if (options.monthlyBuffer) search.set('buffer', String(options.monthlyBuffer));
+  if (options.budgetMode === 'gross') search.set('budget-mode', 'gross');
   const actual = normalizeMonthlyAmount(input.actualTakeHomeMonthly);
   if (salary != null && selected && actual != null) search.set('take-home', String(actual));
   return search.toString();
@@ -251,6 +258,19 @@ function comparisonSalaries(search: URLSearchParams): {
 /** Restore and validate the canonical or issue #9-compatible URL representation. */
 export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
   const salaries = comparisonSalaries(search);
+  const expenses = new Map<string, number>();
+  for (const raw of search.getAll('compare-expenses')) {
+    try {
+      const value: unknown = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const record = value as Record<string, unknown>;
+      const monthly = normalizeMonthlyAmount(record.monthly);
+      if (validName(record.name) && monthly != null)
+        expenses.set(cityIdentity(record.name), monthly);
+    } catch {
+      /* Ignore malformed optional inputs. */
+    }
+  }
   const takeHomes = new Map<string, number>();
   for (const raw of search.getAll('compare-take-home')) {
     try {
@@ -291,6 +311,7 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
         salaries.positional[entryIndex] ??
         parseSalary(search.get('salary')) ??
         DEFAULT_COMPARISON_SALARY,
+      ...(expenses.has(identity) ? { monthlyExpenses: expenses.get(identity)! } : {}),
       ...(takeHomes.has(identity) ? { actualTakeHomeMonthly: takeHomes.get(identity)! } : {})
     });
     entryIndex += 1;
@@ -302,12 +323,18 @@ export function restoreRentPlan(search: URLSearchParams): RestoredRentPlan {
     comparisons,
     hasComparisonState:
       search.has('compare') || search.has('compare-offlist') || search.has(COMPARISON_SALARY_PARAM),
-    ...(search.has('housing') || search.has('expenses') || search.has('savings')
+    ...(search.has('housing') ||
+    search.has('expenses') ||
+    search.has('savings') ||
+    search.has('buffer') ||
+    search.has('budget-mode')
       ? {
           options: normalizePlanningOptions({
             housing: search.get('housing'),
             monthlyExpenses: parseNumeric(search.get('expenses')),
-            monthlySavings: parseNumeric(search.get('savings'))
+            monthlySavings: parseNumeric(search.get('savings')),
+            monthlyBuffer: parseNumeric(search.get('buffer')),
+            budgetMode: search.get('budget-mode')
           })
         }
       : {}),
@@ -332,7 +359,14 @@ export function canonicalizeRentPlanSearch(search: URLSearchParams): string {
   const comparisons = restored.comparisons.flatMap((entry) => {
     const city = restoredCityInput(entry.city);
     return city
-      ? [{ city, salary: entry.salary, actualTakeHomeMonthly: entry.actualTakeHomeMonthly }]
+      ? [
+          {
+            city,
+            salary: entry.salary,
+            actualTakeHomeMonthly: entry.actualTakeHomeMonthly,
+            monthlyExpenses: entry.monthlyExpenses
+          }
+        ]
       : [];
   });
   return serializeRentPlan({

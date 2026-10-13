@@ -25,6 +25,27 @@ const cities = Array.from({ length: MAX_COMPARISON_ENTRIES + 1 }, (_, index) =>
 );
 
 describe('ComparisonSet', () => {
+  it('preserves expense overrides through salary edits, paychecks, enrichment and storage', () => {
+    const storage = createMemoryComparisonStorage();
+    const set = new ComparisonSet({ storage });
+    set.add(cities[0], 80000, 4000);
+    set.setMonthlyExpenses(cities[0].name, 0);
+    set.setSalary(cities[0].name, 90000);
+    set.setActualTakeHome(cities[0].name, 5000);
+    set.updateCity({ ...cities[0], r1: 2000 });
+    const restored = new ComparisonSet({ storage });
+    restored.restore({ resolveCity: () => null });
+    expect(restored.entries[0]).toMatchObject({
+      salary: 90000,
+      monthlyExpenses: 0,
+      actualTakeHomeMonthly: 5000,
+      city: { r1: 2000 }
+    });
+    expect(restored.setMonthlyExpenses(cities[0].name, -1)).toBe(false);
+    restored.setMonthlyExpenses(cities[0].name, null);
+    expect(restored.entries[0].monthlyExpenses).toBeUndefined();
+  });
+
   it('persists entered take-home independently and clears it when its salary changes', () => {
     const storage = createMemoryComparisonStorage();
     const set = new ComparisonSet({ storage });

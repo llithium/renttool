@@ -40,6 +40,33 @@ describe('rent-plan representation', () => {
     expect(invalid.options).toEqual({ housing: '1br', monthlyExpenses: 0, monthlySavings: 0 });
     expect(invalid.actualTakeHomeMonthly).toBeUndefined();
   });
+  it('round-trips buffer, budget mode, and named expense overrides including zero', () => {
+    const query = serializeRentPlan({
+      salary: 80000,
+      options: {
+        housing: '1br',
+        monthlyExpenses: 1000,
+        monthlySavings: 500,
+        monthlyBuffer: 300,
+        budgetMode: 'gross'
+      },
+      comparisons: [
+        {
+          city: { name: 'Austin, TX', source: 'apartment-list' },
+          salary: 80000,
+          monthlyExpenses: 0
+        }
+      ]
+    });
+    const restored = restoreRentPlan(new URLSearchParams(query));
+    expect(restored.options).toMatchObject({ monthlyBuffer: 300, budgetMode: 'gross' });
+    expect(restored.comparisons[0].monthlyExpenses).toBe(0);
+    expect(canonicalizeRentPlanSearch(new URLSearchParams(query))).toBe(query);
+    const invalid = new URLSearchParams(query);
+    invalid.append('compare-expenses', JSON.stringify({ name: 'Austin, TX', monthly: -1 }));
+    expect(restoreRentPlan(invalid).comparisons[0].monthlyExpenses).toBe(0);
+  });
+
   it('builds route paths without a dangling query and canonicalizes legacy ordering', () => {
     const href = rentPlanHref('/compare', {
       salary: 80_000,

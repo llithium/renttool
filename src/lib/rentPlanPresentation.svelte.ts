@@ -2,7 +2,7 @@ import { computeBudget } from '$lib/budget';
 import { RentPlanWorkspace, type ComparisonResult } from '$lib/appState.svelte';
 import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
 import type { Budget, City, CitySuggestion, NearbyPlace } from '$lib/types';
-import { computeSpendingRoom, type PlanningOptions } from '$lib/planning';
+import { computeSpendingRoom, rentCeiling, type PlanningOptions } from '$lib/planning';
 
 /**
  * Presentation seam for the primary rent-planning flow.
@@ -48,6 +48,10 @@ export class RentPlanPresentation {
 
   setComparisonActualTakeHome(name: string, value: number | null): boolean {
     return this.workspace.setComparisonActualTakeHome(name, value);
+  }
+
+  setComparisonExpenses(name: string, value: number | null): boolean {
+    return this.workspace.setComparisonExpenses(name, value);
   }
 
   get activeCity(): City | null {
@@ -99,7 +103,16 @@ export class RentPlanPresentation {
   }
 
   get rentTarget(): number | null {
-    return this.budget?.maxRent ?? null;
+    return this.budget ? rentCeiling(this.budget, this.options, this.actualTakeHomeMonthly) : null;
+  }
+
+  rentTargetForCity(city: City): number | null {
+    if (this.salary == null) return null;
+    return rentCeiling(
+      computeBudget(this.salary, city),
+      this.options,
+      city.name === this.selectedName ? this.actualTakeHomeMonthly : null
+    );
   }
 
   get mapFocusRequest(): number {
@@ -112,6 +125,10 @@ export class RentPlanPresentation {
 
   chooseCity(suggestion: CitySuggestion): Promise<string> {
     return this.workspace.chooseCity(suggestion);
+  }
+
+  exploreCities(): void {
+    this.workspace.clearActiveCity();
   }
 
   /** Select a known city without requesting a second map focus pass. */
@@ -172,8 +189,13 @@ export class RentPlanPresentation {
     return this.workspace.buildHref(pathname);
   }
 
-  buildShareUrl(origin: string): string {
-    return new URL(this.buildHref('/'), origin).href;
+  buildShareUrl(origin: string, scope: 'cities' | 'full' = 'cities', pathname = '/'): string {
+    const search = new URLSearchParams(this.buildSearch());
+    if (scope === 'cities') {
+      const publicFields = new Set(['city', 'lat', 'lng', 'compare', 'compare-offlist', 'housing']);
+      for (const key of [...search.keys()]) if (!publicFields.has(key)) search.delete(key);
+    }
+    return new URL(search.size ? `${pathname}?${search}` : pathname, origin).href;
   }
 
   hydrateFromSearch(search: URLSearchParams): boolean {

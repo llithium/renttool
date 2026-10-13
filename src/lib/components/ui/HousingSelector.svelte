@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from './Select.svelte';
   import { HOUSING_CHOICES, type HousingChoice } from '$lib/planning';
   let {
     value,
@@ -8,17 +9,16 @@
 </script>
 
 <div>
-  <label for={id} class="mb-2 block text-label text-muted">Housing setup</label>
-  <select
+  <Select
     {id}
+    label="Housing setup"
     {value}
-    onchange={(event) => onchange(event.currentTarget.value as HousingChoice)}
-    class="min-h-11 w-full rounded-lg border border-line-strong bg-card px-3 py-2 text-sm text-ink"
-  >
-    {#each Object.entries(HOUSING_CHOICES) as [choice, label] (choice)}
-      <option value={choice}>{label}</option>
-    {/each}
-  </select>
+    {onchange}
+    options={(Object.keys(HOUSING_CHOICES) as HousingChoice[]).map((value) => ({
+      value,
+      label: HOUSING_CHOICES[value]
+    }))}
+  />
   {#if value === 'shared-2br'}
     <p class="mt-2 text-meta text-muted">Two people split the rent equally.</p>
   {/if}

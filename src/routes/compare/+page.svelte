@@ -15,6 +15,7 @@
   import CompareHighlights from '$lib/components/compare/CompareHighlights.svelte';
   import SalaryEquivalence from '$lib/components/compare/SalaryEquivalence.svelte';
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
+  import SharePlan from '$lib/components/ui/SharePlan.svelte';
   import HousingSelector from '$lib/components/ui/HousingSelector.svelte';
   import PersonalCosts from '$lib/components/ui/PersonalCosts.svelte';
 
@@ -136,6 +137,7 @@
           <p aria-live="polite" class="min-h-5 text-meta text-muted">
             {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
           </p>
+          <SharePlan presentation={plan} pathname="/compare" />
           {#if analysis.entries.length}
             <button
               type="button"
@@ -165,6 +167,14 @@
 
     <div class="flex min-w-0 flex-col">
       {#if analysis.entries.length}
+        {#if analysis.entries.length > 1}
+          <CompareHighlights {analysis} {hrefForCity} />
+          <SalaryEquivalence
+            analysis={salaryEquivalence}
+            onreferencechange={(name) => (equivalenceReference = name)}
+          />
+        {/if}
+
         <section
           class="mt-7 grid grid-flow-dense grid-cols-1 gap-5 md:grid-cols-2"
           aria-label="Comparison entries"
@@ -175,6 +185,8 @@
               href={hrefForCity(entry.city)}
               {salaries}
               housing={plan.options.housing}
+              defaultExpenses={plan.options.monthlyExpenses}
+              onexpenses={(value) => plan.setComparisonExpenses(entry.city.name, value)}
               ontakehome={(value) => plan.setComparisonActualTakeHome(entry.city.name, value)}
               onremove={() => {
                 plan.removeComparison(entry.city.name);
@@ -188,14 +200,6 @@
           <p class="mt-5 border-t border-line pt-4 text-sm text-muted">
             Add a second city above to compare spending room and equivalent salaries.
           </p>
-        {/if}
-
-        {#if analysis.entries.length > 1}
-          <CompareHighlights {analysis} {hrefForCity} />
-          <SalaryEquivalence
-            analysis={salaryEquivalence}
-            onreferencechange={(name) => (equivalenceReference = name)}
-          />
         {/if}
 
         <section class="mt-8 border-t border-line pt-6">

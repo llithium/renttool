@@ -99,7 +99,7 @@
     </SectionHeading>
     <p class="mb-3.5 max-w-[66ch] text-sm/relaxed text-muted">
       Keep {city.city} as your active plan while you add a nearby place to compare. Distances are straight-line,
-      within roughly 25 miles.
+      within roughly 25 miles. Other cities use estimated take-home pay for your current salary and goals.
     </p>
     <p aria-live="polite" class="mb-3 text-sm text-muted">{status}</p>
 
@@ -116,6 +116,7 @@
           {@const compared = presentation.isComparing(p.label)}
           {@const known = presentation.cityByName(p.label)}
           {@const rent = known ? housingRent(known, presentation.options.housing) : null}
+          {@const target = known ? presentation.rentTargetForCity(known) : null}
           {@const activeRent = housingRent(city, presentation.options.housing)}
           {@const difference =
             rent != null &&
@@ -141,11 +142,10 @@
                   )}
                 </p>
                 <p class="mt-1 text-meta text-muted">
-                  {#if presentation.rentTarget != null}<span
-                      class={rent <= presentation.rentTarget ? 'text-green' : 'text-red'}
-                      >{rent <= presentation.rentTarget
-                        ? 'Within your rent target'
-                        : 'Above your rent target'}</span
+                  {#if target != null}<span class={rent <= target ? 'text-green' : 'text-red'}
+                      >{rent <= target ? 'Within your rent target' : 'Above your rent target'} ({money(
+                        target
+                      )}/mo)</span
                     > ·
                   {/if}
                   {#if difference != null}{difference === 0

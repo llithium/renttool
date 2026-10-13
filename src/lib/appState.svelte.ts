@@ -343,6 +343,13 @@ export class RentPlanWorkspace {
     return this.commitSelection(name);
   }
 
+  clearActiveCity(): void {
+    this.cancelActiveOperation();
+    this.selectedNameValue = null;
+    this.actualTakeHomeValue = null;
+    this.persistImmediately();
+  }
+
   private commitSelection(name: string): boolean {
     if (!this.cityByName(name)) return false;
     if (this.actualTakeHomeValue?.cityName !== name) this.actualTakeHomeValue = null;
@@ -497,6 +504,10 @@ export class RentPlanWorkspace {
 
   setComparisonActualTakeHome(name: string, value: number | null): boolean {
     return this.comparisonSet.setActualTakeHome(name, value);
+  }
+
+  setComparisonExpenses(name: string, value: number | null): boolean {
+    return this.comparisonSet.setMonthlyExpenses(name, value);
   }
 
   isComparing(name: string): boolean {
@@ -760,7 +771,8 @@ export class RentPlanWorkspace {
       entries.push({
         city,
         salary: restored.salary,
-        actualTakeHomeMonthly: restored.actualTakeHomeMonthly
+        actualTakeHomeMonthly: restored.actualTakeHomeMonthly,
+        monthlyExpenses: restored.monthlyExpenses
       });
       if (suggestion && city.source !== 'apartment-list' && city.r1 == null) {
         scheduleLookup(suggestion, false);

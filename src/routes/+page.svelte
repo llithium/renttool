@@ -18,6 +18,7 @@
   import RentMap from '$lib/components/city/RentMap.svelte';
   import SourcesFooter from '$lib/components/city/SourcesFooter.svelte';
   import LandingContent from '$lib/components/landing/LandingContent.svelte';
+  import ApartmentCheck from '$lib/components/city/ApartmentCheck.svelte';
   import AppHeader from '$lib/components/ui/AppHeader.svelte';
 
   const urlSync = createUrlSync(plan);
@@ -106,8 +107,7 @@
           }}
         />
         <footer class="mt-12 border-t border-line pt-6 text-sm text-muted">
-          Rent targets use 30% of gross income. Explore local estimates, taxes, and nearby options
-          to plan your move.
+          Rent ceilings reserve your expenses, savings, and buffer, capped at 30% of gross income.
         </footer>
       {/if}
 
@@ -131,7 +131,7 @@
           {#if budget}
             <a
               class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-              href="#rent-decision">Rent decision</a
+              href="#apartment-check">Apartment check</a
             >
           {/if}
           <a
@@ -153,11 +153,14 @@
             />
             <SearchLinks
               city={selected}
-              maxRent={budget.maxRent}
+              maxRent={plan.rentTarget ?? budget.maxRent}
               housing={plan.options.housing}
               class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
             />
           </section>
+          {#key `${selected.name}:${plan.options.housing}`}
+            <ApartmentCheck presentation={plan} />
+          {/key}
         {/if}
         <section
           id="nearby-options"
@@ -198,7 +201,12 @@
           <div
             class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8"
           >
-            <RentTrendChart city={selected} {budget} housing={plan.options.housing} />
+            <RentTrendChart
+              city={selected}
+              {budget}
+              housing={plan.options.housing}
+              target={plan.rentTarget ?? budget.maxRent}
+            />
             <TaxBreakdownChart
               city={selected}
               {budget}

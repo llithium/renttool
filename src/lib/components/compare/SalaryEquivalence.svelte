@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from '$lib/components/ui/Select.svelte';
   import type { SalaryEquivalenceView } from '$lib/compare/salaryEquivalence';
 
   let {
@@ -26,21 +27,17 @@
           : ''}.
       </p>
     </div>
-    <div class="flex w-full max-w-sm flex-col gap-2 md:items-end">
-      <label for="salary-equivalence-reference" class="text-label text-muted">
-        Match spending room from
-      </label>
-      <select
+    <div class="w-full max-w-sm">
+      <Select
         id="salary-equivalence-reference"
-        aria-label="Match spending room from"
+        label="Match spending room from"
         value={analysis.referenceName ?? ''}
-        onchange={(event) => onreferencechange((event.currentTarget as HTMLSelectElement).value)}
-        class="w-full cursor-pointer border border-line-strong bg-card px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-      >
-        {#each analysis.entries as entry (entry.city.name)}
-          <option value={entry.city.name}>{entry.city.name}</option>
-        {/each}
-      </select>
+        options={analysis.entries.map((entry) => ({
+          value: entry.city.name,
+          label: entry.city.name
+        }))}
+        onchange={onreferencechange}
+      />
     </div>
   </div>
 

@@ -1,25 +1,12 @@
 <script lang="ts">
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
-  import { onDestroy } from 'svelte';
+  import SharePlan from '$lib/components/ui/SharePlan.svelte';
 
   let { presentation, cityName }: { presentation: RentPlanPresentation; cityName: string } =
     $props();
 
   let comparing = $derived(presentation.isComparing(cityName));
   let compareFull = $derived(!comparing && presentation.comparisonFull);
-
-  let shareLabel = $state('Copy link');
-  let shareTimer: ReturnType<typeof setTimeout> | undefined;
-
-  function resetShareLabel() {
-    shareLabel = 'Copy link';
-    shareTimer = undefined;
-  }
-
-  function scheduleShareReset() {
-    clearTimeout(shareTimer);
-    shareTimer = setTimeout(resetShareLabel, 2600);
-  }
 
   async function onCompare() {
     if (presentation.isComparing(cityName)) {
@@ -28,23 +15,6 @@
     }
     await presentation.addComparison(cityName);
   }
-
-  async function onShare() {
-    if (!navigator.clipboard?.writeText) {
-      shareLabel = 'Copy unavailable';
-      scheduleShareReset();
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(presentation.buildShareUrl(location.origin));
-      shareLabel = 'Copied link';
-    } catch {
-      shareLabel = 'Copy unavailable';
-    }
-    scheduleShareReset();
-  }
-
-  onDestroy(() => clearTimeout(shareTimer));
 </script>
 
 <!-- Secondary actions live after the answer so they cannot compete with the plan. -->
@@ -78,13 +48,14 @@
   </button>
   <button
     type="button"
-    aria-live="polite"
-    title="Copy a shareable link"
-    onclick={onShare}
-    class="min-h-11 cursor-pointer rounded-md px-1 py-2 text-sm font-medium text-muted transition-colors duration-200 not-disabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-55"
+    onclick={() => {
+      presentation.exploreCities();
+      document.getElementById('main-content')?.scrollIntoView({ behavior: 'instant' });
+    }}
+    class="min-h-11 cursor-pointer rounded-md px-1 py-2 text-sm font-semibold text-accent"
+    >Explore other cities</button
   >
-    {shareLabel}
-  </button>
+  <SharePlan {presentation} />
   {#if presentation.comparisonNames.length}
     <a
       href="#comparison-section"

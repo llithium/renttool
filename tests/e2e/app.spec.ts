@@ -1,3 +1,4 @@
+import { chooseSelect } from './select';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import rentData from '../../src/lib/data/apartment-list-rents.json' with { type: 'json' };
@@ -24,16 +25,12 @@ function markerName(city: string, annualSalary: number): string {
 }
 
 async function selectCity(page: Page, query: string, label: string) {
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill(query);
-  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const option = page
-    .getByRole('option')
-    .filter({ hasText: new RegExp(`^${escapedLabel}(?:\\s|$)`) });
+  const option = page.getByRole('listbox').getByRole('option', { name: label, exact: true });
   await expect(option).toHaveCount(1);
   await expect(option).toBeVisible();
-  // CitySearch commits on mousedown; dispatching the same event avoids racing
-  // the list's entrance animation while the debounced response is settling.
+  // CitySearch commits on mousedown, keeping focus in the input until selection.
   await option.dispatchEvent('mousedown');
 }
 
@@ -198,9 +195,9 @@ test('keeps the latest salary when city navigation pushes history', async ({ pag
   await page.goto('/?salary=80000&city=Tampa%2C+FL');
   await waitForHydration(page);
 
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('Austin');
-  const option = page.getByRole('option', { name: 'Austin, TX' });
+  const option = page.getByRole('listbox').getByRole('option', { name: 'Austin, TX' });
   await expect(option).toBeVisible();
   await page.getByLabel('Annual salary', { exact: true }).fill('90000');
   await option.dispatchEvent('mousedown');
@@ -209,7 +206,7 @@ test('keeps the latest salary when city navigation pushes history', async ({ pag
 });
 
 test('makes the landing controls directly accessible with unclipped focus', async ({ page }) => {
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await expect(city).toBeInViewport();
   await city.focus();
 
@@ -242,10 +239,12 @@ test('makes the landing controls directly accessible with unclipped focus', asyn
 });
 
 test('supports keyboard city selection and salary results', async ({ page }) => {
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.click();
   await city.pressSequentially('New York', { delay: 20 });
-  await expect(page.getByRole('option', { name: 'New York, NY' })).toBeVisible();
+  await expect(
+    page.getByRole('listbox').getByRole('option', { name: 'New York, NY' })
+  ).toBeVisible();
   await expect(city).toHaveAttribute('aria-activedescendant', 'city-option-0');
   await city.press('Enter');
   await page.getByLabel('Annual salary', { exact: true }).fill('100000');
@@ -284,9 +283,11 @@ test('shows bundled city suggestions before a slow API response', async ({ page 
     });
   });
 
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('Gastonia');
-  await expect(page.getByRole('option', { name: 'Gastonia, NC' })).toBeVisible({ timeout: 700 });
+  await expect(page.getByRole('listbox').getByRole('option', { name: 'Gastonia, NC' })).toBeVisible(
+    { timeout: 700 }
+  );
 });
 
 test('keeps bundled city suggestions when autocomplete is throttled', async ({ page }) => {
@@ -300,15 +301,17 @@ test('keeps bundled city suggestions when autocomplete is throttled', async ({ p
     })
   );
 
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('Gastonia');
-  await expect(page.getByRole('option', { name: 'Gastonia, NC' })).toBeVisible({ timeout: 700 });
+  await expect(page.getByRole('listbox').getByRole('option', { name: 'Gastonia, NC' })).toBeVisible(
+    { timeout: 700 }
+  );
 });
 
 test('keeps the accepted city explicit while a different city is being typed', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('Austin');
   await expect(
     page.getByText(
@@ -330,10 +333,10 @@ test('credits the bundled Apartment List estimates', async ({ page }) => {
 });
 
 test('has no serious accessibility violations in populated state', async ({ page }) => {
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.click();
   await city.pressSequentially('Tampa', { delay: 20 });
-  await expect(page.getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
+  await expect(page.getByRole('listbox').getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
   await city.press('Enter');
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   await expect(page.getByRole('heading', { name: 'Tampa, FL' })).toBeVisible();
@@ -368,10 +371,10 @@ test('keeps tax breakdown labels readable in both themes', async ({ page }) => {
 
 test('does not overflow a mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.click();
   await city.pressSequentially('Tampa', { delay: 20 });
-  await expect(page.getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
+  await expect(page.getByRole('listbox').getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
   await city.press('Enter');
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   const widths = await page.evaluate(() => ({
@@ -519,15 +522,15 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
     equivalence.getByRole('heading', { name: 'Equivalent salary by city' })
   ).toBeVisible();
   const reference = equivalence.getByLabel('Match spending room from', { exact: true });
-  await expect(reference).toHaveValue('Tampa, FL');
+  await expect(reference).toHaveAttribute('data-value', 'Tampa, FL');
   await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
   const austinArticle = equivalence.locator('article').filter({ hasText: 'Austin, TX' });
   const austinRequiredSalary = austinArticle.locator('dd').nth(1);
   const austinRequiredBefore = await austinRequiredSalary.textContent();
   const targetBefore = await equivalence.getByText(/Target spending room:/).textContent();
 
-  await reference.selectOption({ label: 'Austin, TX' });
-  await expect(reference).toHaveValue('Austin, TX');
+  await chooseSelect(reference, 'Austin, TX');
+  await expect(reference).toHaveAttribute('data-value', 'Austin, TX');
   await expect(equivalence.locator('article').filter({ hasText: 'Austin, TX' })).toContainText(
     'Reference'
   );
@@ -537,7 +540,7 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
     .not.toBe(targetBefore);
 
   await page.getByRole('button', { name: 'Remove Austin, TX' }).click();
-  await expect(reference).toHaveValue('Tampa, FL');
+  await expect(reference).toHaveAttribute('data-value', 'Tampa, FL');
   await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
   await expect(equivalence.locator('article')).toHaveCount(2);
 
@@ -754,11 +757,13 @@ test('retains actual map marker elements when salary changes', async ({ page }) 
 
 test('explains an empty city search and allows a new search', async ({ page }) => {
   await page.route('**/api/city-suggest?*', (route) => route.fulfill({ json: [] }));
-  const city = page.getByRole('combobox', { name: 'City' });
+  const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('zzzzzzzz');
   await expect(page.getByRole('status')).toContainText('No matching cities');
   await city.fill('Tampa');
-  await expect(page.getByRole('option').filter({ hasText: 'Tampa, FL' })).toBeVisible();
+  await expect(
+    page.getByRole('listbox').getByRole('option').filter({ hasText: 'Tampa, FL' })
+  ).toBeVisible();
   await expect(page.getByText('No matching cities')).toHaveCount(0);
 });
 
@@ -772,7 +777,7 @@ test('keeps comparison controls and tables usable on narrow screens', async ({ p
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width
     );
-    const city = page.getByRole('combobox', { name: 'City' });
+    const city = page.getByRole('combobox', { name: 'City', exact: true });
     await city.scrollIntoViewIfNeeded();
     await expect(city).toBeInViewport();
   }
@@ -811,7 +816,7 @@ for (const width of [686, 1440]) {
     await page.mouse.up();
     expect(Number(await slider.inputValue())).toBeGreaterThan(intermediate);
     expect((await slider.boundingBox())!.y).toBeCloseTo(bounds.y, 0);
-    await expect(page.getByRole('heading', { name: 'Rent budget', exact: true })).toBeVisible();
+    await expect(page.getByTestId('plan-summary')).toBeVisible();
     await original!.dispose();
   });
 }
@@ -846,7 +851,7 @@ test('section shortcuts preserve the plan and return keyboard users to editing',
   expect(nearbyBounds.y).toBeGreaterThanOrEqual(navBounds.y + navBounds.height);
   await navigation.getByRole('link', { name: 'Edit plan' }).click();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('combobox', { name: 'City' })).toBeFocused();
+  await expect(page.getByRole('combobox', { name: 'City', exact: true })).toBeFocused();
   await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
   expect(new URL(page.url()).searchParams.get('city')).toBe('Tampa, FL');
 });
@@ -867,7 +872,7 @@ test('explores a gallery city before salary entry and retains the comparison set
   await expect(
     page.getByRole('button', { name: markerName('Chicago, IL', 85000), exact: true })
   ).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'Rent budget', exact: true })).toBeVisible();
+  await expect(page.getByTestId('plan-summary')).toBeVisible();
 });
 
 test('keeps the affordability verdict with the salary controls', async ({ page }) => {
@@ -886,12 +891,12 @@ test('shares housing and personal costs across the plan, map, searches, and comp
   const chicago = (rentData.cities as Record<string, { r1: number; r2: number }>)['Chicago, IL'];
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
   await waitForHydration(page);
-  await page.getByLabel('Housing setup', { exact: true }).selectOption('shared-2br');
+  await chooseSelect(page.getByLabel('Housing setup', { exact: true }), 'shared-2br');
   await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
   await page.getByLabel('Actual monthly take-home', { exact: true }).fill('4200');
   await page.getByLabel('Recurring monthly expenses').fill('1200');
   await page.getByLabel('Monthly savings target').fill('500');
-  await expect(page.getByTestId('spending-room')).toContainText(
+  await expect(page.getByTestId('plan-summary')).toContainText(
     `${dollars(Math.round(4200 - chicago.r2 / 2 - 1700))}/mo`
   );
   await expect(
@@ -915,8 +920,11 @@ test('shares housing and personal costs across the plan, map, searches, and comp
   await expect.poll(() => new URL(page.url()).searchParams.get('take-home')).toBe('4200');
   await page.reload();
   await waitForHydration(page);
-  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveValue('shared-2br');
-  await expect(page.getByTestId('spending-room')).toContainText(
+  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveAttribute(
+    'data-value',
+    'shared-2br'
+  );
+  await expect(page.getByTestId('plan-summary')).toContainText(
     `${dollars(Math.round(4200 - chicago.r2 / 2 - 1700))}/mo`
   );
   await page
@@ -924,13 +932,19 @@ test('shares housing and personal costs across the plan, map, searches, and comp
     .getByRole('link', { name: /^Compare/ })
     .click();
   await waitForHydration(page);
-  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveValue('shared-2br');
+  await expect(page.getByLabel('Housing setup', { exact: true })).toHaveAttribute(
+    'data-value',
+    'shared-2br'
+  );
   const citySearch = page.getByRole('combobox', { name: 'City', exact: true });
+  await expect(
+    page.getByRole('heading', { name: 'Compare cities and salaries', exact: true })
+  ).toBeVisible();
   await citySearch.fill('Seattle');
   const seattle = (rentData.cities as Record<string, { r2: number }>)['Seattle, WA'];
-  await expect(page.getByRole('option').filter({ hasText: 'Seattle, WA' })).toContainText(
-    `${dollars(Math.round(seattle.r2 / 2))}/mo`
-  );
+  await expect(
+    page.getByRole('listbox').getByRole('option').filter({ hasText: 'Seattle, WA' })
+  ).toContainText(`${dollars(Math.round(seattle.r2 / 2))}/mo`);
   await citySearch.press('Escape');
   const card = page.getByTestId('scenario').filter({ hasText: 'Chicago, IL' });
   await expect(card).toContainText('Entered take-home pay');
@@ -946,8 +960,8 @@ test('filters discovered cities by salary, state, and population and adds a comp
 }) => {
   await page.getByLabel('Annual salary', { exact: true }).fill('60000');
   const gallery = page.getByRole('region', { name: 'Cities within your rent target' });
-  await gallery.getByLabel('State', { exact: true }).selectOption('TX');
-  await gallery.getByLabel('Population').selectOption('500k+');
+  await chooseSelect(gallery.getByLabel('State', { exact: true }), 'TX');
+  await chooseSelect(gallery.getByLabel('Population'), '500k+');
   const expected = Object.entries(rentData.cities).filter(
     ([name, rent]) =>
       name.endsWith(', TX') &&
@@ -958,7 +972,7 @@ test('filters discovered cities by salary, state, and population and adds a comp
   await expect(gallery.getByRole('link', { name: /^Explore / })).toHaveCount(expected.length);
   await gallery.getByRole('button', { name: 'Add to comparison', exact: true }).first().click();
   await expect.poll(() => new URL(page.url()).searchParams.getAll('compare').length).toBe(1);
-  await gallery.getByLabel('State', { exact: true }).selectOption('AK');
+  await chooseSelect(gallery.getByLabel('State', { exact: true }), 'AK');
   await expect(
     gallery.getByText('No cities match these filters and rent target.', { exact: false })
   ).toBeVisible();

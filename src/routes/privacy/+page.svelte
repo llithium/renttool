@@ -15,6 +15,13 @@
       browser and reflected in the page address so the plan can be restored or shared.
     </p>
     <p>
+      Share plan defaults to a cities-only link, excluding financial details. Share full plan
+      includes salary, take-home pay, expenses, savings, buffer, and city expense overrides. Copying
+      the page address directly also includes the financial details shown there. Apartment-check
+      inputs are temporary and are excluded from shared links. Discovery filters are saved for this
+      browser tab’s session.
+    </p>
+    <p>
       Requests for city and location data may include the city name or coordinates needed to return
       a result. Rent Tool does not sell personal information.
     </p>

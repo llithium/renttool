@@ -13,8 +13,9 @@
 
 <aside class="text-sm/relaxed text-muted {className}">
   <strong class="font-semibold text-ink">Planning estimate.</strong>
-  Your target uses 30% of gross pay and estimated 2026 taxes for a single filer taking the standard deduction.
-  The rent figure ({rentLabel}) is market context, not a lease quote.
+  Personal ceilings account for expenses, savings, and a buffer, capped at 30% of gross pay. Modeled take-home
+  uses estimated 2026 taxes for a single filer taking the standard deduction. The rent figure ({rentLabel})
+  is market context, not a lease quote.
   <a
     class="font-semibold whitespace-nowrap text-accent underline underline-offset-2 hover:text-accent-deep"
     href="#sources">See methods and sources</a

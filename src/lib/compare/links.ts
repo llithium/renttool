@@ -6,7 +6,12 @@ type NavigationCity = Pick<ComparisonCity, 'name' | 'source' | 'lat' | 'lng'>;
 
 interface RentPlanLinkInput {
   salary: number | null;
-  comparisons: readonly { city: NavigationCity; salary: number; actualTakeHomeMonthly?: number }[];
+  comparisons: readonly {
+    city: NavigationCity;
+    salary: number;
+    actualTakeHomeMonthly?: number;
+    monthlyExpenses?: number;
+  }[];
   options?: PlanningOptions;
   selectedName?: string | null;
   actualTakeHomeMonthly?: number | null;

@@ -4,6 +4,7 @@ import { MAX_SALARY } from '$lib/salary';
 import type { City } from '$lib/types';
 import {
   computeSpendingRoom,
+  optionsForExpenses,
   DEFAULT_PLANNING_OPTIONS,
   housingRent,
   housingShortLabel,
@@ -97,7 +98,7 @@ export function analyzeSalaryEquivalence(
           computeSpendingRoom(
             computeBudget(referenceSalary, reference.city),
             reference.city,
-            options,
+            optionsForExpenses(options, reference.monthlyExpenses),
             reference.actualTakeHomeMonthly
           ).available
         )
@@ -114,7 +115,9 @@ export function analyzeSalaryEquivalence(
 
   return {
     housingLabel: housingShortLabel(options.housing),
-    hasPersonalCosts: options.monthlyExpenses + options.monthlySavings > 0,
+    hasPersonalCosts: inputs.some(
+      (input) => (input.monthlyExpenses ?? options.monthlyExpenses) + options.monthlySavings > 0
+    ),
     usesActualReference: reference?.actualTakeHomeMonthly != null,
     referenceName,
     targetMonthly,
@@ -126,7 +129,11 @@ export function analyzeSalaryEquivalence(
           ? null
           : isReference && reference.actualTakeHomeMonthly == null
             ? input.salary
-            : minimumSalaryForTarget(targetMonthly as number, input.city, options);
+            : minimumSalaryForTarget(
+                targetMonthly as number,
+                input.city,
+                optionsForExpenses(options, input.monthlyExpenses)
+              );
       const unavailableReason =
         baseReason ??
         (housingRent(input.city, options.housing) == null

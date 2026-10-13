@@ -1,5 +1,9 @@
 import { fetchSuggestions as defaultFetchSuggestions } from '$lib/api';
-import { SEED_CITIES } from '$lib/data/cities';
+import {
+  localCitySuggestions,
+  mergeCitySuggestions,
+  suggestionIdentity
+} from './citySearchMatches';
 import type { CitySuggestion } from '$lib/types';
 
 const MIN_QUERY_LENGTH = 2;
@@ -52,19 +56,6 @@ export interface CitySearchDiscovery {
   dispose(): void;
 }
 
-function seedMatches(query: string): CitySuggestion[] {
-  const term = query.trim().toLowerCase();
-  return SEED_CITIES.filter((city) => city.name.toLowerCase().includes(term))
-    .slice(0, MAX_SUGGESTIONS)
-    .map((city) => ({
-      label: city.name,
-      city: city.city,
-      state: city.state,
-      lat: city.lat,
-      lng: city.lng
-    }));
-}
-
 function isAbortError(cause: unknown): boolean {
   return cause instanceof DOMException && cause.name === 'AbortError';
 }
@@ -81,7 +72,7 @@ export function createCitySearchDiscovery(
   options: CitySearchDiscoveryOptions = {}
 ): CitySearchDiscovery {
   const fetchSuggestions = options.fetchSuggestions ?? defaultFetchSuggestions;
-  const localMatches = options.localMatches ?? seedMatches;
+  const localMatches = options.localMatches ?? localCitySuggestions;
   const scheduler = options.scheduler ?? browserScheduler;
   const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const blurDelayMs = options.blurDelayMs ?? DEFAULT_BLUR_DELAY_MS;
@@ -142,7 +133,7 @@ export function createCitySearchDiscovery(
     try {
       const remote = await fetchSuggestions(query, requestController.signal);
       if (!isCurrent(version)) return;
-      nextSuggestions = remote.length ? remote : matchesFor(query);
+      nextSuggestions = mergeCitySuggestions(query, matchesFor(query), remote);
     } catch (cause) {
       if (!isCurrent(version)) return;
       // An abort normally belongs to a newer request and is therefore stale.
@@ -152,11 +143,29 @@ export function createCitySearchDiscovery(
     } finally {
       if (controller === requestController) controller = undefined;
       if (isCurrent(version)) {
-        const suggestions = nextSuggestions ?? currentState.suggestions;
+        const active = currentState.suggestions[currentState.activeIndex];
+        const suggestions = [...(nextSuggestions ?? currentState.suggestions)].slice(
+          0,
+          MAX_SUGGESTIONS
+        );
+        // A refinement must not change the place Enter will select, even at the result limit.
+        if (
+          active &&
+          !suggestions.some(
+            (suggestion) => suggestionIdentity(suggestion) === suggestionIdentity(active)
+          )
+        ) {
+          suggestions.splice(MAX_SUGGESTIONS - 1, 1, active);
+        }
+        const retained = active
+          ? suggestions.findIndex(
+              (suggestion) => suggestionIdentity(suggestion) === suggestionIdentity(active)
+            )
+          : -1;
         update({
           suggestions,
           loading: false,
-          activeIndex: suggestions.length ? 0 : -1
+          activeIndex: retained >= 0 ? retained : suggestions.length ? 0 : -1
         });
       }
     }
@@ -173,7 +182,7 @@ export function createCitySearchDiscovery(
 
   function startImmediateRemote() {
     const query = currentState.query.trim();
-    if (query.length < MIN_QUERY_LENGTH || currentState.loading) return;
+    if (query.length < MIN_QUERY_LENGTH || controller) return;
     clearDebounce();
     startRemote(query, requestVersion);
   }
@@ -281,7 +290,7 @@ export function createCitySearchDiscovery(
         query,
         suggestions,
         open: true,
-        loading: false,
+        loading: true,
         activeIndex: suggestions.length ? 0 : -1
       });
       const version = requestVersion;
@@ -294,7 +303,9 @@ export function createCitySearchDiscovery(
     focus() {
       if (disposed) return;
       clearBlur();
-      update({ open: currentState.suggestions.length > 0 });
+      if (!currentState.suggestions.length && currentState.query.trim().length >= MIN_QUERY_LENGTH)
+        discovery.input(currentState.query);
+      else update({ open: currentState.suggestions.length > 0 });
     },
 
     blur() {

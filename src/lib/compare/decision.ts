@@ -4,6 +4,8 @@ import type { Budget, City } from '$lib/types';
 import {
   comparisonQualification,
   computeSpendingRoom,
+  rentCeiling,
+  optionsForExpenses,
   DEFAULT_PLANNING_OPTIONS,
   housingRentLabel,
   housingShortLabel,
@@ -49,6 +51,7 @@ export interface ComparisonEntry {
   city: ComparisonCity;
   salary: number;
   actualTakeHomeMonthly?: number;
+  monthlyExpenses?: number;
   rent: ComparisonRent;
   rentProvenance: string;
   taxContext: string;
@@ -119,6 +122,7 @@ interface ComparisonEntryBase {
   budget: Budget;
   options: PlanningOptions;
   actualTakeHomeMonthly?: number;
+  monthlyExpenses?: number;
   rentAmount: number | null;
   takeHomeMonthly: number;
   rentGap: number | null;
@@ -181,7 +185,17 @@ const METRIC_DEFINITIONS = {
     worstLabel: 'Highest'
   },
   budget: {
-    label: '30% rent budget',
+    label: 'Rent ceiling',
+    direction: 'high',
+    group: 'affordability',
+    read: (entry) =>
+      finiteOrNull(rentCeiling(entry.budget, entry.options, entry.actualTakeHomeMonthly)),
+    format: monthlyMoney,
+    bestLabel: 'Highest',
+    worstLabel: 'Lowest'
+  },
+  grossBudget: {
+    label: '30% gross-income benchmark',
     direction: 'high',
     group: 'affordability',
     read: (entry) => finiteOrNull(entry.budget.maxRent),
@@ -357,11 +371,14 @@ function viewEntry(
   base: ComparisonEntryBase,
   entries: readonly ComparisonEntryBase[]
 ): ComparisonEntry {
-  const rentBudget = finiteOrNull(base.budget.maxRent);
+  const rentBudget = finiteOrNull(
+    rentCeiling(base.budget, base.options, base.actualTakeHomeMonthly)
+  );
   return {
     city: toComparisonCity(base.city),
     salary: base.salary,
     actualTakeHomeMonthly: base.actualTakeHomeMonthly,
+    monthlyExpenses: base.monthlyExpenses,
     rent: comparisonRent(base),
     rentProvenance: rentProvenance(base.city),
     taxContext: base.city.tax,
@@ -414,7 +431,12 @@ function buildBrief(
 ): DecisionBrief {
   const housing = housingShortLabel(options.housing);
   const definition = { ...CRITERIA[key], title: CRITERIA[key].title.replace('1BR', housing), key };
-  if (key === 'afterRent' && options.monthlyExpenses + options.monthlySavings > 0)
+  if (
+    key === 'afterRent' &&
+    entries.some(
+      (entry) => entry.base.options.monthlyExpenses + entry.base.options.monthlySavings > 0
+    )
+  )
     definition.title = 'Most room after rent, expenses & savings';
   if (key === 'takeHome' && entries.some((entry) => entry.base.actualTakeHomeMonthly != null))
     definition.title = 'Highest take-home pay';
@@ -445,7 +467,9 @@ function buildBrief(
     status: leaders.length > 1 ? 'tie' : 'decided',
     detail: leaderDetail(definition, metric, leaders).replace(
       'a typical 1BR',
-      options.monthlyExpenses + options.monthlySavings > 0 && key === 'afterRent'
+      entries.some(
+        (entry) => entry.base.options.monthlyExpenses + entry.base.options.monthlySavings > 0
+      ) && key === 'afterRent'
         ? 'rent, expenses & savings'
         : options.housing === 'shared-2br'
           ? 'your half of a typical 2BR'
@@ -455,9 +479,10 @@ function buildBrief(
 }
 
 function baseEntry(
-  { city, salary, actualTakeHomeMonthly }: ComparisonEntryInput,
-  options: PlanningOptions
+  { city, salary, actualTakeHomeMonthly, monthlyExpenses }: ComparisonEntryInput,
+  sharedOptions: PlanningOptions
 ): ComparisonEntryBase {
+  const options = optionsForExpenses(sharedOptions, monthlyExpenses);
   const budget = computeBudget(salary, city);
   const spending = computeSpendingRoom(budget, city, options, actualTakeHomeMonthly);
   return {
@@ -466,9 +491,13 @@ function baseEntry(
     budget,
     options,
     actualTakeHomeMonthly,
+    monthlyExpenses,
     rentAmount: spending.rent,
     takeHomeMonthly: spending.takeHomeMonthly,
-    rentGap: spending.rent == null ? null : finiteOrNull(budget.maxRent - spending.rent),
+    rentGap:
+      spending.rent == null
+        ? null
+        : finiteOrNull(rentCeiling(budget, options, actualTakeHomeMonthly) - spending.rent),
     afterRent: finiteOrNull(spending.available)
   };
 }
@@ -500,7 +529,9 @@ export function analyzeComparison(
         metric.key === 'selectedRent'
           ? `${housingShortLabel(options.housing)} rent`
           : metric.key === 'after'
-            ? options.monthlyExpenses + options.monthlySavings > 0
+            ? bases.some(
+                (entry) => entry.options.monthlyExpenses + entry.options.monthlySavings > 0
+              )
               ? 'After rent, expenses & savings'
               : `Take-home after ${housingShortLabel(options.housing)}`
             : metric.key === 'needed'

@@ -97,7 +97,7 @@ describe('CitySearchDiscovery', () => {
       query: 'alpha',
       suggestions: [alpha],
       open: true,
-      loading: false,
+      loading: true,
       activeIndex: 0
     });
     expect(fetchSuggestions).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe('CitySearchDiscovery', () => {
     await settleAsyncWork();
 
     expect(discovery.state).toMatchObject({
-      suggestions: [remote],
+      suggestions: [alpha, remote],
       open: true,
       loading: false,
       activeIndex: 0
@@ -240,9 +240,9 @@ describe('CitySearchDiscovery', () => {
 
     expect(discovery.state).toMatchObject({
       query: 'alpine',
-      suggestions: [remote],
+      suggestions: [alpine, alpha, remote],
       loading: false,
-      activeIndex: 0
+      activeIndex: 1
     });
   });
 
@@ -336,4 +336,39 @@ describe('CitySearchDiscovery', () => {
       activeIndex: -1
     });
   });
+});
+
+it('retains the highlighted place when a refinement adds a better match', async () => {
+  const scheduler = new TestScheduler();
+  const response = deferred<CitySuggestion[]>();
+  const discovery = createCitySearchDiscovery({
+    localMatches: () => [alpine, alpha],
+    fetchSuggestions: () => response.promise,
+    scheduler,
+    debounceMs: 0
+  });
+  discovery.input('alpha');
+  discovery.hover(0);
+  scheduler.advanceBy(0);
+  response.resolve([{ ...alpha, label: 'Alpha, BB', state: 'BB' }]);
+  await settleAsyncWork();
+  expect(discovery.state.suggestions[discovery.state.activeIndex]).toEqual(alpine);
+  expect(discovery.handleKey('Enter').selection).toEqual(alpine);
+});
+
+it('shows the selected city on focus and cancels a pending search when cleared', async () => {
+  const scheduler = new TestScheduler();
+  const fetchSuggestions = vi.fn(async () => [remote]);
+  const discovery = createCitySearchDiscovery({
+    localMatches: () => [alpha],
+    fetchSuggestions,
+    scheduler
+  });
+  discovery.setExternalQuery(alpha.label);
+  discovery.focus();
+  expect(discovery.state.suggestions).toEqual([alpha]);
+  discovery.input('');
+  scheduler.advanceBy(1000);
+  expect(fetchSuggestions).not.toHaveBeenCalled();
+  expect(discovery.state).toMatchObject({ query: '', suggestions: [], loading: false });
 });

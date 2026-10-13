@@ -93,7 +93,7 @@ export function markerPresentation(
     fillColor: !hasBudgetAndRent ? palette.neutral : fits ? palette.fits : palette.over,
     fillOpacity: 0.9,
     fit,
-    tooltipDetail: `${rentLabel} ${money(rent)} · ${fit}`,
+    tooltipDetail: `${rentLabel} ${money(rent)} · ${fit}${maxRent != null ? ` · ceiling ${money(maxRent)}/mo` : ''}`,
     ariaLabel: `${city.name}, ${accessibleLabel} ${money(rent)}, ${fit}`
   };
 }
