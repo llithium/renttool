@@ -8,7 +8,7 @@
    user actually picked. Delete it only alongside the toggle. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Coastal wayfinding palette shared by discovery, plans, and comparisons. */
+/* Coastal light palette with neutral black and gray surfaces in dark mode. */
 :root {
   color-scheme: light;
 
@@ -39,25 +39,25 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --accent: #91b8ff;
-  --accent-ink: #102238;
-  --accent-soft: #253e5f;
+  --accent: #f4f4f5;
+  --accent-ink: #111113;
+  --accent-soft: #252529;
   --accent-deep: #ffffff;
-  --green: #7fbd8c;
-  --green-soft: #20342a;
-  --red: #e37a68;
-  --red-soft: #3b2522;
-  --amber: #d7ad63;
-  --amber-ink: #102238;
+  --green: #91cba3;
+  --green-soft: #1f3025;
+  --red: #f0a09a;
+  --red-soft: #352322;
+  --amber: #e2bd7b;
+  --amber-ink: #111113;
 
-  --canvas: #0e1b2b;
-  --card: #16283d;
-  --card-2: #203247;
-  --ink: #edf4fc;
-  --muted: #afc0d1;
-  --faint: #8da3b9;
-  --line: #30465e;
-  --line-strong: #59718a;
+  --canvas: #0c0c0e;
+  --card: #151517;
+  --card-2: #1e1e21;
+  --ink: #f5f5f5;
+  --muted: #a7a7b0;
+  --faint: #92929c;
+  --line: #2b2b30;
+  --line-strong: #56565f;
 
   --elevation-card: 0 14px 34px rgba(0, 0, 0, 0.26);
   --elevation-pop: 0 18px 42px rgba(0, 0, 0, 0.38);

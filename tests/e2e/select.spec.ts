@@ -44,7 +44,7 @@ for (const dark of [false, true]) {
     await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
     if (dark) await page.getByRole('button', { name: 'Switch to dark mode' }).click();
     const housing = page.getByRole('combobox', { name: 'Housing setup', exact: true });
-    if (dark) await expect(housing).toHaveCSS('color', 'rgb(237, 244, 252)');
+    if (dark) await expect(housing).toHaveCSS('color', 'rgb(245, 245, 245)');
     await housing.click();
     const menu = page.getByRole('listbox', { name: 'Housing setup', exact: true });
     const bounds = (await menu.boundingBox())!;
