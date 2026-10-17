@@ -13,11 +13,11 @@
 </script>
 
 <header class={className}>
-  <div class="flex flex-wrap items-end justify-between gap-4">
+  <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
     <h1 class="max-w-5xl text-display text-ink">
       {city.name}
     </h1>
-    <span class="pb-2 text-meta text-muted"
+    <span class="pb-1 text-meta text-muted"
       >{SOURCE_LABEL[city.source]}{city.rentYear ? ` · ${city.rentYear}` : ''}</span
     >
   </div>

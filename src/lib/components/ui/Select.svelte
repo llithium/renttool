@@ -177,7 +177,7 @@
     data-value={value}
     onclick={() => (open ? close() : void show())}
     onkeydown={keydown}
-    class="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors {open
+    class="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-sm font-semibold transition-colors {open
       ? 'border-accent bg-card text-ink'
       : 'border-line-strong bg-card-2 text-ink hover:border-accent hover:bg-card'}"
   >
@@ -205,7 +205,7 @@
       role="listbox"
       aria-labelledby={`${id}-label`}
       style={`left:${left}px;${above ? 'bottom' : 'top'}:${edge}px;width:${width}px;max-height:${height}px`}
-      class="fixed inset-auto z-50 m-0 overflow-y-auto overscroll-contain rounded-xl border border-line-strong bg-card p-1.5 text-ink shadow-pop"
+      class="fixed inset-auto z-50 m-0 overflow-y-auto overscroll-contain rounded-md border border-line-strong bg-card p-1.5 text-ink shadow-pop"
     >
       {#each options as option, index (option.value)}
         <!-- svelte-ignore a11y_interactive_supports_focus (Focus stays on the combobox; aria-activedescendant identifies the active option.) -->

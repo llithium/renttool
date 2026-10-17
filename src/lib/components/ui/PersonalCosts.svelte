@@ -7,6 +7,7 @@
     onoptions,
     actualTakeHomeMonthly = null,
     ceilingUsesGrossIncome,
+    compact = false,
     ontakehome,
     id = 'plan'
   }: {
@@ -14,13 +15,14 @@
     onoptions: (value: PlanningOptions) => void;
     actualTakeHomeMonthly?: number | null;
     ceilingUsesGrossIncome?: boolean;
+    compact?: boolean;
     ontakehome?: (value: number | null) => void;
     id?: string;
   } = $props();
 </script>
 
-<details class="mt-5 border-t border-line pt-4">
-  <summary class="min-h-11 cursor-pointer text-sm font-semibold text-ink"
+<details class="min-w-0 flex-1 {compact ? '' : 'mt-5 border-t border-line pt-4'}">
+  <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold text-ink"
     >Personal expenses &amp; savings (optional)</summary
   >
   <div class="mt-3 grid gap-4 sm:grid-cols-2">

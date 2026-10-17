@@ -8,37 +8,43 @@
    user actually picked. Delete it only alongside the toggle. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Coastal light palette with neutral black and gray surfaces in dark mode. */
+/* Neutral planning surfaces, graphite actions, and indigo input feedback. */
 :root {
   color-scheme: light;
 
-  --accent: #245bc4;
+  --primary: #18191c;
+  --primary-ink: #ffffff;
+  --primary-soft: #eceef1;
+  --accent: #4f46e5;
   --accent-ink: #ffffff;
-  --accent-soft: #e4edff;
-  --accent-deep: #17449b;
-  --green: #147b3b;
-  --green-soft: #e4f2e8;
-  --red: #b7352d;
-  --red-soft: #f7e4e1;
-  --amber: #ad7d22;
-  --amber-ink: #151515;
+  --accent-soft: #eeedfd;
+  --accent-deep: #3730a3;
+  --green: #317345;
+  --green-soft: #e6f0e5;
+  --red: #a43833;
+  --red-soft: #fae8e5;
+  --amber: #bc8d3b;
+  --amber-ink: #18191c;
 
-  --canvas: #eef4f8;
+  --canvas: #f8f8f9;
   --card: #ffffff;
-  --card-2: #e6eef5;
-  --ink: #18304b;
-  --muted: #526579;
-  --faint: #697e92;
-  --line: #d5e0ea;
-  --line-strong: #a9bdcf;
+  --card-2: #f1f2f4;
+  --ink: #18191c;
+  --muted: #5e626b;
+  --faint: #666b75;
+  --line: #e2e4e8;
+  --line-strong: #b6bac3;
 
-  --elevation-card: 0 14px 34px rgba(21, 21, 21, 0.08);
-  --elevation-pop: 0 18px 42px rgba(21, 21, 21, 0.14);
+  --elevation-card: 0 2px 8px rgb(24 25 28 / 3%);
+  --elevation-pop: 0 12px 32px rgb(24 25 28 / 12%);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
 
+  --primary: #f4f4f5;
+  --primary-ink: #111113;
+  --primary-soft: #252529;
   --accent: #f4f4f5;
   --accent-ink: #111113;
   --accent-soft: #252529;
@@ -67,19 +73,19 @@
    variable above, so flipping [data-theme] re-colors the page at runtime. A
    non-inline @theme would freeze today's light values into the utilities. */
 @theme inline {
-  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
 
   /* Typography roles keep the planning hierarchy stable across the city,
      comparison, and supporting-content surfaces. The display ramp is fluid;
      product copy remains spatially predictable. */
-  --text-display: clamp(2.75rem, 2.25rem + 2vw, 3.75rem);
-  --text-display--line-height: 0.98;
+  --text-display: clamp(2.375rem, 2rem + 1.5vw, 3.5rem);
+  --text-display--line-height: 1.08;
   --text-display--font-weight: 600;
   --text-display--letter-spacing: -0.035em;
 
-  --text-headline: clamp(1.875rem, 1.7rem + 0.75vw, 2.25rem);
-  --text-headline--line-height: 1.08;
+  --text-headline: clamp(1.5rem, 1.4rem + 0.65vw, 1.875rem);
+  --text-headline--line-height: 1.2;
   --text-headline--font-weight: 600;
   --text-headline--letter-spacing: -0.03em;
 
@@ -88,7 +94,7 @@
   --text-title--font-weight: 600;
   --text-title--letter-spacing: -0.02em;
 
-  --text-body: 1rem;
+  --text-body: 0.9375rem;
   --text-body--line-height: 1.55;
   --text-body--font-weight: 400;
 
@@ -107,6 +113,9 @@
   --text-data--font-weight: 600;
   --text-data--letter-spacing: -0.02em;
 
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);

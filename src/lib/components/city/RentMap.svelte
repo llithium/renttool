@@ -366,7 +366,7 @@
   </SectionHeading>
   <div
     bind:this={el}
-    class="leaflet-theme h-100 w-full overflow-hidden rounded-xl border border-line bg-card-2"
+    class="leaflet-theme h-100 w-full overflow-hidden rounded-md border border-line bg-card-2"
   ></div>
   <p class="mt-3 text-xs/relaxed text-muted">
     Select a marker to load that city. Other cities use estimated take-home pay for your current

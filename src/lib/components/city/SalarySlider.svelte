@@ -54,7 +54,7 @@
     height: 24px;
     margin-top: -10px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--primary);
     border: 3px solid var(--card);
     box-shadow: var(--elevation-card);
     transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -67,7 +67,7 @@
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--primary);
     border: 3px solid var(--card);
     box-shadow: var(--elevation-card);
     transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);

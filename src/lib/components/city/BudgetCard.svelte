@@ -22,18 +22,50 @@
 </script>
 
 {#if city}
-  <section
-    aria-label="Plan summary"
-    class="min-h-64 border-y border-line py-5 sm:min-h-44"
-    data-testid="plan-summary"
-  >
+  <section aria-label="Plan summary" class="@container min-w-0" data-testid="plan-summary">
     {#if budget}
+      <dl class="grid grid-cols-1 gap-x-4 gap-y-2 @2xs:grid-cols-2 @md:grid-cols-3">
+        <div class="row-span-2 grid grid-rows-subgrid">
+          <dt class="text-label text-muted">
+            {usesGrossTarget ? '30% of gross income' : 'Personal rent ceiling'}
+          </dt>
+          <dd
+            class="self-baseline text-[clamp(2rem,3vw,2.75rem)] leading-tight font-semibold tracking-tight text-ink tabular-nums"
+          >
+            {money(ceiling)}<span class="text-sm text-muted">/mo</span>
+          </dd>
+        </div>
+        <div class="row-span-2 grid grid-rows-subgrid">
+          <dt class="text-label text-muted">
+            Local {housingShortLabel(presentation.options.housing)} estimate
+          </dt>
+          <dd class="self-baseline text-2xl/tight font-semibold tracking-tight tabular-nums">
+            {money(rent)}<span class="text-sm text-muted">/mo</span>
+          </dd>
+        </div>
+        <div class="row-span-2 grid grid-rows-subgrid @2xs:col-span-2 @md:col-span-1">
+          <dt class="text-label text-muted">{spendingLabel}</dt>
+          <dd
+            class="self-baseline text-2xl/tight font-semibold tracking-tight tabular-nums {available !=
+              null && available < 0
+              ? 'text-red'
+              : 'text-ink'}"
+          >
+            {money(available)}<span class="text-sm text-muted">/mo</span>
+            {#if available != null && (presentation.options.monthlyBuffer ?? 0) > 0 && (presentation.options.monthlyBuffer ?? 0) > available}
+              <p class="mt-1 text-meta text-red">
+                Buffer shortfall: {money((presentation.options.monthlyBuffer ?? 0) - available)}/mo
+              </p>
+            {/if}
+          </dd>
+        </div>
+      </dl>
       <p
-        class="mb-4 text-sm font-semibold {fits == null
+        class="mt-4 inline-block rounded-full px-3 py-1.5 text-meta font-medium {fits == null
           ? 'text-muted'
           : fits
-            ? 'text-green'
-            : 'text-red'}"
+            ? 'bg-green-soft text-green'
+            : 'bg-red-soft text-red'}"
       >
         {fits == null
           ? 'Local rent estimate unavailable'
@@ -45,42 +77,6 @@
               ? 'Local rent exceeds your 30% target'
               : 'Local rent exceeds your ceiling'}
       </p>
-      <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div>
-          <dt class="text-label text-muted">
-            {usesGrossTarget ? '30% of gross income' : 'Personal rent ceiling'}
-          </dt>
-          <dd
-            class="mt-1 text-[clamp(1.75rem,3vw,2.5rem)] leading-tight font-semibold tracking-tight text-accent tabular-nums"
-          >
-            {money(ceiling)}<span class="text-sm text-muted">/mo</span>
-          </dd>
-        </div>
-        <div>
-          <dt class="text-label text-muted">
-            Local {housingShortLabel(presentation.options.housing)} estimate
-          </dt>
-          <dd class="mt-1 text-2xl/tight font-semibold tracking-tight tabular-nums">
-            {money(rent)}<span class="text-sm text-muted">/mo</span>
-          </dd>
-        </div>
-        <div class="col-span-2 sm:col-span-1">
-          <dt class="text-label text-muted">{spendingLabel}</dt>
-          <dd
-            class="mt-1 text-2xl/tight font-semibold tracking-tight tabular-nums {available !=
-              null && available < 0
-              ? 'text-red'
-              : 'text-ink'}"
-          >
-            {money(available)}<span class="text-sm text-muted">/mo</span>
-          </dd>
-          {#if available != null && (presentation.options.monthlyBuffer ?? 0) > 0 && (presentation.options.monthlyBuffer ?? 0) > available}
-            <p class="mt-1 text-meta text-red">
-              Buffer shortfall: {money((presentation.options.monthlyBuffer ?? 0) - available)}/mo
-            </p>
-          {/if}
-        </div>
-      </dl>
       <p class="mt-3 text-meta text-muted">
         {usesGrossTarget
           ? 'Using 30% of gross income.'

@@ -36,7 +36,7 @@
 <section
   id="apartment-check"
   tabindex="-1"
-  class="mt-7 scroll-mt-28 border-t border-line pt-7"
+  class="mt-6 scroll-mt-28 rounded-lg border border-line bg-card p-5 md:p-7"
   aria-labelledby="apartment-heading"
 >
   <h2 id="apartment-heading" class="text-title">Check an actual apartment</h2>
@@ -57,10 +57,7 @@
     {/each}
   </div>
   {#if result}
-    <div
-      class="mt-5 rounded-xl border border-line-strong bg-card p-5"
-      data-testid="apartment-result"
-    >
+    <div class="mt-5 rounded-md border border-line bg-card-2 p-5" data-testid="apartment-result">
       <p
         class="font-semibold {result.withinCeiling && result.afterBuffer >= 0
           ? 'text-green'

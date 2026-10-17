@@ -24,7 +24,7 @@
         alt={image.alt}
         loading="lazy"
         decoding="async"
-        class="aspect-3/1 max-h-64 w-full object-cover"
+        class="aspect-4/1 max-h-48 w-full object-cover"
         onerror={() => (hidden = true)}
       />
       <span

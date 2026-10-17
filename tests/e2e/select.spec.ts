@@ -57,7 +57,7 @@ for (const dark of [false, true]) {
       ['serious', 'critical'].includes(violation.impact ?? '')
     );
     expect(violations).toEqual([]);
-    await page.getByRole('heading', { name: 'Find your next place.' }).click();
+    await page.getByRole('heading', { name: 'Know what rent fits before you move.' }).click();
     await expect(menu).toHaveCount(0);
     await chooseSelect(housing, 'shared-2br');
     await expect(housing).toHaveAttribute('data-value', 'shared-2br');
@@ -67,7 +67,7 @@ for (const dark of [false, true]) {
 test('opens above a low field without moving the page and skips disabled choices', async ({
   page
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 390, height: 480 });
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
   const housing = page.getByRole('combobox', { name: 'Housing setup', exact: true });
   await expect(housing).toBeVisible();

@@ -44,7 +44,7 @@
             href={recommended.url}
             target="_blank"
             rel="noopener"
-            class="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-ink no-underline shadow-card transition duration-200 hover:-translate-y-px hover:bg-accent-deep hover:shadow-pop active:translate-y-0 active:shadow-card"
+            class="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-ink no-underline transition-opacity duration-200 hover:opacity-85"
           >
             <span>Search Zillow under {money(listingCap)}</span>
             <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">

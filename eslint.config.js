@@ -72,7 +72,7 @@ export default ts.config(
           ignore: [
             '^leaflet-',
             '^motion-',
-            '^(discovery|discovery-heading|city-gallery|destination|destination-link|destination-photo|destination-name|destination-rent|photo-credit|city-arrival|arrival-photo|arrival-heading)$'
+            '^(landing|landing-.*|featured-.*|discovery|discovery-.*|city-gallery|destination|destination-.*|photo-credit|city-arrival|arrival-photo|arrival-heading)$'
           ]
         }
       ]

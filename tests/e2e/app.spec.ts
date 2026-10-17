@@ -6,7 +6,7 @@ import acsData from '../../src/lib/data/acs-city-facts.json' with { type: 'json'
 import fmrData from '../../src/lib/data/fmr-county.json' with { type: 'json' };
 import imageData from '../../src/lib/data/city-images.json' with { type: 'json' };
 
-const BUNDLED_RENTS = rentData.cities as Record<string, { r1: number }>;
+const BUNDLED_RENTS = rentData.cities as Record<string, { r1: number; r2: number }>;
 
 function oneBedroomRent(city: string): number {
   const rent = BUNDLED_RENTS[city]?.r1;
@@ -100,7 +100,7 @@ test('does not server-render the landing state before a saved city hydrates', as
   const response = await request.get('/?salary=80000&city=Tampa%2C+FL');
   const html = await response.text();
   expect(html).toContain('Loading saved rent plan');
-  expect(html).not.toMatch(/<h1[^>]*>\s*Find your next place\.\s*<\/h1>/);
+  expect(html).not.toMatch(/<h1[^>]*>\s*Know what rent fits before you move\.\s*<\/h1>/);
 });
 
 test('restores an off-list selected city and seed comparison from a shared URL', async ({
@@ -191,6 +191,33 @@ test('canonicalizes a shared URL after the client router is ready', async ({ pag
   expect(routerErrors).toEqual([]);
 });
 
+test('keeps primary navigation in place when switching between plan and compare', async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 1774, height: 1112 });
+  for (const comparison of ['', '&compare=Chicago%2C+IL']) {
+    await page.goto(`/?salary=70000&city=Chicago%2C+IL${comparison}`);
+    await waitForHydration(page);
+    await page.evaluate(() => document.fonts.ready);
+
+    const navigation = page.getByRole('navigation', { name: 'Primary', exact: true });
+    const originalBounds = await navigation.boundingBox();
+    expect(originalBounds).not.toBeNull();
+
+    for (const view of ['Compare', 'Plan']) {
+      const link = navigation.getByRole('link', { name: new RegExp(`^${view}`) });
+      await link.click();
+      await expect(link).toHaveAttribute('aria-current', 'page');
+      await waitForHydration(page);
+      const bounds = await navigation.boundingBox();
+      expect(bounds).not.toBeNull();
+      for (const edge of ['x', 'y', 'width', 'height'] as const) {
+        expect(bounds![edge]).toBeCloseTo(originalBounds![edge], 0);
+      }
+    }
+  }
+});
+
 test('keeps the latest salary when city navigation pushes history', async ({ page }) => {
   await page.goto('/?salary=80000&city=Tampa%2C+FL');
   await waitForHydration(page);
@@ -236,6 +263,96 @@ test('makes the landing controls directly accessible with unclipped focus', asyn
   });
 
   expect(clippingAncestor).toBeNull();
+});
+
+test('opens the featured city with the current salary and housing setup', async ({ page }) => {
+  await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+  await chooseSelect(
+    page.getByRole('combobox', { name: 'Housing setup', exact: true }),
+    'shared-2br'
+  );
+
+  const featured = page.getByRole('figure');
+  await expect(featured).toContainText('half a 2BR estimate');
+  const explore = featured.getByRole('link', { name: /^Explore / });
+  const href = new URL((await explore.getAttribute('href'))!, 'http://localhost');
+  const cityName = href.searchParams.get('city')!;
+  await expect(featured).toContainText(dollars(Math.round(BUNDLED_RENTS[cityName].r2 / 2)));
+  expect(href.searchParams.get('salary')).toBe('80000');
+  expect(href.searchParams.get('housing')).toBe('shared-2br');
+  await explore.click();
+
+  await expect(page.getByRole('heading', { name: cityName, exact: true })).toBeVisible();
+  await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
+  await expect(page.getByRole('combobox', { name: 'Housing setup', exact: true })).toHaveAttribute(
+    'data-value',
+    'shared-2br'
+  );
+});
+
+test('crossfades between photographed cities and holds the city while it is being explored', async ({
+  page
+}) => {
+  await page.clock.install();
+  // Restart the page so the carousel interval belongs to the controlled clock.
+  await page.reload();
+  await waitForHydration(page);
+  const featured = page.getByRole('figure', { name: 'Featured cities' });
+  const explore = featured.getByRole('link', { name: /^Explore / });
+  const firstHref = await explore.getAttribute('href');
+  await page.clock.fastForward(8_000);
+  await expect(explore).not.toHaveAttribute('href', firstHref!);
+  const incomingImage = featured.locator('.featured-photo img').last();
+  await expect
+    .poll(() => incomingImage.evaluate((image) => image.getAnimations().length))
+    .toBeGreaterThan(0);
+  // Native image animations use the document timeline independently of the timer clock.
+  const opacity = await incomingImage.evaluate((image) => {
+    const animation = image.getAnimations()[0];
+    const duration = Number(animation.effect?.getTiming().duration);
+    animation.pause();
+    animation.currentTime = duration / 2;
+    return Number.parseFloat(getComputedStyle(image).opacity);
+  });
+  expect(opacity).toBeGreaterThan(0);
+  expect(opacity).toBeLessThan(1);
+  await featured.locator('.featured-photo img').evaluateAll((images) => {
+    for (const image of images) for (const animation of image.getAnimations()) animation.finish();
+  });
+  const secondHref = (await explore.getAttribute('href'))!;
+  const cityName = new URL(secondHref, 'http://localhost').searchParams.get('city')!;
+  const imageUrl = await featured.getByRole('img').getAttribute('src');
+  const image = Object.values(imageData).find((image) => image.url === imageUrl);
+  expect(image).toBeDefined();
+  await expect(featured).toContainText(image!.photographerName);
+  await expect(featured).toContainText(dollars(oneBedroomRent(cityName)));
+
+  await featured.hover();
+  await page.clock.fastForward(16_000);
+  await expect(explore).toHaveAttribute('href', secondHref);
+  await page.getByRole('heading', { name: 'Know what rent fits before you move.' }).hover();
+  await page.clock.fastForward(8_000);
+  await expect(explore).not.toHaveAttribute('href', secondHref);
+
+  await explore.focus();
+  const focusedHref = (await explore.getAttribute('href'))!;
+  await page.clock.fastForward(16_000);
+  await expect(explore).toHaveAttribute('href', focusedHref);
+  await explore.press('Enter');
+  const focusedCity = new URL(focusedHref, 'http://localhost').searchParams.get('city')!;
+  await expect(page.getByRole('heading', { name: focusedCity, exact: true })).toBeVisible();
+});
+
+test('starts featured cities paused when reduced motion is requested', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.clock.install();
+  await page.reload();
+  await waitForHydration(page);
+  const featured = page.getByRole('figure', { name: 'Featured cities' });
+  const explore = featured.getByRole('link', { name: /^Explore / });
+  const firstHref = (await explore.getAttribute('href'))!;
+  await page.clock.fastForward(24_000);
+  await expect(explore).toHaveAttribute('href', firstHref);
 });
 
 test('supports keyboard city selection and salary results', async ({ page }) => {
@@ -445,7 +562,7 @@ test('keeps each selected city with its salary when opening the detailed compari
   const nashvilleRent = oneBedroomRent('Nashville, TN');
   await expect(
     page.getByText(`${dollars(60_000 / 40 - denverRent)} under budget`, { exact: true })
-  ).toHaveCSS('color', 'rgb(20, 123, 59)');
+  ).toHaveCSS('color', 'rgb(49, 115, 69)');
   const oneBedroomRow = page.getByRole('row').filter({ hasText: /^1BR rent/ });
   await expect(oneBedroomRow).toHaveCount(1);
   await expect(oneBedroomRow.locator('td[data-tone="best"]')).toContainText(

@@ -12,7 +12,6 @@
   import EstimateNote from '$lib/components/city/EstimateNote.svelte';
   import SearchLinks from '$lib/components/city/SearchLinks.svelte';
   import NearbySuburbs from '$lib/components/city/NearbySuburbs.svelte';
-  import RentTrendChart from '$lib/components/city/RentTrendChart.svelte';
   import TaxBreakdownChart from '$lib/components/city/TaxBreakdownChart.svelte';
   import ComparisonTable from '$lib/components/city/ComparisonTable.svelte';
   import RentMap from '$lib/components/city/RentMap.svelte';
@@ -87,7 +86,7 @@
         </section>
       {:else}
         <!-- The same controls stay mounted across empty, valid, and invalid salaries. -->
-        <LandingContent city={selected}>
+        <LandingContent presentation={plan}>
           <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
         </LandingContent>
       {/if}
@@ -106,15 +105,15 @@
             return `/?${params}`;
           }}
         />
-        <footer class="mt-12 border-t border-line pt-6 text-sm text-muted">
+        <p class="mt-8 text-sm text-muted">
           Rent ceilings reserve your expenses, savings, and buffer, capped at 30% of gross income.
-        </footer>
+        </p>
       {/if}
 
       {#if urlSync.hydrated && selected}
         <nav
           aria-label="Plan sections"
-          class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur-sm md:mx-0 md:px-0"
+          class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 md:mx-0 md:px-0"
         >
           {#if budget}<a
               class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
@@ -155,75 +154,66 @@
               city={selected}
               maxRent={plan.rentTarget ?? budget.maxRent}
               housing={plan.options.housing}
-              class="mt-6 rounded-xl border border-line bg-card p-5 md:p-6"
+              class="mt-5 rounded-lg border border-line bg-card p-5 md:p-7"
             />
           </section>
           {#key `${selected.name}:${plan.options.housing}`}
             <ApartmentCheck presentation={plan} />
           {/key}
         {/if}
-        <section
-          id="nearby-options"
-          tabindex="-1"
-          aria-label="Nearby rent options"
-          class="scroll-mt-28"
+        <div
+          class="mt-6 grid min-w-0 gap-7 rounded-lg border border-line bg-card p-5 md:p-7 lg:grid-cols-2 lg:gap-8"
         >
-          <NearbySuburbs
-            presentation={plan}
-            city={selected}
-            class="mt-7 border-t border-line pt-7"
-          />
-        </section>
-
-        <section
-          id="rent-map"
-          tabindex="-1"
-          aria-label="Rent map"
-          class="scroll-mt-28 border-t border-line pt-7"
-        >
-          <RentMap presentation={plan} />
-        </section>
+          <section id="rent-map" tabindex="-1" aria-label="Rent map" class="min-w-0 scroll-mt-28">
+            <RentMap presentation={plan} />
+          </section>
+          <section
+            id="nearby-options"
+            tabindex="-1"
+            aria-label="Nearby rent options"
+            class="min-w-0 scroll-mt-28 border-line max-lg:border-t max-lg:pt-7 lg:border-l lg:pl-8"
+          >
+            <NearbySuburbs presentation={plan} city={selected} />
+          </section>
+        </div>
 
         <section
           id="city-details"
           tabindex="-1"
           aria-label="City and tax details"
-          class="scroll-mt-28"
+          class="mt-6 grid min-w-0 scroll-mt-28 gap-6 {budget
+            ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]'
+            : ''}"
         >
-          <CityFacts city={selected} looking={plan.looking} class="mt-7" />
-          {#key selected.name}<CityImage city={selected} class="mt-7" />{/key}
+          <div class="min-w-0 rounded-lg border border-line bg-card p-5 md:p-7">
+            <CityFacts city={selected} looking={plan.looking} />
+          </div>
+          {#if budget}
+            <div class="min-w-0 rounded-lg border border-line bg-card p-5 md:p-7">
+              <TaxBreakdownChart
+                city={selected}
+                {budget}
+                housing={plan.options.housing}
+                actualTakeHomeMonthly={plan.actualTakeHomeMonthly}
+              />
+            </div>
+          {/if}
+          {#key selected.name}<CityImage
+              city={selected}
+              class="overflow-hidden rounded-lg lg:col-span-full"
+            />{/key}
         </section>
 
-        {#if budget}
-          <!-- The two charts share one section band, split by a hairline rather
-             than sitting in two boxes. They remain visible because the budget
-             and market comparison are part of the same decision. -->
-          <div
-            class="mt-7 grid grid-cols-1 gap-6 border-t border-line pt-7 md:grid-cols-2 md:gap-8"
-          >
-            <RentTrendChart
-              city={selected}
-              {budget}
-              housing={plan.options.housing}
-              target={plan.rentTarget ?? budget.maxRent}
-            />
-            <TaxBreakdownChart
-              city={selected}
-              {budget}
-              housing={plan.options.housing}
-              actualTakeHomeMonthly={plan.actualTakeHomeMonthly}
-              class="border-line max-md:border-t max-md:pt-6 md:border-l md:pl-8"
-            />
-          </div>
-        {/if}
-
         {#if budget && plan.comparisonCities.length}
-          <ComparisonTable presentation={plan} class="mt-7 border-t border-line pt-7" />
+          <ComparisonTable
+            presentation={plan}
+            class="mt-6 rounded-lg border border-line bg-card p-5 md:p-7"
+          />
         {/if}
       {/if}
 
-      {#if urlSync.hydrated && selected}
-        <SourcesFooter class="mt-7 border-t border-line pt-7" />
+      {#if urlSync.hydrated}
+        <SourcesFooter class="mt-8 border-t border-line pt-7" />
       {/if}
     </div>
   </div>

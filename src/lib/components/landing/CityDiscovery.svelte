@@ -91,9 +91,9 @@
         {cities.length} cities · current ceiling {money(presentation.rentTarget)}/mo for {housingShortLabel(
           presentation.options.housing
         )}
-      </p>{/if}
+      </p>{:else}<p class="text-sm text-muted">{cities.length} cities to explore</p>{/if}
   </div>
-  <div class="mb-6 grid max-w-2xl gap-4 sm:grid-cols-2">
+  <div class="discovery-filters">
     <Select
       id="discovery-state"
       label="State"
@@ -145,11 +145,11 @@
       onchange={(value) => (filters.reference = value)}
     />
   </div>
-  <p class="mb-3 text-meta text-muted">
+  <p class="mt-3 mb-5 text-meta text-muted">
     Personal ceilings and spending room use each city’s estimated take-home pay. Distance is
     straight-line.
   </p>
-  <p aria-live="polite" class="mb-3 text-sm text-muted">{status}</p>
+  <p aria-live="polite" class="text-sm text-muted" class:mb-3={status !== ''}>{status}</p>
   {#if !cities.length}<p role="status" class="py-8 text-sm text-muted">
       No cities match these filters and rent target. Try another state, population size, or salary.
     </p>{/if}
@@ -241,8 +241,15 @@
                   : 'Your comparison is full.';
             }
           }}
-          class="mt-2 min-h-11 cursor-pointer text-sm font-semibold text-accent disabled:cursor-not-allowed disabled:text-faint"
-          >{presentation.isComparing(city.name)
+          class="destination-compare"
+          ><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <path
+              d={presentation.isComparing(city.name) ? 'M5 10h10' : 'M5 10h10m-5-5v10'}
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </svg>{presentation.isComparing(city.name)
             ? 'Remove comparison'
             : presentation.comparisonFull
               ? 'Comparison full'
@@ -264,7 +271,8 @@
 
 <style>
   .discovery {
-    margin-top: 3.5rem;
+    margin-top: 2.5rem;
+    padding-top: 0;
   }
   .discovery-heading {
     display: flex;
@@ -274,10 +282,19 @@
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
   }
+  .discovery-filters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--card);
+  }
   .city-gallery {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.75rem;
+    gap: 1.75rem 1.5rem;
   }
   .destination {
     min-width: 0;
@@ -286,20 +303,20 @@
     display: block;
     color: var(--ink);
     text-decoration: none;
-    border-radius: 1rem;
+    border-radius: 0.5rem;
   }
   .destination-photo {
     position: relative;
     overflow: hidden;
-    border-radius: 1rem;
-    background: #18304b;
-    aspect-ratio: 1.5;
+    border-radius: 0.5rem;
+    background: #27272a;
+    aspect-ratio: 1.7;
   }
   .destination-photo::after {
     content: '';
     position: absolute;
-    inset: 30% 0 0;
-    background: linear-gradient(transparent, rgb(8 24 44 / 85%));
+    inset: 25% 0 0;
+    background: linear-gradient(transparent, rgb(0 0 0 / 88%));
   }
   img {
     width: 100%;
@@ -313,12 +330,12 @@
   .destination-name {
     position: absolute;
     z-index: 1;
-    bottom: 1.2rem;
-    left: 1.2rem;
+    bottom: 1rem;
+    left: 1rem;
     color: white;
     font-family: var(--font-display);
-    font-size: 1.6rem;
-    font-weight: 650;
+    font-size: 1.5rem;
+    font-weight: 600;
   }
   small {
     display: block;
@@ -330,8 +347,12 @@
     display: flex;
     justify-content: space-between;
     gap: 0.5rem;
-    padding: 0.9rem 0 0.35rem;
+    padding: 1rem 0 0.35rem;
     font-size: 0.875rem;
+  }
+  .destination-rent strong {
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
   }
   .destination-rent span {
     color: var(--muted);
@@ -344,13 +365,46 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+  .destination-compare {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    margin-top: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    color: var(--accent);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .destination-compare:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .destination-compare:disabled {
+    color: var(--faint);
+    cursor: not-allowed;
+  }
   @media (max-width: 800px) {
+    .discovery {
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+    }
+    .discovery-filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     .city-gallery {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1.5rem 1rem;
     }
   }
   @media (max-width: 440px) {
+    .discovery-filters {
+      gap: 1rem 0.75rem;
+      padding: 1rem;
+    }
     .city-gallery {
       grid-template-columns: 1fr;
     }

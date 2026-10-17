@@ -17,8 +17,8 @@
   }
 </script>
 
-<!-- Secondary actions live after the answer so they cannot compete with the plan. -->
-<div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3">
+<!-- Secondary actions share the input deck's footer. -->
+<div class="flex flex-wrap items-start gap-2 md:gap-x-4">
   <button
     type="button"
     aria-pressed={comparing}
@@ -59,7 +59,7 @@
   {#if presentation.comparisonNames.length}
     <a
       href="#comparison-section"
-      class="min-h-11 rounded-md px-1 py-2 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
+      class="inline-flex min-h-11 items-center rounded-md px-1 py-2 text-sm font-semibold text-accent no-underline hover:bg-accent-soft hover:text-accent-deep"
     >
       View comparison ({presentation.comparisonNames.length})
     </a>
