@@ -53,17 +53,32 @@ export interface CitySuggestion {
   lng?: number;
 }
 
-/** A credited Unsplash image from the checked-in city-image manifest. */
-export interface CityImage {
+/** One credited photo per city, resolved from the checked-in manifest. */
+interface CityImageBase {
   id: string;
   url: string;
   alt: string;
   photoUrl: string;
   photographerName: string;
   photographerUrl: string;
-  source: 'unsplash';
   sourceUrl: string;
+  /** Vertical focal point (0–100%) when a wide crop needs adjustment. */
+  focusY?: number;
 }
+
+export type CityImage = CityImageBase &
+  (
+    | { source: 'unsplash' }
+    | {
+        source: 'wikimedia';
+        title: string;
+        licenseName: string;
+        licenseUrl: string;
+        articleUrl: string;
+        width: number;
+        height: number;
+      }
+  );
 
 /** A nearby place returned by /api/nearby (bundled SimpleMaps places). */
 export interface NearbyPlace {

@@ -6,17 +6,15 @@
  * pages do not need an Unsplash key or search request.
  *
  * Usage:
- *   UNSPLASH_ACCESS_KEY=... bun run scripts/build-unsplash-images.ts
+ *   UNSPLASH_ACCESS_KEY=... bun run images:unsplash
  *   UNSPLASH_ACCESS_KEY=... bun run scripts/build-unsplash-images.ts --city="Tampa, FL"
  *   UNSPLASH_ACCESS_KEY=... bun run scripts/build-unsplash-images.ts --city="Tampa, FL" --wait
  *   UNSPLASH_ACCESS_KEY=... bun run scripts/build-unsplash-images.ts --refresh
  *   UNSPLASH_ACCESS_KEY=... bun run scripts/build-unsplash-images.ts --no-wait
  */
 
-import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { CityImage } from '../src/lib/types';
+import { MANIFEST_PATH, RENT_DATA_PATH, readJson, writeManifest } from './city-image-manifest';
 import { selectPhoto, type UnsplashPhoto } from './unsplash-image-matcher';
 import { isRateLimitResponse, rateLimitRemaining, rateLimitWaitMs } from './unsplash-rate-limit';
 
@@ -28,9 +26,6 @@ interface SearchResponse {
   results?: unknown;
 }
 
-const ROOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
-const RENT_DATA_PATH = join(ROOT_DIR, 'src/lib/data/apartment-list-rents.json');
-const MANIFEST_PATH = join(ROOT_DIR, 'src/lib/data/city-images.json');
 const UNSPLASH_API = 'https://api.unsplash.com/search/photos';
 const IMAGE_HOST = 'images.unsplash.com';
 const UNSPLASH_HOST = 'unsplash.com';
@@ -135,24 +130,6 @@ export function parseArgs(argv = process.argv.slice(2)): CliOptions {
   };
 }
 
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, 'utf8')) as T;
-}
-
-async function writeManifestFile(manifest: Record<string, CityImage>): Promise<number> {
-  const sortedManifest = Object.fromEntries(
-    Object.entries(manifest).sort(([left], [right]) => left.localeCompare(right))
-  );
-  const temporaryPath = `${MANIFEST_PATH}.${process.pid}.${Date.now()}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify(sortedManifest, null, 2)}\n`);
-    await rename(temporaryPath, MANIFEST_PATH);
-  } finally {
-    await unlink(temporaryPath).catch(() => undefined);
-  }
-  return Object.keys(sortedManifest).length;
-}
-
 export interface RefreshDependencies {
   fetch: typeof fetch;
   readJson: <T>(path: string) => Promise<T>;
@@ -187,7 +164,7 @@ export async function main(dependencies: Partial<RefreshDependencies> = {}): Pro
   const deps: RefreshDependencies = {
     fetch,
     readJson,
-    writeManifest: writeManifestFile,
+    writeManifest,
     sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
     ...dependencies
   };
@@ -256,8 +233,14 @@ export async function main(dependencies: Partial<RefreshDependencies> = {}): Pro
       const results = (data as SearchResponse).results as unknown[];
       const image = selectPhoto(results, city, state);
       const normalized = image ? normalizePhoto(image, city, state) : null;
-      if (!normalized) {
-        console.warn(`${name}: no usable landscape result`);
+      const duplicate =
+        normalized &&
+        Object.entries(manifest).some(
+          ([otherCity, other]) =>
+            otherCity !== name && other.source === normalized.source && other.id === normalized.id
+        );
+      if (!normalized || duplicate) {
+        console.warn(`${name}: no unique landscape result with confirmed city/state metadata`);
         missing += 1;
       } else {
         manifest[name] = normalized;

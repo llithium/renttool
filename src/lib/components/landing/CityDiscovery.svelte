@@ -5,6 +5,7 @@
   import { haversineMiles } from '$lib/geo';
   import { SEED_CITIES, RENT_DATA_META } from '$lib/data/cities';
   import { findCityImage } from '$lib/data/city-images';
+  import ImageCredit from '$lib/components/city/ImageCredit.svelte';
   import type { CitySuggestion } from '$lib/types';
   import { money } from '$lib/format';
   import {
@@ -197,6 +198,7 @@
             {#if image}
               <img
                 src={image.url}
+                style:object-position={image.focusY == null ? undefined : `50% ${image.focusY}%`}
                 alt={image.alt}
                 loading="lazy"
                 onerror={(event) => {
@@ -220,10 +222,7 @@
           </p>{/if}
         {#if image}
           <p class="photo-credit">
-            Photo: <a href={image.photographerUrl} target="_blank" rel="noopener"
-              >{image.photographerName}</a
-            >
-            / <a href={image.sourceUrl} target="_blank" rel="noopener">Unsplash</a>
+            <ImageCredit {image} />
           </p>
         {/if}
         <button
@@ -360,10 +359,6 @@
   .photo-credit {
     font-size: 0.7rem;
     color: var(--muted);
-  }
-  .photo-credit a {
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
   .destination-compare {
     display: inline-flex;

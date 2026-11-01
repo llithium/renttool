@@ -32,8 +32,8 @@
       saved in browser storage or shared links.
     </p>
     <p>
-      City pages may load a representative image from the checked-in Unsplash image manifest. The
-      browser loads that image from Unsplash's CDN, but Rent Tool does not send the city name to an
+      City pages may load a representative image from the checked-in image manifest. The browser
+      loads that image from Unsplash or Wikimedia, but Rent Tool does not send the city name to an
       image-search API at runtime.
     </p>
     <p>

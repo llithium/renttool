@@ -13,6 +13,7 @@
 /test-results/
 /playwright-report/
 /blob-report/
+/.city-images/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]

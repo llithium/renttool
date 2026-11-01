@@ -58,6 +58,7 @@ export function matchesCity(photo: UnsplashPhoto, city: string, state: string): 
   const requestedCity = normalizedText(city);
   const text = photoText(photo);
   const locationCity = normalizedText(stringValue(photo.location?.city) || '');
+  if (locationCity && locationCity !== requestedCity) return false;
   const cityMatches = locationCity === requestedCity || containsPhrase(text, requestedCity);
 
   const locationName = normalizedText(stringValue(photo.location?.name) || '');
@@ -69,32 +70,11 @@ export function matchesCity(photo: UnsplashPhoto, city: string, state: string): 
   return cityMatches && stateMatches;
 }
 
-function locationContradictsCity(photo: UnsplashPhoto, city: string, state: string): boolean {
-  const requestedCity = normalizedText(city);
-  const locationCity = normalizedText(stringValue(photo.location?.city) || '');
-  if (locationCity && locationCity !== requestedCity) return true;
-
-  const locationName = normalizedText(stringValue(photo.location?.name) || '');
-  if (!locationName) return false;
-
-  const locationState = Object.entries(STATE_NAME).find(
-    ([abbreviation, fullName]) =>
-      containsPhrase(locationName, normalizedText(abbreviation)) ||
-      containsPhrase(locationName, normalizedText(fullName))
-  )?.[0];
-
-  return Boolean(locationState && locationState !== state.toUpperCase());
-}
-
-/** Prefer explicit metadata matches, then fall back to relevant results without contradictions. */
+/** Search ranking alone is not evidence that a photo depicts this city and state. */
 export function selectPhoto(results: unknown[], city: string, state: string): UnsplashPhoto | null {
   const photos = results.filter((result): result is UnsplashPhoto =>
     Boolean(result && typeof result === 'object')
   );
 
-  return (
-    photos.find((photo) => matchesCity(photo, city, state)) ??
-    photos.find((photo) => !locationContradictsCity(photo, city, state)) ??
-    null
-  );
+  return photos.find((photo) => matchesCity(photo, city, state)) ?? null;
 }

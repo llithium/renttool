@@ -170,6 +170,12 @@ test.beforeEach(async ({ page }) => {
       body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><rect width="4" height="2" fill="black"/></svg>'
     })
   );
+  await page.route(/^https:\/\/(upload|thumb)\.wikimedia\.org\//, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><rect width="4" height="2" fill="black"/></svg>'
+    })
+  );
   await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
   await page.goto('/');
   await waitForHydration(page);
@@ -389,6 +395,25 @@ test('shows a static credited city image when the city has a manifest entry', as
     'href',
     expected.photographerUrl
   );
+});
+
+test('credits a Wikimedia city photo with its title and license', async ({ page }) => {
+  await selectCity(page, 'Anchorage', 'Anchorage, AK');
+  await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+  const expected = imageData['Anchorage, AK'];
+  const image = page.getByTestId('city-image');
+  await expect(image).toBeVisible();
+  await expect(image.locator('img')).toHaveAttribute('src', expected.url);
+  await expect(image).toContainText('Wikimedia Commons');
+  await expect(image).toContainText(expected.photographerName);
+  await expect(
+    image.getByRole('link', { name: expected.licenseName, exact: true })
+  ).toHaveAttribute('href', expected.licenseUrl);
+  await expect(image.getByRole('link', { name: expected.title, exact: true })).toHaveAttribute(
+    'href',
+    expected.photoUrl
+  );
+  await expect(image).toContainText('Cropped for display');
 });
 
 test('shows bundled city suggestions before a slow API response', async ({ page }) => {

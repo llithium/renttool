@@ -18,7 +18,9 @@ const config = {
           'self',
           'data:',
           'https://tile.openstreetmap.org',
-          'https://images.unsplash.com'
+          'https://images.unsplash.com',
+          'https://upload.wikimedia.org',
+          'https://thumb.wikimedia.org'
         ],
         'connect-src': ['self', 'ws:', 'wss:', ...__impeccableLiveDev],
         'font-src': ['self', 'https://fonts.gstatic.com'],

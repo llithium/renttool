@@ -68,8 +68,8 @@ Other scripts: `bun run build` (production, adapter-vercel), `bun run preview`,
 `bun run data:update` (refresh Apartment List and HUD rents and realign dependent city facts),
 `bun run data:check` (report whether those bundles are current and aligned),
 `bun run test:e2e:install` (download Chromium), and
-`bun run test:e2e` (browser/accessibility tests), and `bun run images:refresh` (maintainer-only
-Unsplash manifest refresh).
+`bun run test:e2e` (browser/accessibility tests), `bun run images:refresh` (fill missing city
+photos from Wikimedia), and `bun run images:review` (generate a local photo contact sheet).
 `bun run validate` runs the format check, lint, type-check, unit tests, data-builder tests,
 and build in one go.
 `bun audit` is an optional manual check that needs network access.
@@ -119,14 +119,14 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | **Photon** (OSM)                            | `/api/city-suggest` | none       | City autocomplete + coordinates                  |
 | **Apartment List Rent Estimates** (bundled) | none                | none       | Monthly city 1BR/2BR estimates                   |
 | **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 606 Census places           |
-| **Unsplash**                                | bundled             | none       | Curated credited city header image               |
+| **Unsplash / Wikimedia Commons**            | bundled             | none       | One credited photo per city                      |
 | **FCC Area API**                            | `/api/geocode`      | none       | Coords → county FIPS                             |
 | **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2027 Fair Market Rents for **every US county** |
 | **SimpleMaps places** (bundled)             | `/api/nearby`       | none       | Nearby towns/suburbs around a point              |
 | **SimpleMaps places** (bundled)             | `/api/population`   | none       | Population for a coordinate                      |
 | **SimpleMaps places** (bundled)             | `/api/coordinates`  | none       | Exact city/state coordinate fallback             |
 
-- `UNSPLASH_ACCESS_KEY` is only needed by maintainers running `bun run images:refresh`; it is not
+- `UNSPLASH_ACCESS_KEY` is only needed by maintainers running `bun run images:unsplash`; it is not
   needed by the deployed app.
 
 The app **degrades gracefully** and needs **no keys at all**: 606 cities use the bundled
@@ -139,18 +139,31 @@ The UI identifies the statistic it is showing: Apartment List estimated median r
 HUD 40th-percentile Fair Market Rent. See
 [docs/API.md](docs/API.md) for the full endpoint reference (params, responses, examples).
 
-City pages use an optional checked-in Unsplash manifest at
-`src/lib/data/city-images.json`. The browser loads the selected image directly from Unsplash's CDN,
-and the city name is not sent to an image-search API at runtime. Entries include the image URL,
-photographer, photo page, and referral links. To refresh or extend the manifest, copy
-`.env.example` to `.env.local`, set `UNSPLASH_ACCESS_KEY`, and run `bun run images:refresh`.
-Full-catalog runs save every accepted entry immediately and automatically wait for an exhausted
-hourly quota before resuming. Use `--no-wait` to stop at the quota boundary with a saved checkpoint and a nonzero exit status. Explicit
-`--city="City, ST"` smoke tests do not wait unless `--wait` is also supplied.
-The refresh command prefers landscape results whose Unsplash metadata matches the requested city,
-rejects results with explicitly contradictory location metadata, and otherwise uses the search
-result's relevance. Review the checked-in manifest before publishing; the page omits the image when
-no manifest entry exists.
+City pages use one optional photo per city from `src/lib/data/city-images.json`. The browser loads
+the photo directly from Unsplash or Wikimedia. City names are not sent to an image-search API at
+runtime. Attribution appears wherever a photo is displayed; Wikimedia entries also include the
+image title, license link, and a notice that the photo is cropped for display.
+An optional `focusY` percentage in a manifest entry adjusts its vertical crop in all photo views.
+
+Run `bun run images:refresh` to fill missing entries from Wikimedia without an API key. The importer
+matches the city/state Wikipedia article and checks its coordinates against the bundled city
+coordinates. It selects landscape photos from that article, rejecting maps, flags, collages,
+undersized files, duplicate photos, and files without supported license and author metadata.
+It keeps existing entries and saves each accepted photo immediately, so rerunning after an
+interruption resumes from the saved catalog. Failed requests exit with an error; unavailable
+photos leave the previous entry intact.
+
+- `bun run images:refresh --repair-duplicates` also attempts to replace photos shared by multiple cities.
+- `bun run images:refresh --city="Anchorage, AK"` replaces one city's photo when a suitable candidate is found.
+- `bun run images:review` writes `.city-images/review.html`, a searchable contact sheet with a
+  filter for missing and shared photos. Open it locally to check photo subjects and crops before publishing.
+
+The optional Unsplash importer is available through `bun run images:unsplash`. Set
+`UNSPLASH_ACCESS_KEY` in `.env` or the command environment. It requires confirmed city/state
+location metadata and rejects photos already assigned to another city. Full-catalog runs save each
+accepted entry and wait when the hourly quota is exhausted. Use `--no-wait` to exit with the saved
+checkpoint instead, or `--city="City, ST"` to target one city (`--refresh` replaces an existing entry).
+Unsplash entries retain the returned CDN URLs and referral links.
 
 The full SimpleMaps places table stays server-side. Restored cities that lack a curated
 coordinate use `/api/coordinates` for an exact city/state match, avoiding a roughly 1.25 MB

@@ -4,6 +4,7 @@
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import { RENT_DATA_META, SEED_CITIES } from '$lib/data/cities';
   import { findCityImage } from '$lib/data/city-images';
+  import ImageCredit from '$lib/components/city/ImageCredit.svelte';
   import { STATE_NAME } from '$lib/data/states';
   import { housingRent, housingShortLabel } from '$lib/planning';
   import { money } from '$lib/format';
@@ -129,6 +130,9 @@
         {#key featuredCity.name}
           <img
             src={featuredImage.url}
+            style:object-position={featuredImage.focusY == null
+              ? undefined
+              : `50% ${featuredImage.focusY}%`}
             alt={featuredImage.alt}
             fetchpriority="high"
             transition:fade={{ duration: reducedMotion ? 0 : 700 }}
@@ -139,23 +143,22 @@
             }}
           />
         {/key}
-        <div class="featured-location">
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"
-              stroke="currentColor"
-              stroke-width="1.7"
-            />
-            <circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7" />
-          </svg>
-          {featuredCity.city}, {STATE_NAME[featuredCity.state] ?? featuredCity.state}
+        <div class="featured-meta">
+          <div class="featured-location">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"
+                stroke="currentColor"
+                stroke-width="1.7"
+              />
+              <circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7" />
+            </svg>
+            {featuredCity.city}, {STATE_NAME[featuredCity.state] ?? featuredCity.state}
+          </div>
+          <p class="featured-credit">
+            <ImageCredit image={featuredImage} />
+          </p>
         </div>
-        <p class="featured-credit">
-          Photo: <a href={featuredImage.photographerUrl} target="_blank" rel="noopener"
-            >{featuredImage.photographerName}</a
-          >
-          / <a href={featuredImage.sourceUrl} target="_blank" rel="noopener">Unsplash</a>
-        </p>
       </div>
       <figcaption class="featured-caption">
         <div class="featured-rent">
@@ -288,12 +291,14 @@
     object-fit: cover;
     object-position: 48% center;
   }
-  .featured-location {
+  .featured-meta {
     position: absolute;
     z-index: 1;
     right: 1rem;
-    bottom: 2.5rem;
+    bottom: 0.75rem;
     left: 1rem;
+  }
+  .featured-location {
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -306,18 +311,10 @@
     flex-shrink: 0;
   }
   .featured-credit {
-    position: absolute;
-    z-index: 1;
-    right: 1rem;
-    bottom: 0.75rem;
-    left: 1rem;
+    margin-top: 0.375rem;
     color: #ffffff;
     font-size: 0.6875rem;
     line-height: 1.3;
-  }
-  .featured-credit a {
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
   .featured-caption {
     display: flex;

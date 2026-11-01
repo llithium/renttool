@@ -2,6 +2,7 @@
   import type { ComparisonEntry } from '$lib/compare/decision';
   import type { CompareSalaries } from '$lib/compare/salaries.svelte';
   import { findCityImage } from '$lib/data/city-images';
+  import ImageCredit from '$lib/components/city/ImageCredit.svelte';
   import SalaryInput from '$lib/components/ui/SalaryInput.svelte';
   import MonthlyAmountInput from '$lib/components/ui/MonthlyAmountInput.svelte';
   import { housingShortLabel, type HousingChoice } from '$lib/planning';
@@ -39,6 +40,7 @@
       <a {href} tabindex="-1" aria-hidden="true"
         ><img
           src={image.url}
+          style:object-position={image.focusY == null ? undefined : `50% ${image.focusY}%`}
           alt=""
           loading="lazy"
           class="h-20 w-full rounded-xl object-cover"
@@ -49,10 +51,7 @@
         /></a
       >
       <figcaption class="mt-1 text-meta text-muted">
-        Photo: <a href={image.photographerUrl} target="_blank" rel="noopener" class="underline"
-          >{image.photographerName}</a
-        >
-        / <a href={image.sourceUrl} target="_blank" rel="noopener" class="underline">Unsplash</a>
+        <ImageCredit {image} />
       </figcaption>
     </figure>
   {/if}

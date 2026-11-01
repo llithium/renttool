@@ -39,17 +39,17 @@ describe('Unsplash city matching', () => {
     ).toBe(false);
   });
 
-  it('keeps a relevant search result when location metadata is absent', () => {
+  it('leaves the city without an image when location metadata is absent', () => {
     const sparseResult: UnsplashPhoto = {
       id: 'atlanta-photo',
       alt_description: 'Downtown skyline at sunset',
       location: null
     };
 
-    expect(selectPhoto([sparseResult], 'Atlanta', 'GA')).toBe(sparseResult);
+    expect(selectPhoto([sparseResult], 'Atlanta', 'GA')).toBeNull();
   });
 
-  it('skips an explicitly different city when choosing a sparse fallback', () => {
+  it('skips a different city and an unverified search result', () => {
     const wrongCity: UnsplashPhoto = {
       id: 'san-francisco-photo',
       alt_description: 'City skyline',
@@ -61,10 +61,10 @@ describe('Unsplash city matching', () => {
       location: null
     };
 
-    expect(selectPhoto([wrongCity, sparseResult], 'Atlanta', 'GA')).toBe(sparseResult);
+    expect(selectPhoto([wrongCity, sparseResult], 'Atlanta', 'GA')).toBeNull();
   });
 
-  it('skips an explicitly different state when choosing a sparse fallback', () => {
+  it('chooses a confirmed city/state match over sparse or contradictory results', () => {
     const wrongState: UnsplashPhoto = {
       id: 'springfield-mo-photo',
       alt_description: 'Downtown skyline',
@@ -76,6 +76,7 @@ describe('Unsplash city matching', () => {
       location: null
     };
 
-    expect(selectPhoto([wrongState, sparseResult], 'Springfield', 'IL')).toBe(sparseResult);
+    const correct = photo({ city: 'Springfield', name: 'Springfield, Illinois, United States' });
+    expect(selectPhoto([wrongState, sparseResult, correct], 'Springfield', 'IL')).toBe(correct);
   });
 });

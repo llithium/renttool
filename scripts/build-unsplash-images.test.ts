@@ -8,7 +8,8 @@ const photo = {
   urls: { regular: 'https://images.unsplash.com/photo-1?ixid=abc' },
   links: { html: 'https://unsplash.com/photos/photo-1' },
   user: { name: 'Photographer', links: { html: 'https://unsplash.com/@photographer' } },
-  alt_description: 'Tampa skyline'
+  alt_description: 'Austin skyline',
+  location: { city: 'Austin', name: 'Austin, Texas, United States' }
 };
 
 function dependencies(fetch: RefreshDependencies['fetch'], writes: Array<Record<string, unknown>>) {

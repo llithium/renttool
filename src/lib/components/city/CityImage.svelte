@@ -1,6 +1,7 @@
 <script lang="ts">
   import { findCityImage } from '$lib/data/city-images';
   import type { City } from '$lib/types';
+  import ImageCredit from './ImageCredit.svelte';
 
   let { city, class: className = '' }: { city: City; class?: string } = $props();
   let image = $derived(findCityImage(city.city, city.state));
@@ -21,6 +22,7 @@
     >
       <img
         src={image.url}
+        style:object-position={image.focusY == null ? undefined : `50% ${image.focusY}%`}
         alt={image.alt}
         loading="lazy"
         decoding="async"
@@ -34,22 +36,7 @@
       </span>
     </a>
     <figcaption class="px-3 py-2 text-meta text-muted">
-      Photo by
-      <a
-        href={image.photographerUrl}
-        target="_blank"
-        rel="noopener"
-        class="text-accent underline decoration-1 underline-offset-2 hover:text-accent-deep"
-        >{image.photographerName}</a
-      >
-      via
-      <a
-        href={image.sourceUrl}
-        target="_blank"
-        rel="noopener"
-        class="text-accent underline decoration-1 underline-offset-2 hover:text-accent-deep"
-        >Unsplash</a
-      >
+      <ImageCredit {image} />
     </figcaption>
   </figure>
 {/if}

@@ -23,7 +23,9 @@
     "test:watch": "vitest",
     "test:e2e:install": "playwright install chromium",
     "test:e2e": "playwright test",
-    "images:refresh": "bun run scripts/build-unsplash-images.ts",
+    "images:refresh": "bun run scripts/build-wikimedia-images.ts",
+    "images:unsplash": "bun run scripts/build-unsplash-images.ts",
+    "images:review": "bun run scripts/review-city-images.ts",
     "validate": "bun run format:check && bun run lint && bun run check && bun run test && bun run test:data && bun run build"
   },
   "devDependencies": {
@@ -35,6 +37,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/leaflet": "^1.9.15",
+    "entities": "^9.0.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-better-tailwindcss": "^4.7.0",
