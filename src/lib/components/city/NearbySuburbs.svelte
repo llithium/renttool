@@ -107,6 +107,7 @@
     {#key city.name}
       <CommuteFilter
         {places}
+        {presentation}
         onfilter={(result) => {
           commute = result;
           expanded = false;

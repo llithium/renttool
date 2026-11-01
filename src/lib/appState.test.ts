@@ -4,6 +4,7 @@ import {
   COMPARISON_STORAGE_KEY,
   DEFAULT_COMPARISON_SALARY
 } from '$lib/compare/comparisonSet.svelte';
+import { COMMUTE_STORAGE_KEY } from '$lib/commute';
 import type { CitySuggestion, LookupResult, NearbyPlace } from '$lib/types';
 
 function adapters(
@@ -64,6 +65,36 @@ const hudRent: LookupResult = {
 };
 
 describe('RentPlanWorkspace', () => {
+  it('restores private commute settings independently of URL plan state', () => {
+    const { dependency, storage } = trackedAdapters(unavailableRent);
+    const plan = new RentPlanWorkspace(dependency);
+    const destination = { label: 'Work address', lat: 41.878, lng: -87.636 };
+    plan.setCommute({ destination, maximum: 45 });
+    const previous = plan.commute.destination;
+    plan.setCommute({ ...plan.commute, maximum: 60 });
+    expect(plan.commute.destination).toBe(previous);
+    const restored = new RentPlanWorkspace(dependency);
+    restored.hydrateFromSearch(new URLSearchParams('city=Tampa%2C+FL&salary=80000'));
+    expect(restored.commute).toEqual({ destination, maximum: 60 });
+    expect(restored.buildSearch()).not.toContain('Work');
+    expect(storage.get(COMMUTE_STORAGE_KEY)).toContain('Work address');
+    restored.selectCity('Chicago, IL');
+    expect(restored.commute.destination).toEqual(destination);
+    restored.setCommute({ ...restored.commute, destination: null });
+    const cleared = new RentPlanWorkspace(dependency);
+    cleared.restoreSession();
+    expect(cleared.commute).toEqual({ destination: null, maximum: 60 });
+  });
+
+  it.each(['invalid json', '{"destination":{"label":"Broken","lat":100,"lng":0},"maximum":-1}'])(
+    'ignores invalid stored commute settings: %s',
+    (raw) => {
+      const plan = new RentPlanWorkspace(adapters(unavailableRent, { [COMMUTE_STORAGE_KEY]: raw }));
+      plan.hydrateFromSearch(new URLSearchParams('city=Chicago%2C+IL'));
+      expect(plan.commute).toEqual({ destination: null, maximum: 30 });
+    }
+  );
+
   const nearby: NearbyPlace = {
     label: 'Nearby Town, ZZ',
     city: 'Nearby Town',

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { CommuteFilterResult } from '$lib/commute';
   import type { ComparisonEntry } from '$lib/compare/decision';
   import type { CompareSalaries } from '$lib/compare/salaries.svelte';
   import { findCityImage } from '$lib/data/city-images';
@@ -9,6 +10,10 @@
 
   let {
     entry,
+    commute,
+    commuteLoading,
+    commuteDestination,
+    commuteMaximum,
     href,
     salaries,
     housing,
@@ -18,6 +23,10 @@
     onremove
   }: {
     entry: ComparisonEntry;
+    commute: CommuteFilterResult | null;
+    commuteLoading: boolean;
+    commuteDestination?: string;
+    commuteMaximum: number;
     href: string;
     salaries: CompareSalaries;
     housing: HousingChoice;
@@ -77,6 +86,22 @@
       </svg>
     </button>
   </div>
+
+  {#if commuteDestination}
+    {@const minutes = commute?.minutes[entry.city.name]}
+    <div class="mt-4 border-t border-line pt-3 text-sm">
+      <p class="text-muted">Drive to {commuteDestination}</p>
+      <p class="mt-1 font-semibold tabular-nums">
+        {#if minutes != null}
+          {minutes} min drive ·
+          <span class={minutes <= commuteMaximum ? 'text-green' : 'text-red'}
+            >{minutes <= commuteMaximum ? 'Within' : 'Over'} {commuteMaximum}-minute limit</span
+          >
+        {:else if commuteLoading}Checking driving time…
+        {:else}Driving time unavailable{/if}
+      </p>
+    </div>
+  {/if}
 
   <SalaryInput
     id={`salary-${entry.city.name.replace(/[^a-z0-9]+/gi, '-')}`}

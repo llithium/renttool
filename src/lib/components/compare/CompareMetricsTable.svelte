@@ -1,11 +1,21 @@
 <script lang="ts">
+  import type { CommuteFilterResult } from '$lib/commute';
   import type { ComparisonView, MetricCell } from '$lib/compare/decision';
   import type { ComparisonCity } from '$lib/compare/comparisonModel';
 
   let {
     analysis,
-    hrefForCity
-  }: { analysis: ComparisonView; hrefForCity: (city: ComparisonCity) => string } = $props();
+    hrefForCity,
+    commute,
+    commuteLoading,
+    commuteDestination
+  }: {
+    analysis: ComparisonView;
+    hrefForCity: (city: ComparisonCity) => string;
+    commute: CommuteFilterResult | null;
+    commuteLoading: boolean;
+    commuteDestination?: string;
+  } = $props();
 </script>
 
 {#snippet metricCell(cell: MetricCell, index: number, entryCount: number, withTitle = false)}
@@ -91,6 +101,30 @@
             {/each}
           </tr>
         {/each}
+        {#if commuteDestination}
+          <tr>
+            <th
+              class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"
+            >
+              Drive to {commuteDestination}
+            </th>
+            {#each analysis.entries as entry (entry.city.name)}
+              {@const minutes = commute?.minutes[entry.city.name]}
+              <td class="min-w-44 text-right tabular-nums">
+                {minutes != null ? `${minutes} min` : commuteLoading ? 'Checking…' : 'Unavailable'}
+                {#if minutes != null && commute}
+                  <span
+                    class="mt-1 block text-meta {minutes <= commute.maximum
+                      ? 'text-green'
+                      : 'text-red'}"
+                    >{minutes <= commute.maximum ? 'Within' : 'Over'}
+                    {commute.maximum}-minute limit</span
+                  >
+                {/if}
+              </td>
+            {/each}
+          </tr>
+        {/if}
         <tr>
           <th
             class="sticky left-0 z-10 min-w-36 bg-canvas text-left font-semibold text-muted sm:min-w-46"

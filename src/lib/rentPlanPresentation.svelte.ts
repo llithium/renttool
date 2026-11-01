@@ -1,3 +1,4 @@
+import type { CommuteSettings } from '$lib/commute';
 import { computeBudget } from '$lib/budget';
 import { RentPlanWorkspace, type ComparisonResult } from '$lib/appState.svelte';
 import { MAX_COMPARISON_ENTRIES, type ComparisonEntry } from '$lib/compare/comparisonSet.svelte';
@@ -18,6 +19,14 @@ export class RentPlanPresentation {
 
   constructor(workspace: RentPlanWorkspace = new RentPlanWorkspace()) {
     this.workspace = workspace;
+  }
+
+  get commute(): CommuteSettings {
+    return this.workspace.commute;
+  }
+
+  setCommute(settings: CommuteSettings): void {
+    this.workspace.setCommute(settings);
   }
 
   get salary(): number | null {

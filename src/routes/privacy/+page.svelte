@@ -27,9 +27,11 @@
     </p>
     <p>
       Commute searches send your entered address to Photon through our server. Choosing a
-      destination sends its coordinates and nearby city-center coordinates to the routing provider
-      (FOSSGIS by default), which may retain request logs. Commute inputs are temporary and are not
-      saved in browser storage or shared links.
+      destination sends its coordinates and city-center coordinates to the routing provider (FOSSGIS
+      by default), which may retain request logs. Your chosen destination and maximum drive time are
+      saved in this browser so they carry between Plan and Compare. They are excluded from shared
+      links and the page address. Use Clear in the commute controls to remove the saved destination,
+      or clear browser storage to remove all commute settings.
     </p>
     <p>
       City pages may load a representative image from the checked-in image manifest. The browser

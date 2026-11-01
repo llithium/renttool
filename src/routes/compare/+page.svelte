@@ -9,6 +9,8 @@
   import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createUrlSync } from '$lib/urlSync.svelte';
   import type { CitySuggestion } from '$lib/types';
+  import CommuteFilter from '$lib/components/city/CommuteFilter.svelte';
+  import type { CommuteFilterResult } from '$lib/commute';
   import AppHeader from '$lib/components/ui/AppHeader.svelte';
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
   import ScenarioCard from '$lib/components/compare/ScenarioCard.svelte';
@@ -24,6 +26,21 @@
 
   let hydrated = $state(false);
   let cityMessage = $state('');
+  let commute = $state<CommuteFilterResult | null>(null);
+  let commuteLoading = $state(false);
+  // Rent or salary updates must not re-request unchanged routes.
+  let commuteOriginKey = $derived(
+    JSON.stringify(
+      plan.comparisonCities.map((city) => ({
+        label: city.name,
+        city: city.city,
+        state: city.state,
+        lat: city.lat,
+        lng: city.lng
+      }))
+    )
+  );
+  let commuteOrigins: CitySuggestion[] = $derived(JSON.parse(commuteOriginKey));
 
   let cityViewHref = $derived.by(() => {
     return plan.buildHref('/');
@@ -165,6 +182,21 @@
       </div>
     </aside>
 
+    {#if hydrated}
+      <section
+        aria-label="Commute times"
+        class="mt-6 rounded-lg border border-line bg-card p-5 md:p-7"
+      >
+        <CommuteFilter
+          presentation={plan}
+          places={commuteOrigins}
+          mode="comparison"
+          onloading={(loading) => (commuteLoading = loading)}
+          onfilter={(result) => (commute = result)}
+        />
+      </section>
+    {/if}
+
     <div class="flex min-w-0 flex-col">
       {#if analysis.entries.length}
         {#if analysis.entries.length > 1}
@@ -182,6 +214,10 @@
           {#each analysis.entries as entry (entry.city.name)}
             <ScenarioCard
               {entry}
+              {commute}
+              {commuteLoading}
+              commuteDestination={plan.commute.destination?.label}
+              commuteMaximum={plan.commute.maximum}
               href={hrefForCity(entry.city)}
               {salaries}
               housing={plan.options.housing}
@@ -209,7 +245,13 @@
               Taxes estimate a single filer taking the standard deduction.
             </p>
           </div>
-          <CompareMetricsTable {analysis} {hrefForCity} />
+          <CompareMetricsTable
+            {analysis}
+            {hrefForCity}
+            {commute}
+            {commuteLoading}
+            commuteDestination={plan.commute.destination?.label}
+          />
         </section>
       {:else if hydrated}
         <section class="border-b border-line py-16 md:py-20" aria-labelledby="empty-heading">

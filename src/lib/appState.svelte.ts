@@ -33,6 +33,7 @@ import {
   normalizePlanningOptions,
   type PlanningOptions
 } from '$lib/planning';
+import { COMMUTE_STORAGE_KEY, normalizeCommuteSettings, type CommuteSettings } from '$lib/commute';
 import fmrMeta from '$lib/data/fmr-meta.json';
 
 const LAST_KEY = LEGACY_PLAN_STORAGE_KEY;
@@ -91,6 +92,8 @@ const browserAdapters: RentPlanAdapters = {
  * coordinate the workflow themselves.
  */
 export class RentPlanWorkspace {
+  private commuteValue = $state<CommuteSettings>(normalizeCommuteSettings(null));
+  private commuteRestored = false;
   private salaryValue = $state<number | null>(null);
   private optionsValue = $state<PlanningOptions>(normalizePlanningOptions(null));
   private actualTakeHomeValue = $state<{
@@ -133,6 +136,42 @@ export class RentPlanWorkspace {
       },
       (name, result) => this.applyRentLookup(name, result)
     );
+  }
+
+  get commute(): CommuteSettings {
+    return this.commuteValue;
+  }
+
+  setCommute(settings: CommuteSettings): void {
+    const next = normalizeCommuteSettings(settings);
+    const previous = this.commuteValue.destination;
+    if (
+      previous &&
+      next.destination &&
+      previous.lat === next.destination.lat &&
+      previous.lng === next.destination.lng &&
+      previous.label === next.destination.label
+    ) {
+      next.destination = previous;
+    }
+    this.commuteValue = next;
+    this.commuteRestored = true;
+    try {
+      this.adapters.writeStorage(COMMUTE_STORAGE_KEY, JSON.stringify(this.commuteValue));
+    } catch {
+      // Keep the current settings usable when browser storage is unavailable.
+    }
+  }
+
+  private restoreCommute(): void {
+    if (this.commuteRestored) return;
+    this.commuteRestored = true;
+    try {
+      const raw = this.adapters.readStorage(COMMUTE_STORAGE_KEY);
+      if (raw) this.commuteValue = normalizeCommuteSettings(JSON.parse(raw));
+    } catch {
+      // Malformed or unavailable storage leaves the default commute settings.
+    }
   }
 
   get salary(): number | null {
@@ -805,6 +844,7 @@ export class RentPlanWorkspace {
 
   /** Seed state from URL query params. URL comparison state is authoritative. */
   hydrateFromSearch(search: URLSearchParams): boolean {
+    this.restoreCommute();
     this.cancelAllResolutions();
     const representation = restoreRentPlan(search);
     if (representation.salary != null) this.salaryValue = representation.salary;
@@ -858,6 +898,7 @@ export class RentPlanWorkspace {
   }
 
   restoreSession() {
+    this.restoreCommute();
     try {
       const raw = this.adapters.readStorage(LAST_KEY) ?? this.adapters.readStorage(LEGACY_KEY);
       let restoredPlan: Record<string, unknown> | null = null;

@@ -36,8 +36,13 @@ nearby city centers; the candidate list remains limited to eight places within r
 25 miles of the active city. This does not filter the map or external listing searches.
 Times exclude live traffic; they are not rush-hour or apartment-specific estimates.
 Unknown routes are excluded only while the filter is active. Provider failures leave
-all nearby cities visible with a retry action. Addresses and commute filters are temporary,
-reset with the active city, and excluded from storage and shared links.
+all nearby cities visible with a retry action. The selected destination and time limit are
+saved in this browser and retained across reloads, city changes, and Compare. Compare shows
+each entry’s drive time and whether it meets the limit in its card and full breakdown;
+comparison entries remain visible even when they exceed the limit. Missing city coordinates
+use the bundled coordinate lookup. Routing times are recalculated on each visit.
+Clear removes the saved destination. Commute settings are excluded from shared links and the
+page address, including full-plan links.
 
 Address searches use Photon; one OSRM table request calculates all driving times through
 [FOSSGIS](https://routing.openstreetmap.de/about.html). Requests are explicit (no typeahead),

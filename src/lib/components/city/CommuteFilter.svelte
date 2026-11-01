@@ -1,26 +1,43 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import Select from '$lib/components/ui/Select.svelte';
-  import type { NearbyPlace } from '$lib/types';
-  import { matchesCommute, type CommuteDestination, type CommuteFilterResult } from '$lib/commute';
+  import type { CitySuggestion } from '$lib/types';
+  import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
+  import { fetchCoordinates } from '$lib/api';
+  import {
+    isLocation,
+    COMMUTE_LIMITS,
+    matchesCommute,
+    type CommuteDestination,
+    type CommuteFilterResult
+  } from '$lib/commute';
 
   let {
     places,
-    onfilter
-  }: { places: NearbyPlace[]; onfilter: (result: CommuteFilterResult | null) => void } = $props();
+    presentation,
+    mode = 'nearby',
+    onfilter,
+    onloading
+  }: {
+    places: CitySuggestion[];
+    presentation: RentPlanPresentation;
+    mode?: 'nearby' | 'comparison';
+    onfilter: (result: CommuteFilterResult | null) => void;
+    onloading?: (loading: boolean) => void;
+  } = $props();
   let query = $state('');
-  let destination = $state<CommuteDestination | null>(null);
+  let destination = $derived(presentation.commute.destination);
   let suggestions = $state<CommuteDestination[]>([]);
   let searching = $state(false);
   let routing = $state(false);
   let message = $state('');
   let routeError = $state('');
-  let maximum = $state('30');
+  let maximum = $derived(String(presentation.commute.maximum));
   let minutes = $state<Record<string, number | null> | null>(null);
   let retry = $state(0);
   let searchController: AbortController | undefined;
-  const options = ['15', '30', '45', '60', '90'].map((value) => ({
-    value,
+  const options = COMMUTE_LIMITS.map((value) => ({
+    value: String(value),
     label: `${value} minutes`
   }));
   let filter = $derived(minutes ? { minutes, maximum: Number(maximum) } : null);
@@ -30,11 +47,13 @@
   );
 
   $effect(() => onfilter(filter));
+  $effect(() => onloading?.(routing));
+  let displayedQuery = $derived(destination?.label ?? query);
 
   function reset() {
     searchController?.abort();
     searching = false;
-    destination = null;
+    if (destination) presentation.setCommute({ ...presentation.commute, destination: null });
     suggestions = [];
     minutes = null;
     message = '';
@@ -43,6 +62,7 @@
 
   async function search(event: SubmitEvent) {
     event.preventDefault();
+    const searchQuery = displayedQuery;
     reset();
     const controller = new AbortController();
     searchController = controller;
@@ -51,7 +71,7 @@
       const response = await fetch('/api/commute-address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query: searchQuery }),
         signal: controller.signal
       });
       if (!response.ok)
@@ -87,26 +107,65 @@
     routing = true;
     void (async () => {
       try {
-        const response = await fetch('/api/commute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            destination: target,
-            origins: origins.map(({ lat, lng }) => ({ lat, lng }))
-          }),
-          signal: controller.signal
-        });
+        const resolved = await Promise.all(
+          origins.map(async (place) => {
+            if (isLocation(place)) return { ...place, lat: place.lat, lng: place.lng };
+            const coordinates = await fetchCoordinates(place.city, place.state, controller.signal);
+            return coordinates ? { ...place, lat: coordinates[0], lng: coordinates[1] } : null;
+          })
+        );
+        const located = resolved.filter((place) => place !== null);
+        if (controller.signal.aborted) return;
+        if (!located.length) {
+          minutes = Object.fromEntries(origins.map((place) => [place.label, null]));
+          return;
+        }
+        const requestTimes = () =>
+          fetch('/api/commute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              destination: target,
+              origins: located.map(({ lat, lng }) => ({ lat, lng }))
+            }),
+            signal: controller.signal
+          });
+        let response = await requestTimes();
+        // Switching views can follow a previous route request immediately.
+        if (response.status === 429) {
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(finish, 1200);
+            function finish() {
+              clearTimeout(timer);
+              controller.signal.removeEventListener('abort', finish);
+              resolve();
+            }
+            controller.signal.addEventListener('abort', finish, { once: true });
+          });
+          controller.signal.throwIfAborted();
+          response = await requestTimes();
+        }
         if (!response.ok)
           throw new Error(
             response.status === 429
               ? 'Please wait a moment, then retry.'
-              : 'Driving times are unavailable. Retry to filter nearby cities.'
+              : 'Driving times are unavailable. Try again.'
           );
         const data: { minutes: (number | null)[] } = await response.json();
         if (controller.signal.aborted) return;
-        minutes = Object.fromEntries(
-          origins.map((place, index) => [place.label, data.minutes[index]])
-        );
+        if (
+          !Array.isArray(data.minutes) ||
+          data.minutes.length !== located.length ||
+          !data.minutes.every(
+            (value) =>
+              value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+          )
+        )
+          throw new Error('Driving times are unavailable. Try again.');
+        minutes = {
+          ...Object.fromEntries(origins.map((place) => [place.label, null])),
+          ...Object.fromEntries(located.map((place, index) => [place.label, data.minutes[index]]))
+        };
       } catch (error) {
         if (!controller.signal.aborted)
           routeError = error instanceof Error ? error.message : 'Driving times are unavailable.';
@@ -119,7 +178,7 @@
   onDestroy(() => searchController?.abort());
 </script>
 
-<div class="mb-5 border-b border-line pb-5">
+<div class={mode === 'nearby' ? 'mb-5 border-b border-line pb-5' : ''}>
   <form onsubmit={search}>
     <label for="commute-address" class="mb-2 block text-sm font-semibold text-ink"
       >Commute time</label
@@ -129,8 +188,11 @@
         <input
           id="commute-address"
           type="search"
-          bind:value={query}
-          oninput={reset}
+          value={displayedQuery}
+          oninput={(event) => {
+            query = event.currentTarget.value;
+            reset();
+          }}
           placeholder="Enter address, city, state or ZIP code"
           aria-label="Commute destination"
           autocomplete="off"
@@ -156,7 +218,7 @@
       </div>
       <button
         type="submit"
-        disabled={searching || query.trim().length < 2}
+        disabled={searching || displayedQuery.trim().length < 2}
         class="shrink-0 cursor-pointer rounded-lg bg-primary px-3 text-sm font-semibold text-primary-ink disabled:cursor-default disabled:opacity-50"
         >{searching ? 'Searching…' : 'Find'}</button
       >
@@ -174,7 +236,7 @@
             type="button"
             class="min-h-11 w-full cursor-pointer p-3 text-left text-sm hover:bg-card-2"
             onclick={() => {
-              destination = suggestion;
+              presentation.setCommute({ ...presentation.commute, destination: suggestion });
               query = suggestion.label;
               suggestions = [];
               message = '';
@@ -196,7 +258,8 @@
         label="Maximum drive time"
         value={maximum}
         {options}
-        onchange={(value) => (maximum = value)}
+        onchange={(value) =>
+          presentation.setCommute({ ...presentation.commute, maximum: Number(value) })}
       />
     </div>
   </details>
@@ -215,8 +278,12 @@
     </div>
   {/if}
   <div aria-live="polite" class="text-sm text-muted">
-    {#if routing}<p class="mt-2">Calculating driving times… Nearby cities are not filtered yet.</p>
-    {:else if routeError}<p class="mt-2">{routeError} Showing all nearby cities.</p>
+    {#if routing}<p class="mt-2">
+        Calculating driving times…{mode === 'nearby' ? ' Nearby cities are not filtered yet.' : ''}
+      </p>
+    {:else if routeError}<p class="mt-2">
+        {routeError}{mode === 'nearby' ? ' Showing all nearby cities.' : ''}
+      </p>
       <button
         type="button"
         onclick={() => (retry += 1)}
@@ -225,8 +292,11 @@
       >
     {:else if filter}
       <p class="mt-2">
-        {matchCount} of {places.length} nearby cities within {maximum} minutes.{unknownCount
-          ? ` ${unknownCount} without a route excluded.`
+        {matchCount} of {places.length}
+        {mode === 'nearby' ? 'nearby' : 'comparison'} cities within {maximum} minutes.{unknownCount
+          ? mode === 'nearby'
+            ? ` ${unknownCount} without a route excluded.`
+            : ` ${unknownCount} without a route.`
           : ''}
       </p>
       {#if !matchCount}<p class="mt-2">
@@ -235,8 +305,11 @@
     {/if}
   </div>
   <p class="mt-2 text-meta text-muted">
-    City-center driving estimates, without live traffic. This filters only the nearby list, not the
-    map or listing sites.
+    City-center driving estimates, without live traffic.
+    {mode === 'nearby'
+      ? 'This filters only the nearby list, not the map or listing sites.'
+      : 'All comparison entries stay visible, including those over your time limit.'}
+    Saved in this browser.
   </p>
   <p class="mt-1 text-meta text-muted">
     Address search: Photon. Routes: <a

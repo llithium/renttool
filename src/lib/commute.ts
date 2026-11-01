@@ -91,3 +91,26 @@ export function parseAddresses(data: unknown): CommuteDestination[] {
   }
   return results;
 }
+
+export const COMMUTE_STORAGE_KEY = 'rent-tool-commute-v1';
+export const COMMUTE_LIMITS = [15, 30, 45, 60, 90] as const;
+export interface CommuteSettings {
+  destination: CommuteDestination | null;
+  maximum: number;
+}
+
+/** Treat browser storage as untrusted; older plans simply have no commute destination. */
+export function normalizeCommuteSettings(value: unknown): CommuteSettings {
+  const settings = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const candidate = settings.destination;
+  const destination =
+    isLocation(candidate) &&
+    'label' in candidate &&
+    typeof candidate.label === 'string' &&
+    candidate.label.trim().length > 0 &&
+    candidate.label.length <= 300
+      ? { lat: candidate.lat, lng: candidate.lng, label: candidate.label.trim() }
+      : null;
+  const maximum = COMMUTE_LIMITS.find((limit) => limit === settings.maximum) ?? 30;
+  return { destination, maximum };
+}
