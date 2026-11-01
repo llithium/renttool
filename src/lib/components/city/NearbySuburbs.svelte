@@ -3,6 +3,8 @@
   import { fetchNearby } from '$lib/api';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
+  import CommuteFilter from './CommuteFilter.svelte';
+  import { matchesCommute, type CommuteFilterResult } from '$lib/commute';
   import { money } from '$lib/format';
   import { housingRent, housingRentLabel } from '$lib/planning';
 
@@ -24,7 +26,9 @@
   let expanded = $state(false);
   let status = $state('');
   let pendingRentNames = $state<string[]>([]);
-  let visiblePlaces = $derived(expanded ? places : places.slice(0, 4));
+  let commute = $state<CommuteFilterResult | null>(null);
+  let filteredPlaces = $derived(places.filter((place) => matchesCommute(place.label, commute)));
+  let visiblePlaces = $derived(expanded ? filteredPlaces : filteredPlaces.slice(0, 4));
   let compareFull = $derived(presentation.comparisonFull);
 
   async function toggleComparison(place: NearbyPlace) {
@@ -59,6 +63,8 @@
   $effect(() => {
     const { lat, lng, city: cityName, state } = city;
     pendingRentNames = [];
+    commute = null;
+    places = [];
     if (lat == null || lng == null) {
       places = [];
       loading = false;
@@ -66,9 +72,6 @@
     }
     const controller = new AbortController();
     loading = true;
-    // Keep the current chips on screen until the replacement arrives — clearing
-    // them here would collapse the card to the loading line and back on every
-    // click, which reads as a flash. The swap below is atomic.
     fetchNearby(lat, lng, cityName, state, controller.signal).then((res) => {
       if (controller.signal.aborted) return;
       places = res;
@@ -101,6 +104,15 @@
       Keep {city.city} as your active plan while you add a nearby place to compare. Distances are straight-line,
       within roughly 25 miles. Other cities use estimated take-home pay for your current salary and goals.
     </p>
+    {#key city.name}
+      <CommuteFilter
+        {places}
+        onfilter={(result) => {
+          commute = result;
+          expanded = false;
+        }}
+      />
+    {/key}
     <p aria-live="polite" class="mb-3 text-sm text-muted">{status}</p>
 
     {#if !places.length}
@@ -133,6 +145,9 @@
               <p class="mt-1 text-meta text-muted tabular-nums">
                 {#if p.pop != null}{fmtPop(p.pop)} population ·
                 {/if}{p.miles} mi away
+                {#if commute && commute.minutes[p.label] != null}
+                  · <span class="font-semibold text-ink">{commute.minutes[p.label]} min drive</span>
+                {/if}
               </p>
               {#if rent != null && known}
                 <p class="mt-2 text-sm tabular-nums">
@@ -190,12 +205,12 @@
         {/each}
       </ol>
 
-      {#if places.length > 4}
+      {#if filteredPlaces.length > 4}
         <button
           onclick={() => (expanded = !expanded)}
           class="mt-3 cursor-pointer rounded-lg px-2 py-1 text-sm font-semibold text-accent hover:bg-accent-soft hover:text-accent-deep"
         >
-          {expanded ? 'Show fewer places' : `Show ${places.length - 4} more places`}
+          {expanded ? 'Show fewer places' : `Show ${filteredPlaces.length - 4} more places`}
         </button>
       {/if}
     {/if}

@@ -30,6 +30,22 @@ Discovery supports lowest rent, most spending room, rent closest to ceiling, and
 straight-line distance from a bundled reference city. Filters persist in session storage
 when returning from a city page or reloading the same browser tab.
 
+Nearby options include a **Commute time** destination search and a maximum driving-time
+filter (15–90 minutes). Select an address result to calculate routes from the existing
+nearby city centers; the candidate list remains limited to eight places within roughly
+25 miles of the active city. This does not filter the map or external listing searches.
+Times exclude live traffic; they are not rush-hour or apartment-specific estimates.
+Unknown routes are excluded only while the filter is active. Provider failures leave
+all nearby cities visible with a retry action. Addresses and commute filters are temporary,
+reset with the active city, and excluded from storage and shared links.
+
+Address searches use Photon; one OSRM table request calculates all driving times through
+[FOSSGIS](https://routing.openstreetmap.de/about.html). Requests are explicit (no typeahead),
+with a 1.1-second per-provider, per-server-instance burst guard. The public routing service
+allows at most one request per second and no heavy usage. Before scaling to multiple server
+instances or higher traffic, configure `COMMUTE_OSRM_URL` for a dedicated OSRM driving server
+or add a shared quota gate; the local guard is not a deployment-wide rate limiter.
+
 Your plan syncs to the URL for restoration. **Share plan** defaults to **Share cities only**,
 which excludes all financial fields. **Share full plan** includes salaries, housing,
 personal costs, buffer, entered paychecks, and comparison expense overrides. Copying the
@@ -264,7 +280,7 @@ Commit the regenerated JSON together with the fiscal-year documentation update.
   CompareMetricsTable
 - `src/routes/` — the rent-plan view (`/`), comparison view (`/compare`), privacy page, and terms
   page
-- `src/routes/api/` — the six serverless endpoints above
+- `src/routes/api/` — the serverless data and commute endpoints
 
 The planning routes (`/` and `/compare`) are orchestration only: they use the rent-plan
 presentation seam to wire state and intents to components, while owning the section rhythm (the

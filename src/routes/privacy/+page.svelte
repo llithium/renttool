@@ -26,6 +26,12 @@
       a result. Rent Tool does not sell personal information.
     </p>
     <p>
+      Commute searches send your entered address to Photon through our server. Choosing a
+      destination sends its coordinates and nearby city-center coordinates to the routing provider
+      (FOSSGIS by default), which may retain request logs. Commute inputs are temporary and are not
+      saved in browser storage or shared links.
+    </p>
+    <p>
       City pages may load a representative image from the checked-in Unsplash image manifest. The
       browser loads that image from Unsplash's CDN, but Rent Tool does not send the city name to an
       image-search API at runtime.

@@ -1,17 +1,18 @@
 # API Reference
 
-The app ships six serverless `GET` endpoints under `/api/*` ([src/routes/api/](../src/routes/api/)).
+The app ships serverless data and commute endpoints under `/api/*` ([src/routes/api/](../src/routes/api/)).
 They provide a stable client contract over keyless and bundled data sources.
 
 **Conventions**
 
-- All endpoints are `GET` and return JSON.
+- All endpoints return JSON. Data endpoints use `GET`; commute endpoints use `POST`.
 - Bad/missing **required** params return **HTTP 400**, except autocomplete queries shorter
   than two characters, which return an empty list (`{ "message": "…" }`). Every other
-  failure — upstream down or not found — returns **HTTP 200** with an `ok: false`
+  failure for the GET endpoints — upstream down or not found — returns **HTTP 200** with an `ok: false`
   (or empty-result) body, so the client can degrade gracefully instead of throwing.
 - FIPS params are strings: `state` is 2 digits, `county` is 3 digits.
-- Responses set `Cache-Control` for CDN/edge caching (durations noted per endpoint).
+- GET responses set `Cache-Control` for CDN/edge caching (durations noted per endpoint).
+  Commute responses use `no-store`.
 
 Typical call order for a city outside the bundled Apartment List snapshot:
 `city-suggest` → (pick gives coords) → `geocode` (coords → FIPS) → `fmr`.
@@ -258,3 +259,24 @@ Cache: `max-age=86400, s-maxage=2592000` (30d).
 ```bash
 curl "http://localhost:5173/api/population?lat=27.9477&lng=-82.4584"
 ```
+
+## POST `/api/commute-address`
+
+Body: `{ "query": "233 S Wacker Dr, Chicago IL" }` (2–200 characters).
+Returns `{ "destinations": [{ "label": "…", "lat": 41.878, "lng": -87.636 }] }`.
+Up to five US addresses from Photon. Empty matches are distinct from provider failures.
+The user explicitly chooses a result; the first match is never silently assumed.
+
+## POST `/api/commute`
+
+Body: `{ "destination": { "lat": 41.878, "lng": -87.636 }, "origins": [{ "lat": 42.045, "lng": -87.688 }] }`.
+Accepts 1–8 valid coordinate pairs. Returns `{ "minutes": [27] }`, in origin order.
+OSRM table requests route **from each city to the destination**, with no straight-line
+fallback. Seconds are rounded up to whole minutes; unreachable routes remain `null`.
+No traffic, departure-time, transit, or cycling estimates are provided.
+
+Both POST endpoints return 400 for invalid bodies, 413 above 8,000 characters, 429 for
+provider bursts within 1.1 seconds per server instance, and 502 for upstream failures
+or malformed route tables. Responses are not cached. The public OSRM provider defaults
+to FOSSGIS; set `COMMUTE_OSRM_URL` to a dedicated driving-server base URL for higher usage.
+See README for the deployment-wide quota limitation of the per-instance guard.
