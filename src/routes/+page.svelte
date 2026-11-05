@@ -72,7 +72,7 @@
     content="Turn a salary offer into a practical rent budget and compare it with current local estimates."
   />
   <meta property="og:type" content="website" />
-  <meta property="og:image" content="/favicon.svg" />
+  <meta property="og:image" content="/renttool-icon.png" />
 </svelte:head>
 
 <svelte:window onhashchange={revealLinkedSection} />
