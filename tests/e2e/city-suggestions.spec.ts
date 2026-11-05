@@ -1,3 +1,4 @@
+import { openPlanEditor } from './plan';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -68,6 +69,7 @@ test('keeps keyboard choices visible in a mobile menu and meets accessibility ch
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?salary=80000&city=San+Diego%2C+CA');
+  await openPlanEditor(page);
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('San');
   const list = page.getByRole('listbox', { name: 'City suggestions' });

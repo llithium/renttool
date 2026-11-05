@@ -10,7 +10,7 @@ import {
   type HousingChoice
 } from '$lib/planning';
 
-export type DiscoverySort = 'rent' | 'spending' | 'distance' | 'target';
+export type DiscoverySort = 'population' | 'rent' | 'spending' | 'distance' | 'target';
 
 export interface DiscoveryFilters {
   state: string;
@@ -22,7 +22,7 @@ export interface DiscoveryFilters {
 export const DEFAULT_DISCOVERY_FILTERS: DiscoveryFilters = {
   state: '',
   population: 'any',
-  sort: 'rent',
+  sort: 'population',
   reference: ''
 };
 
@@ -40,9 +40,13 @@ export function normalizeDiscoveryFilters(value: unknown): DiscoveryFilters {
         ? record.population
         : 'any',
     sort:
-      record.sort === 'spending' || record.sort === 'distance' || record.sort === 'target'
+      record.sort === 'population' ||
+      record.sort === 'rent' ||
+      record.sort === 'spending' ||
+      record.sort === 'distance' ||
+      record.sort === 'target'
         ? record.sort
-        : 'rent',
+        : DEFAULT_DISCOVERY_FILTERS.sort,
     reference:
       typeof record.reference === 'string' &&
       SEED_CITIES.some(
@@ -54,14 +58,6 @@ export function normalizeDiscoveryFilters(value: unknown): DiscoveryFilters {
 }
 
 export type PopulationFilter = 'any' | 'under100k' | '100k-500k' | '500k+';
-const FEATURED_CITIES = [
-  'Chicago, IL',
-  'Seattle, WA',
-  'Atlanta, GA',
-  'Denver, CO',
-  'Charlotte, NC',
-  'Philadelphia, PA'
-];
 
 export function discoverCities(
   {
@@ -85,9 +81,6 @@ export function discoverCities(
   },
   cities: readonly City[] = SEED_CITIES
 ): City[] {
-  if (maxRent == null && !state && population === 'any' && sort === 'rent' && !reference) {
-    return FEATURED_CITIES.flatMap((name) => cities.find((city) => city.name === name) ?? []);
-  }
   const ceiling = (city: City) =>
     salary != null && options ? rentCeiling(computeBudget(salary, city), options) : maxRent;
   const spending = (city: City) =>
@@ -99,6 +92,10 @@ export function discoverCities(
       ? haversineMiles(reference.lat, reference.lng, city.lat, city.lng)
       : null;
   const score = (city: City): number | null => {
+    if (sort === 'population') {
+      const people = city.citySnapshot?.population ?? city.pop;
+      return people == null ? null : -people;
+    }
     if (sort === 'spending') {
       const available = spending(city);
       return available == null ? null : -available;

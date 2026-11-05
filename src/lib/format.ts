@@ -4,7 +4,8 @@ import type { RentMetric } from '$lib/types';
 /** "$1,234" — rounded, no decimals. */
 export function money(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return '—';
-  return '$' + Math.round(n).toLocaleString();
+  const rounded = Math.round(n);
+  return (rounded < 0 ? '-$' : '$') + Math.abs(rounded).toLocaleString('en-US');
 }
 
 /** Percent with sign, e.g. "+4.3%" / "-6.2%" / "flat". */

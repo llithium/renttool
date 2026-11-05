@@ -1,3 +1,4 @@
+import { openPlanEditor } from './plan';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
@@ -38,12 +39,14 @@ for (const width of [1280, 390]) {
     });
 
     await page.goto('/?salary=80000&city=Washington%2C+DC');
+    await page.getByText('Map & nearby rents', { exact: true }).click();
     const section = page.locator('#nearby-options');
     await expect.poll(() => requests).toContain('38.65');
     await expect.poll(() => requests).toContain('38.66');
     expect(requests.filter((lat) => lat !== '38.65' && lat !== '38.66')).toEqual([]);
     expect(new URL(page.url()).searchParams.getAll('compare-offlist')).toEqual([]);
     await expect(section.getByText('Dale City, VA', { exact: true })).toHaveCount(0);
+    await page.getByText('Map & nearby rents', { exact: true }).click();
     await section.getByRole('button', { name: 'Show 2 more places' }).click();
     const dale = section.getByRole('listitem').filter({ hasText: 'Dale City, VA' });
     const missing = section.getByRole('listitem').filter({ hasText: 'Missing Town, VA' });
@@ -113,6 +116,10 @@ test('checks missing map rents when they enter view and settles unavailable mark
   });
 
   await page.goto('/');
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   await expect(
     page.getByRole('button', { name: 'Map Town, FL, 1 bedroom $1,250, fits budget', exact: true })
   ).toBeVisible();
@@ -122,6 +129,7 @@ test('checks missing map rents when they enter view and settles unavailable mark
   const unavailable = page.getByRole('button', { name: /Far Town, WA, .*rent data unavailable/ });
   await expect(unavailable).toBeVisible();
   expect(requests).toEqual(['27.99', '47.6']);
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('90000');
   await expect(
     page.getByRole('button', { name: 'Map Town, FL, 1 bedroom $1,250, fits budget', exact: true })

@@ -8,8 +8,6 @@
   import CitySidebar from '$lib/components/city/CitySidebar.svelte';
   import CityDiscovery from '$lib/components/landing/CityDiscovery.svelte';
   import CityFacts from '$lib/components/city/CityFacts.svelte';
-  import CityImage from '$lib/components/city/CityImage.svelte';
-  import EstimateNote from '$lib/components/city/EstimateNote.svelte';
   import SearchLinks from '$lib/components/city/SearchLinks.svelte';
   import NearbySuburbs from '$lib/components/city/NearbySuburbs.svelte';
   import TaxBreakdownChart from '$lib/components/city/TaxBreakdownChart.svelte';
@@ -29,8 +27,27 @@
 
   let selected = $derived(plan.activeCity);
   let budget = $derived(plan.budget);
+  let cityDetailsOpen = $state(true);
+  let areaOpen = $state(true);
+  let activeSection = $state('');
+  let apartmentOpen = $state(false);
+  $effect(() => {
+    if (plan.mapFocusRequest > 0 || plan.commute.destination) areaOpen = true;
+  });
+
+  function revealLinkedSection() {
+    activeSection = window.location.hash;
+    if (activeSection === '#apartment-check') apartmentOpen = true;
+    if (activeSection === '#rent-map' || activeSection === '#nearby-options') areaOpen = true;
+    if (activeSection === '#city-details') cityDetailsOpen = true;
+  }
+  $effect(() => {
+    if (apartmentOpen) activeSection = '#apartment-check';
+    else if (activeSection === '#apartment-check') activeSection = '';
+  });
 
   onMount(() => {
+    revealLinkedSection();
     const teardown = urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary));
     return () => {
       plan.flushPersistence();
@@ -58,10 +75,13 @@
   <meta property="og:image" content="/favicon.svg" />
 </svelte:head>
 
+<svelte:window onhashchange={revealLinkedSection} />
+
 <main
   id="main-content"
+  tabindex="-1"
   data-hydrated={urlSync.hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-[120rem] px-4 pt-4 pb-12 md:px-6 md:pt-6 md:pb-16"
 >
   <AppHeader
     planHref={plan.buildHref('/')}
@@ -89,6 +109,48 @@
         <LandingContent presentation={plan}>
           <CitySidebar presentation={plan} {salary} onsalary={(value) => salary.set(value)} />
         </LandingContent>
+        {#if selected}
+          <nav
+            aria-label="Plan sections"
+            data-section-nav="plan"
+            class="mt-2 flex flex-wrap items-center gap-x-4 border-b border-line py-2 lg:border-y"
+          >
+            {#if budget}
+              <a
+                class="inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-deep"
+                href="#apartment-check"
+                onclick={() => (apartmentOpen = true)}
+                aria-current={activeSection === '#apartment-check' ? 'location' : undefined}
+                >Apartment check</a
+              >
+            {/if}
+            {#if budget}<a
+                class="inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-deep"
+                href="#listing-search"
+                aria-current={activeSection === '#listing-search' ? 'location' : undefined}
+                >Listings</a
+              >{/if}
+            <a
+              class="inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-deep"
+              href="#rent-map"
+              aria-current={activeSection === '#rent-map' ? 'location' : undefined}
+              onclick={() => (areaOpen = true)}>Map</a
+            >
+            <a
+              class="inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-deep"
+              href="#nearby-options"
+              aria-current={activeSection === '#nearby-options' ? 'location' : undefined}
+              onclick={() => (areaOpen = true)}>Nearby options</a
+            >
+
+            <a
+              class="inline-flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-deep"
+              href="#city-details"
+              aria-current={activeSection === '#city-details' ? 'location' : undefined}
+              onclick={() => (cityDetailsOpen = true)}>City &amp; taxes</a
+            >
+          </nav>
+        {/if}
       {/if}
 
       {#if urlSync.hydrated && !selected}
@@ -111,109 +173,75 @@
       {/if}
 
       {#if urlSync.hydrated && selected}
-        <nav
-          aria-label="Plan sections"
-          class="sticky top-0 z-30 -mx-4 mt-6 flex flex-wrap gap-1 border-b border-line bg-canvas/95 px-4 py-2 md:mx-0 md:px-0"
-        >
-          {#if budget}<a
-              class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-              href="#listing-search">Listings</a
-            >{/if}
-          <a
-            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#rent-map">Map</a
-          >
-          <a
-            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#nearby-options">Nearby options</a
-          >
-          {#if budget}
-            <a
-              class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-              href="#apartment-check">Apartment check</a
-            >
-          {/if}
-          <a
-            class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#city-details">City &amp; taxes</a
-          >
-          <a
-            class="ml-auto inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-label text-muted no-underline hover:bg-card-2 hover:text-ink"
-            href="#plan-controls">Edit plan</a
-          >
-        </nav>
-
         {#if budget}
-          <section id="listing-search" aria-label="Apartment searches" class="scroll-mt-28 pt-7">
-            <EstimateNote
-              city={selected}
-              housing={plan.options.housing}
-              class="mt-3 max-w-[74ch]"
-            />
+          {#key `${selected.name}:${plan.options.housing}`}
+            <ApartmentCheck presentation={plan} bind:open={apartmentOpen} />
+          {/key}
+          <section id="listing-search" aria-label="Apartment searches" class="scroll-mt-28">
             <SearchLinks
               city={selected}
               maxRent={plan.rentTarget ?? budget.maxRent}
               housing={plan.options.housing}
-              class="mt-5 rounded-lg border border-line bg-card p-5 md:p-7"
+              class="py-5"
             />
           </section>
-          {#key `${selected.name}:${plan.options.housing}`}
-            <ApartmentCheck presentation={plan} />
-          {/key}
         {/if}
-        <div
-          class="mt-6 grid min-w-0 gap-7 rounded-lg border border-line bg-card p-5 md:p-7 lg:grid-cols-2 lg:gap-8"
-        >
-          <section id="rent-map" tabindex="-1" aria-label="Rent map" class="min-w-0 scroll-mt-28">
-            <RentMap presentation={plan} />
-          </section>
-          <section
-            id="nearby-options"
-            tabindex="-1"
-            aria-label="Nearby rent options"
-            class="min-w-0 scroll-mt-28 border-line max-lg:border-t max-lg:pt-7 lg:border-l lg:pl-8"
-          >
-            <NearbySuburbs presentation={plan} city={selected} />
-          </section>
-        </div>
+        <details bind:open={areaOpen} class="border-b border-line">
+          <summary class="min-h-14 cursor-pointer py-4 text-title">Map &amp; nearby rents</summary>
+          <div class="grid min-w-0 items-start gap-7 pb-6 lg:grid-cols-2 lg:gap-8">
+            <section id="rent-map" tabindex="-1" aria-label="Rent map" class="min-w-0 scroll-mt-28">
+              <RentMap presentation={plan} />
+            </section>
+            <section
+              id="nearby-options"
+              tabindex="-1"
+              aria-label="Nearby rent options"
+              class="min-w-0 scroll-mt-28 border-line max-lg:border-t max-lg:pt-7 lg:border-l lg:pl-8"
+            >
+              <NearbySuburbs presentation={plan} city={selected} />
+            </section>
+          </div>
+        </details>
 
         <section
           id="city-details"
           tabindex="-1"
           aria-label="City and tax details"
-          class="mt-6 grid min-w-0 scroll-mt-28 gap-6 {budget
-            ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]'
-            : ''}"
+          class="min-w-0 scroll-mt-28 border-b border-line"
         >
-          <div class="min-w-0 rounded-lg border border-line bg-card p-5 md:p-7">
-            <CityFacts city={selected} looking={plan.looking} />
-          </div>
-          {#if budget}
-            <div class="min-w-0 rounded-lg border border-line bg-card p-5 md:p-7">
-              <TaxBreakdownChart
-                city={selected}
-                {budget}
-                housing={plan.options.housing}
-                actualTakeHomeMonthly={plan.actualTakeHomeMonthly}
-              />
+          <details bind:open={cityDetailsOpen}>
+            <summary class="min-h-14 cursor-pointer py-4 text-title"
+              >City facts &amp; tax breakdown</summary
+            >
+            <div
+              class="grid min-w-0 gap-6 {budget
+                ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]'
+                : ''}"
+            >
+              <div class="min-w-0 py-6">
+                <CityFacts city={selected} looking={plan.looking} />
+              </div>
+              {#if budget}
+                <div class="min-w-0 py-6">
+                  <TaxBreakdownChart
+                    city={selected}
+                    {budget}
+                    housing={plan.options.housing}
+                    actualTakeHomeMonthly={plan.actualTakeHomeMonthly}
+                  />
+                </div>
+              {/if}
             </div>
-          {/if}
-          {#key selected.name}<CityImage
-              city={selected}
-              class="overflow-hidden rounded-lg lg:col-span-full"
-            />{/key}
+          </details>
         </section>
 
         {#if budget && plan.comparisonCities.length}
-          <ComparisonTable
-            presentation={plan}
-            class="mt-6 rounded-lg border border-line bg-card p-5 md:p-7"
-          />
+          <ComparisonTable presentation={plan} class="mt-6 border-t border-line py-6" />
         {/if}
       {/if}
 
       {#if urlSync.hydrated}
-        <SourcesFooter class="mt-8 border-t border-line pt-7" />
+        <SourcesFooter class="mt-6 pt-4" />
       {/if}
     </div>
   </div>

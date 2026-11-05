@@ -9,6 +9,20 @@ describe('budget-aware city discovery', () => {
     { ...city('Other, FL', 1100), pop: 200000 },
     { ...city('Unknown, TX', 1000), pop: null }
   ];
+  it('sorts the full catalog by rent when lowest rent is selected', () => {
+    expect(
+      discoverCities({ maxRent: null, housing: '1br' }, places).map((place) => place.name)
+    ).toEqual(['Small, TX', 'Unknown, TX', 'Other, FL', 'Large, TX']);
+  });
+  it('orders largest cities and leaves unknown sizes last', () => {
+    const withPopulation = { ...places[0], pop: 800000 };
+    expect(
+      discoverCities({ maxRent: null, housing: '1br', sort: 'population' }, [
+        withPopulation,
+        ...places.slice(1)
+      ]).map((place) => place.name)
+    ).toEqual(['Small, TX', 'Large, TX', 'Other, FL', 'Unknown, TX']);
+  });
   it('combines rent, state, and population filters', () => {
     expect(
       discoverCities(
@@ -53,5 +67,5 @@ it('sorts by target proximity, spending room, and distance with missing coordina
       state: 'ZZ',
       reference: 'Unknown, ZZ'
     })
-  ).toEqual({ sort: 'rent', population: 'any', state: '', reference: '' });
+  ).toEqual({ sort: 'population', population: 'any', state: '', reference: '' });
 });

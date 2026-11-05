@@ -245,6 +245,11 @@
   }
 
   onMount(() => {
+    // The map may be revealed from a disclosure or resized with its column.
+    const resizeObserver = new ResizeObserver(() => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) map?.invalidateSize({ animate: false });
+    });
+    resizeObserver.observe(el);
     void import('leaflet')
       .then((leaflet) => {
         if (disposed) return;
@@ -290,6 +295,7 @@
 
     return () => {
       disposed = true;
+      resizeObserver.disconnect();
       rentCheckController.abort();
       map?.remove();
     };
@@ -342,8 +348,8 @@
 
 <section class={className}>
   <SectionHeading title="Affordability map">
-    <div class="flex gap-3.5 text-xs text-muted">
-      <div class="flex flex-wrap justify-end gap-x-3.5 gap-y-1">
+    <div class="flex w-full gap-3.5 text-meta text-muted sm:w-auto">
+      <div class="flex flex-wrap justify-start gap-x-3.5 gap-y-1">
         {#if selectedName}
           <span class="inline-flex items-center gap-1.5 font-semibold text-ink">
             <i class="inline-block size-2.5 rounded-full border-2 border-accent bg-card"></i>
@@ -368,9 +374,9 @@
     bind:this={el}
     class="leaflet-theme h-100 w-full overflow-hidden rounded-md border border-line bg-card-2"
   ></div>
-  <p class="mt-3 text-xs/relaxed text-muted">
-    Select a marker to load that city. Other cities use estimated take-home pay for your current
-    salary and goals.
+  <p class="mt-3 text-meta text-muted">
+    Select a marker to load that city. Other cities use estimated pay at this salary; entered pay
+    applies only to {selectedName ?? 'the selected city'}.
   </p>
 </section>
 

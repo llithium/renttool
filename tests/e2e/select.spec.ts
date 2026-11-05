@@ -1,3 +1,4 @@
+import { openPlanEditor } from './plan';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { chooseSelect } from './select';
@@ -11,6 +12,7 @@ test('supports keyboard selection, cancellation, type-ahead, and tab dismissal',
   page
 }) => {
   await page.goto('/?salary=80000');
+  await openPlanEditor(page);
   const housing = page.getByRole('combobox', { name: 'Housing setup', exact: true });
   await housing.focus();
   await housing.press('ArrowDown');
@@ -43,8 +45,9 @@ for (const dark of [false, true]) {
     await page.goto('/?salary=80000');
     await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
     if (dark) await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    await openPlanEditor(page);
     const housing = page.getByRole('combobox', { name: 'Housing setup', exact: true });
-    if (dark) await expect(housing).toHaveCSS('color', 'rgb(245, 245, 245)');
+    if (dark) await expect(housing).toHaveCSS('color', 'rgb(241, 245, 255)');
     await housing.click();
     const menu = page.getByRole('listbox', { name: 'Housing setup', exact: true });
     const bounds = (await menu.boundingBox())!;
@@ -57,7 +60,7 @@ for (const dark of [false, true]) {
       ['serious', 'critical'].includes(violation.impact ?? '')
     );
     expect(violations).toEqual([]);
-    await page.getByRole('heading', { name: 'Know what rent fits before you move.' }).click();
+    await page.getByRole('heading', { name: 'Find your city. Know your rent.' }).click();
     await expect(menu).toHaveCount(0);
     await chooseSelect(housing, 'shared-2br');
     await expect(housing).toHaveAttribute('data-value', 'shared-2br');
@@ -69,8 +72,11 @@ test('opens above a low field without moving the page and skips disabled choices
 }) => {
   await page.setViewportSize({ width: 390, height: 480 });
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
+  await openPlanEditor(page);
   const housing = page.getByRole('combobox', { name: 'Housing setup', exact: true });
   await expect(housing).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await housing.evaluate((element) => element.scrollIntoView({ block: 'end' }));
   const before = (await housing.boundingBox())!;
   await housing.click();
   await expect(housing).toHaveAttribute('aria-expanded', 'true');
@@ -82,6 +88,7 @@ test('opens above a low field without moving the page and skips disabled choices
   expect(menu.y + menu.height).toBeLessThanOrEqual(after.y);
   await housing.press('Escape');
   await page.getByRole('button', { name: 'Explore other cities', exact: true }).click();
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('');
   const sort = page.getByRole('combobox', { name: 'Sort by', exact: true });
   await sort.click();

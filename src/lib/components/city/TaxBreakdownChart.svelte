@@ -44,13 +44,12 @@
 
 <!-- Local snippets rather than extra components: the segment and swatch are used
      only inside this chart, and inlining keeps every utility visible here. -->
-{#snippet segment(width: number, label: string, minLabelPct: number, tone: string)}
+{#snippet segment(width: number, tone: string)}
   <div
-    class="flex min-w-0 items-center overflow-hidden px-2 text-meta font-semibold whitespace-nowrap transition-[width] duration-400 {tone}"
+    aria-hidden="true"
+    class="h-full min-w-0 transition-[width] duration-400 {tone}"
     style="width:{width}%"
-  >
-    {#if width >= minLabelPct}<span class="truncate">{label}</span>{/if}
-  </div>
+  ></div>
 {/snippet}
 
 {#snippet swatch(label: string, tone: string)}
@@ -63,6 +62,7 @@
   <SectionHeading title="Where the money goes" />
 
   <div class="mb-1 text-meta text-muted">
+    <strong class="block font-semibold text-ink">Salary-based tax estimate</strong>
     Gross monthly {money(budget.grossMonthly)}{taxAmt > 0
       ? ` · estimated taxes ${money(taxAmt)}`
       : ''}
@@ -70,43 +70,23 @@
   <div
     role="img"
     aria-label={`Gross monthly ${money(budget.grossMonthly)}: ${money(taxAmt)} taxes, ${money(budget.takeHomeMonthly)} take-home`}
-    class="mb-2 flex h-8 w-full origin-left animate-grow-x overflow-hidden rounded-lg"
+    class="mb-3 flex h-5 w-full origin-left animate-grow-x overflow-hidden"
   >
     {#if budget.federalMonthly > 0}
-      {@render segment(
-        fedPct,
-        `Federal ${money(budget.federalMonthly)}`,
-        13,
-        'bg-red text-accent-ink'
-      )}
+      {@render segment(fedPct, 'bg-red')}
     {/if}
     {#if budget.ficaMonthly > 0}
-      {@render segment(ficaPct, `FICA ${money(budget.ficaMonthly)}`, 13, 'bg-amber text-amber-ink')}
+      {@render segment(ficaPct, 'bg-amber')}
     {/if}
     {#if budget.stateMonthly > 0}
-      {@render segment(
-        statePct,
-        `State ${money(budget.stateMonthly)}`,
-        13,
-        'bg-tax-state text-accent-ink'
-      )}
+      {@render segment(statePct, 'bg-tax-state')}
     {/if}
     {#if budget.localMonthly > 0}
-      {@render segment(
-        localPct,
-        `Local ${money(budget.localMonthly)}`,
-        13,
-        'bg-tax-local text-accent-ink'
-      )}
+      {@render segment(localPct, 'bg-tax-local')}
     {/if}
-    {@render segment(
-      takePct,
-      `Take-home ${money(budget.takeHomeMonthly)}`,
-      0,
-      'bg-green text-accent-ink'
-    )}
+    {@render segment(takePct, 'bg-green')}
   </div>
-  <div class="mb-4 flex flex-wrap gap-x-3.5 gap-y-1 text-meta text-muted">
+  <div class="mb-6 flex flex-wrap gap-x-3.5 gap-y-2 text-meta text-muted">
     {#if budget.federalMonthly > 0}
       {@render swatch(`Federal ${money(budget.federalMonthly)}`, 'bg-red')}
     {/if}
@@ -119,26 +99,28 @@
     {#if budget.localTaxModeled && budget.localMonthly > 0}
       {@render swatch(`Local ${money(budget.localMonthly)}`, 'bg-tax-local')}
     {/if}
+    {@render swatch(`Take-home ${money(budget.takeHomeMonthly)}`, 'bg-green')}
   </div>
 
   {#if rentAmount != null}
     <div class="mb-1 text-meta text-muted">
-      Take-home split{actualTakeHomeMonthly != null ? ' · entered pay' : ' · estimated pay'}
+      {actualTakeHomeMonthly != null
+        ? `Your entered take-home: ${money(takeHome)}/mo`
+        : 'Estimated take-home split'}
     </div>
     <div
       role="img"
-      aria-label={`Take-home split: ${money(rent)} rent, ${money(remaining)} left`}
-      class="mb-2 flex h-8 w-full origin-left animate-grow-x overflow-hidden rounded-lg"
+      aria-label={`Take-home split: ${money(rent)} rent, ${money(remaining)} left before other expenses and savings`}
+      class="mb-3 flex h-5 w-full origin-left animate-grow-x overflow-hidden"
     >
-      {@render segment(
-        rentPct,
-        rentPct >= 30 ? `Rent ${money(rent)}` : money(rent),
-        14,
-        `${rentShare > 100 ? 'bg-red' : 'bg-accent'} text-accent-ink`
-      )}
+      {@render segment(rentPct, rentShare > 100 ? 'bg-red' : 'bg-accent')}
       {#if remaining > 0}
-        {@render segment(leftPct, `Left ${money(remaining)}`, 16, 'bg-surplus text-ink')}
+        {@render segment(leftPct, 'bg-surplus')}
       {/if}
+    </div>
+    <div class="mb-3 flex flex-wrap gap-x-3.5 gap-y-2 text-meta text-muted">
+      {@render swatch(`Rent ${money(rent)}`, rentShare > 100 ? 'bg-red' : 'bg-accent')}
+      {@render swatch(`After rent, before expenses & savings ${money(remaining)}`, 'bg-surplus')}
     </div>
     <p class="mt-1 text-sm text-ink">
       {#if takeHome > 0}

@@ -1,3 +1,4 @@
+import { openPlanEditor } from './plan';
 import { chooseSelect } from './select';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
@@ -25,6 +26,7 @@ function markerName(city: string, annualSalary: number): string {
 }
 
 async function selectCity(page: Page, query: string, label: string) {
+  await openPlanEditor(page);
   const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill(query);
   const option = page.getByRole('listbox').getByRole('option', { name: label, exact: true });
@@ -40,8 +42,7 @@ async function waitForHydration(page: Page) {
 
 async function chartContrastRatios(page: Page): Promise<number[]> {
   return page
-    .getByRole('img', { name: /^Gross monthly/ })
-    .locator(':scope > div')
+    .locator('[role="img"][aria-label^="Gross monthly"] + div > span')
     .evaluateAll((elements) => {
       function parseColor(value: string): [number, number, number] {
         const channels = value.match(/\d*\.?\d+/g)?.map(Number) ?? [];
@@ -65,7 +66,17 @@ async function chartContrastRatios(page: Page): Promise<number[]> {
       return elements.map((element) => {
         const style = getComputedStyle(element);
         const foreground = luminance(style.color);
-        const background = luminance(style.backgroundColor);
+        let surface: Element | null = element;
+        while (
+          surface &&
+          ['rgba(0, 0, 0, 0)', 'transparent'].includes(getComputedStyle(surface).backgroundColor)
+        )
+          surface = surface.parentElement;
+        const background = luminance(
+          surface
+            ? getComputedStyle(surface).backgroundColor
+            : getComputedStyle(document.documentElement).backgroundColor
+        );
         const lighter = Math.max(foreground, background);
         const darker = Math.min(foreground, background);
         return (lighter + 0.05) / (darker + 0.05);
@@ -100,7 +111,7 @@ test('does not server-render the landing state before a saved city hydrates', as
   const response = await request.get('/?salary=80000&city=Tampa%2C+FL');
   const html = await response.text();
   expect(html).toContain('Loading saved rent plan');
-  expect(html).not.toMatch(/<h1[^>]*>\s*Know what rent fits before you move\.\s*<\/h1>/);
+  expect(html).not.toContain('Find your city.');
 });
 
 test('restores an off-list selected city and seed comparison from a shared URL', async ({
@@ -232,6 +243,7 @@ test('keeps the latest salary when city navigation pushes history', async ({ pag
   await city.fill('Austin');
   const option = page.getByRole('listbox').getByRole('option', { name: 'Austin, TX' });
   await expect(option).toBeVisible();
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('90000');
   await option.dispatchEvent('mousedown');
 
@@ -272,6 +284,7 @@ test('makes the landing controls directly accessible with unclipped focus', asyn
 });
 
 test('opens the featured city with the current salary and housing setup', async ({ page }) => {
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   await chooseSelect(
     page.getByRole('combobox', { name: 'Housing setup', exact: true }),
@@ -336,7 +349,7 @@ test('crossfades between photographed cities and holds the city while it is bein
   await featured.hover();
   await page.clock.fastForward(16_000);
   await expect(explore).toHaveAttribute('href', secondHref);
-  await page.getByRole('heading', { name: 'Know what rent fits before you move.' }).hover();
+  await page.getByRole('heading', { name: 'Find your city. Know your rent.' }).hover();
   await page.clock.fastForward(8_000);
   await expect(explore).not.toHaveAttribute('href', secondHref);
 
@@ -370,8 +383,12 @@ test('supports keyboard city selection and salary results', async ({ page }) => 
   ).toBeVisible();
   await expect(city).toHaveAttribute('aria-activedescendant', 'city-option-0');
   await city.press('Enter');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('100000');
   await expect(page.getByRole('heading', { name: 'New York, NY' })).toBeVisible();
+  await expect(
+    page.getByText('City facts & tax breakdown', { exact: true }).locator('..')
+  ).toHaveAttribute('open', '');
   await expect(
     page.locator('[data-testid="fact"]').getByText('Estimated median 1BR rent', { exact: true })
   ).toBeVisible();
@@ -382,6 +399,7 @@ test('supports keyboard city selection and salary results', async ({ page }) => 
 
 test('shows a static credited city image when the city has a manifest entry', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
 
   const image = page.getByTestId('city-image');
@@ -399,6 +417,7 @@ test('shows a static credited city image when the city has a manifest entry', as
 
 test('credits a Wikimedia city photo with its title and license', async ({ page }) => {
   await selectCity(page, 'Anchorage', 'Anchorage, AK');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   const expected = imageData['Anchorage, AK'];
   const image = page.getByTestId('city-image');
@@ -452,6 +471,7 @@ test('keeps bundled city suggestions when autocomplete is throttled', async ({ p
 
 test('keeps the accepted city explicit while a different city is being typed', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   const city = page.getByRole('combobox', { name: 'City', exact: true });
   await city.fill('Austin');
@@ -465,7 +485,9 @@ test('keeps the accepted city explicit while a different city is being typed', a
 
 test('credits the bundled Apartment List estimates', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+  await page.getByText('Data & methods', { exact: true }).click();
   const source = page.getByRole('link', { name: 'Apartment List Rent Estimates' });
   await expect(source).toHaveAttribute(
     'href',
@@ -480,10 +502,9 @@ test('has no serious accessibility violations in populated state', async ({ page
   await city.pressSequentially('Tampa', { delay: 20 });
   await expect(page.getByRole('listbox').getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
   await city.press('Enter');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   await expect(page.getByRole('heading', { name: 'Tampa, FL' })).toBeVisible();
-  // Result/side cards fade in via an entrance animation; wait for them to reach
-  // full opacity so axe measures settled colors rather than mid-fade contrast.
   await page.waitForFunction(() =>
     [
       ...document.querySelectorAll('[data-testid="results"] > *, [data-testid="sidebar"] > *')
@@ -497,8 +518,13 @@ test('has no serious accessibility violations in populated state', async ({ page
 
 test('keeps tax breakdown labels readable in both themes', async ({ page }) => {
   await selectCity(page, 'New York', 'New York, NY');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('100000');
   await expect(page.getByRole('heading', { name: 'New York, NY' })).toBeVisible();
+
+  await expect(
+    page.getByText('City facts & tax breakdown', { exact: true }).locator('..')
+  ).toHaveAttribute('open', '');
 
   for (const theme of ['light', 'dark'] as const) {
     if (theme === 'dark') {
@@ -518,6 +544,7 @@ test('does not overflow a mobile viewport', async ({ page }) => {
   await city.pressSequentially('Tampa', { delay: 20 });
   await expect(page.getByRole('listbox').getByRole('option', { name: 'Tampa, FL' })).toBeVisible();
   await city.press('Enter');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -527,6 +554,7 @@ test('does not overflow a mobile viewport', async ({ page }) => {
 });
 
 test('enforces the five-city comparison limit', async ({ page }) => {
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('100000');
   for (const [query, label] of [
     ['Tampa', 'Tampa, FL'],
@@ -546,6 +574,7 @@ test('enforces the five-city comparison limit', async ({ page }) => {
 });
 
 test('restores the comparison set from browser history links', async ({ page }) => {
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   await expect.poll(() => new URL(page.url()).searchParams.get('salary')).toBe('80000');
 
@@ -570,24 +599,28 @@ test('restores the comparison set from browser history links', async ({ page }) 
 test('keeps each selected city with its salary when opening the detailed comparison', async ({
   page
 }) => {
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('60000');
   await selectCity(page, 'Denver', 'Denver, CO');
   await page.getByRole('button', { name: '+ Compare' }).click();
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('90000');
   await selectCity(page, 'Nashville', 'Nashville, TN');
   await page.getByRole('button', { name: '+ Compare' }).click();
 
   await page.getByRole('link', { name: 'Detailed comparison →' }).click();
   await expect(page).toHaveURL(/\/compare\?/);
-  await expect(page.getByRole('heading', { name: 'Denver, CO' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Nashville, TN' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View Denver, CO plan' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View Nashville, TN plan' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit details for Denver, CO', exact: true }).click();
   await expect(page.getByLabel('Annual salary in Denver, CO')).toHaveValue('60,000');
   await expect(page.getByLabel('Annual salary in Nashville, TN')).toHaveValue('90,000');
   const denverRent = oneBedroomRent('Denver, CO');
   const nashvilleRent = oneBedroomRent('Nashville, TN');
   await expect(
     page.getByText(`${dollars(60_000 / 40 - denverRent)} under budget`, { exact: true })
-  ).toHaveCSS('color', 'rgb(49, 115, 69)');
+  ).toHaveCSS('color', 'rgb(33, 112, 71)');
+  await page.getByText('Full breakdown', { exact: true }).click();
   const oneBedroomRow = page.getByRole('row').filter({ hasText: /^1BR rent/ });
   await expect(oneBedroomRow).toHaveCount(1);
   await expect(oneBedroomRow.locator('td[data-tone="best"]')).toContainText(
@@ -686,7 +719,7 @@ test('compares equivalent salaries with a selectable reference city', async ({ p
   await expect(equivalence.getByText('Reference', { exact: true })).toHaveCount(1);
   await expect(equivalence.locator('article')).toHaveCount(2);
 
-  // Axe samples computed colors, so wait until entrance opacity has settled.
+  // Let recalculated values finish their short position animation.
   await page.locator('[data-testid="scenario"]').evaluateAll(async (scenarios) => {
     await Promise.all(
       scenarios
@@ -718,7 +751,12 @@ test('shows salary equivalence only when two comparison entries are present', as
 
 test('exposes map markers to the keyboard', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   await expect(page.getByText('Current city: Tampa, FL', { exact: true })).toBeVisible();
   const marker = page.getByRole('button', {
     name: markerName('New York, NY', 80_000)
@@ -820,7 +858,11 @@ test('labels HUD data as Fair Market Rent', async ({ page }) => {
     })
   );
   await selectCity(page, 'Ithaca', 'Ithaca, NY');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
+  await expect(
+    page.getByText('City facts & tax breakdown', { exact: true }).locator('..')
+  ).toHaveAttribute('open', '');
   await expect(
     page.locator('[data-testid="fact"]').getByText('1BR Fair Market Rent', { exact: true })
   ).toBeVisible();
@@ -833,6 +875,7 @@ test('labels HUD data as Fair Market Rent', async ({ page }) => {
 
 test('restores selected city and salary after reload', async ({ page }) => {
   await selectCity(page, 'Tampa', 'Tampa, FL');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('80000');
   // State is mirrored into the URL, so the reload restores from the query string.
   await expect.poll(() => new URL(page.url()).searchParams.get('city')).toBe('Tampa, FL');
@@ -878,6 +921,9 @@ test('re-resolves an off-list city from deep-linked coordinates', async ({ page 
   await waitForHydration(page);
   await expect(page.getByRole('heading', { name: 'Ithaca, NY' })).toBeVisible();
   await expect(
+    page.getByText('City facts & tax breakdown', { exact: true }).locator('..')
+  ).toHaveAttribute('open', '');
+  await expect(
     page.locator('[data-testid="fact"]').getByText('1BR Fair Market Rent', { exact: true })
   ).toBeVisible();
 });
@@ -885,10 +931,16 @@ test('re-resolves an off-list city from deep-linked coordinates', async ({ page 
 test('retains actual map marker elements when salary changes', async ({ page }) => {
   await page.goto('/?salary=80000&city=Tampa%2C+FL');
   await waitForHydration(page);
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   const marker = page.getByRole('button', { name: markerName('Tampa, FL', 80_000) });
   await expect(marker).toBeVisible();
   const original = await marker.elementHandle();
   if (!original) throw new Error('The selected city marker did not mount.');
+
+  await openPlanEditor(page);
 
   await page.getByLabel('Annual salary', { exact: true }).fill('30000');
   const updated = page.getByRole('button', { name: markerName('Tampa, FL', 30_000) });
@@ -924,6 +976,7 @@ test('keeps comparison controls and tables usable on narrow screens', async ({ p
     await expect(city).toBeInViewport();
   }
   await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByText('Full breakdown', { exact: true }).click();
   const table = page.getByRole('region', { name: /Full city comparison/ });
   await table.focus();
   await expect(table).toBeFocused();
@@ -991,7 +1044,9 @@ test('section shortcuts preserve the plan and return keyboard users to editing',
   const navBounds = (await navigation.boundingBox())!;
   const nearbyBounds = (await nearby.boundingBox())!;
   expect(nearbyBounds.y).toBeGreaterThanOrEqual(navBounds.y + navBounds.height);
-  await navigation.getByRole('link', { name: 'Edit plan' }).click();
+  await page.getByRole('link', { name: 'Edit salary and housing', exact: true }).click();
+  await page.keyboard.press('Tab');
+  await expect(page.getByTestId('plan-editor-toggle')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('combobox', { name: 'City', exact: true })).toBeFocused();
   await expect(page.getByLabel('Annual salary', { exact: true })).toHaveValue('80,000');
@@ -1003,13 +1058,20 @@ test('explores a gallery city before salary entry and retains the comparison set
 }) => {
   await page.goto('/?compare=Seattle%2C+WA');
   await waitForHydration(page);
+  await chooseSelect(page.getByLabel('State', { exact: true }), 'IL');
+  await chooseSelect(page.getByLabel('Population', { exact: true }), '500k+');
   await page.getByRole('link', { name: 'Explore Chicago, IL', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Chicago, IL', exact: true })).toBeVisible();
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   await expect(page.getByRole('heading', { name: 'Affordability map' })).toBeVisible();
   await expect(page.getByText('Enter a salary to see what fits.', { exact: true })).toBeVisible();
   await expect
     .poll(() => new URL(page.url()).searchParams.getAll('compare'))
     .toContain('Seattle, WA');
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('85000');
   await expect(
     page.getByRole('button', { name: markerName('Chicago, IL', 85000), exact: true })
@@ -1020,7 +1082,7 @@ test('explores a gallery city before salary entry and retains the comparison set
 test('keeps the affordability verdict with the salary controls', async ({ page }) => {
   await page.goto('/?salary=85000&city=Chicago%2C+IL');
   await waitForHydration(page);
-  const planControls = page.getByTestId('sidebar').locator('#plan-controls');
+  const planControls = page.getByTestId('sidebar');
   await expect(
     planControls.getByRole('heading', { name: 'Fits your 30% gross-income target' })
   ).toBeVisible();
@@ -1034,12 +1096,17 @@ test('shares housing and personal costs across the plan, map, searches, and comp
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
   await waitForHydration(page);
   await chooseSelect(page.getByLabel('Housing setup', { exact: true }), 'shared-2br');
+  await openPlanEditor(page);
   await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
   await page.getByLabel('Actual monthly take-home', { exact: true }).fill('4200');
   await page.getByLabel('Recurring monthly expenses').fill('1200');
   await page.getByLabel('Monthly savings target').fill('500');
   await expect(page.getByTestId('plan-summary')).toContainText(
     `${dollars(Math.round(4200 - chicago.r2 / 2 - 1700))}/mo`
+  );
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
   );
   await expect(
     page.getByRole('button', {
@@ -1088,6 +1155,7 @@ test('shares housing and personal costs across the plan, map, searches, and comp
     page.getByRole('listbox').getByRole('option').filter({ hasText: 'Seattle, WA' })
   ).toContainText(`${dollars(Math.round(seattle.r2 / 2))}/mo`);
   await citySearch.press('Escape');
+  await page.getByRole('button', { name: 'Edit details for Chicago, IL', exact: true }).click();
   const card = page.getByTestId('scenario').filter({ hasText: 'Chicago, IL' });
   await expect(card).toContainText('Entered take-home pay');
   await card.getByText('Use actual take-home pay', { exact: true }).click();
@@ -1100,6 +1168,7 @@ test('shares housing and personal costs across the plan, map, searches, and comp
 test('filters discovered cities by salary, state, and population and adds a comparison', async ({
   page
 }) => {
+  await openPlanEditor(page);
   await page.getByLabel('Annual salary', { exact: true }).fill('60000');
   const gallery = page.getByRole('region', { name: 'Cities within your rent target' });
   await chooseSelect(gallery.getByLabel('State', { exact: true }), 'TX');
@@ -1120,15 +1189,19 @@ test('filters discovered cities by salary, state, and population and adds a comp
   ).toBeVisible();
 });
 
-test('shows nearby rent prices and places the rent decision and searches before photography', async ({
+test('shows nearby rent prices and places city photography beside the city identity', async ({
   page
 }) => {
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
   await waitForHydration(page);
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   const nearby = page.locator('#nearby-options');
   await expect(nearby.getByText(/\/mo/).first()).toBeVisible();
   await expect(
-    nearby.getByText(/Within your rent target|Above your rent target/).first()
+    nearby.getByText(/Fits estimated budget|Above estimated budget/).first()
   ).toBeVisible();
   const positions = await page.evaluate(() => {
     const result = document.querySelector('#rent-decision')!;
@@ -1143,8 +1216,9 @@ test('shows nearby rent prices and places the rent decision and searches before 
       )
     };
   });
-  expect(positions).toEqual({ resultBeforeSearch: true, searchBeforePhoto: true });
+  expect(positions).toEqual({ resultBeforeSearch: true, searchBeforePhoto: false });
   await page.setViewportSize({ width: 390, height: 844 });
+  await openPlanEditor(page);
   await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(

@@ -8,13 +8,20 @@
   import { STATE_NAME } from '$lib/data/states';
   import { housingRent, housingShortLabel } from '$lib/planning';
   import { money } from '$lib/format';
-  import CityHeadline from '$lib/components/city/CityHeadline.svelte';
 
   let { children, presentation }: { children?: Snippet; presentation: RentPlanPresentation } =
     $props();
 
   let city = $derived(presentation.activeCity);
-  const featuredCities = SEED_CITIES.flatMap((city) => {
+  const heroCities = new Set([
+    'Chicago, IL',
+    'Seattle, WA',
+    'Denver, CO',
+    'Atlanta, GA',
+    'Philadelphia, PA',
+    'Tampa, FL'
+  ]);
+  const featuredCities = SEED_CITIES.filter((city) => heroCities.has(city.name)).flatMap((city) => {
     const image = findCityImage(city.city, city.state);
     return image ? [{ city, image }] : [];
   });
@@ -54,7 +61,7 @@
   });
 
   $effect(() => {
-    // Leave the card still while someone reads, tabs through it, or edits a city plan.
+    // Leave the featured city still while someone reads, tabs through it, or edits a plan.
     if (city) {
       hovered = false;
       focused = false;
@@ -79,32 +86,12 @@
 </svelte:head>
 
 <article aria-label="Rent plan" class="min-w-0" class:landing={!city}>
-  {#if city}
-    <div class="city-arrival">
-      <CityHeadline {city} />
-    </div>
-  {:else}
+  {#if !city}
     <header class="arrival-heading">
-      <h1>Know what rent fits before you move.</h1>
+      <h1>Find your city.<br />Know your rent.</h1>
       <p>
-        See what your salary makes possible, compare local rents, and leave room for everyday life.
+        Choose a city and enter your salary to see local rents and what you’ll have left each month.
       </p>
-      <a class="landing-start" href="#plan-controls"
-        >Build my rent plan <svg
-          aria-hidden="true"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          ><path
-            d="M5 12h14m-6-6 6 6-6 6"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          /></svg
-        ></a
-      >
     </header>
   {/if}
 
@@ -211,77 +198,63 @@
 <style>
   .landing {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: 1.5rem 0;
-    align-items: stretch;
-    padding-top: 0.5rem;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-areas: 'heading photo' 'editor photo';
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 1.5rem;
+    background: var(--card);
+    box-shadow: var(--elevation-card);
   }
   .arrival-heading {
-    padding: 2rem 2.5rem;
-    border: 1px solid var(--line);
-    border-right: 0;
-    border-radius: 0.75rem 0 0 0.75rem;
-    background: var(--card);
+    grid-area: heading;
+    padding: 2.5rem 2.5rem 1.75rem;
   }
   .arrival-heading h1 {
-    max-width: 20ch;
-    font-size: clamp(2.375rem, 4vw, 3.5rem);
+    font-size: clamp(2.75rem, 4.6vw, 4.25rem);
     font-weight: 600;
-    line-height: 1.08;
-    letter-spacing: -0.045em;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
   }
   .arrival-heading p {
-    max-width: 52ch;
-    margin-top: 1rem;
+    max-width: 42ch;
+    margin-top: 1.25rem;
     font-size: 1rem;
-    line-height: 1.55;
+    line-height: 1.6;
     color: var(--muted);
   }
-  .landing-start {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    border-radius: 999px;
-    padding: 0.75rem 1.25rem;
-    background: var(--primary);
-    color: var(--primary-ink);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-  }
-  .landing-start:hover {
-    opacity: 0.85;
-  }
   .landing .landing-editor {
-    grid-column: 1 / -1;
+    grid-area: editor;
+    padding: 0 2.5rem 1.5rem;
+  }
+  .landing .landing-editor :global(#plan-controls) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
   .featured-city {
-    grid-column: 2;
-    grid-row: 1;
-    display: flex;
+    position: relative;
+    grid-area: photo;
     min-width: 0;
+    min-height: 35rem;
+    display: flex;
     flex-direction: column;
-    padding: 1.5rem;
-    border: 1px solid var(--line);
-    border-left: 0;
-    border-radius: 0 0.75rem 0.75rem 0;
-    background: var(--card);
   }
   .featured-photo {
     position: relative;
     flex: 1;
-    min-height: 11rem;
+    min-height: 20rem;
     overflow: hidden;
-    border-radius: 0.5rem;
-    background: #27272a;
+    background: #294773;
   }
   .featured-photo::after {
     content: '';
     position: absolute;
-    inset: 25% 0 0;
-    background: linear-gradient(transparent, rgb(0 0 0 / 88%));
+    inset: 35% 0 0;
+    background: linear-gradient(transparent, rgb(7 20 47 / 88%));
     pointer-events: none;
   }
   .featured-photo img {
@@ -289,56 +262,58 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: 48% center;
   }
   .featured-meta {
     position: absolute;
     z-index: 1;
-    right: 1rem;
-    bottom: 0.75rem;
-    left: 1rem;
+    right: 1.5rem;
+    bottom: 1.25rem;
+    left: 1.5rem;
   }
   .featured-location {
     display: flex;
     align-items: center;
     gap: 0.375rem;
-    color: #ffffff;
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.4;
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 600;
   }
   .featured-location svg {
     flex-shrink: 0;
   }
   .featured-credit {
     margin-top: 0.375rem;
-    color: #ffffff;
-    font-size: 0.6875rem;
-    line-height: 1.3;
+    color: white;
+    font-size: 0.75rem;
+    line-height: 1.4;
   }
   .featured-caption {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.75rem;
-    padding-top: 1rem;
+    padding: 1.25rem;
+    border-radius: 0;
+    background: var(--card);
   }
   .featured-rent span {
     display: block;
     margin-bottom: 0.25rem;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
   }
   .featured-rent strong {
-    font-size: 1.375rem;
-    font-weight: 600;
-    letter-spacing: -0.035em;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
   }
   .featured-rent small {
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 400;
     letter-spacing: 0;
   }
@@ -347,65 +322,71 @@
     min-height: 2.75rem;
     align-items: center;
     gap: 0.5rem;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 0.5rem 0.75rem;
-    color: var(--ink);
-    font-size: 0.75rem;
-    font-weight: 500;
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--primary);
+    color: var(--primary-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
     text-decoration: none;
   }
-  .featured-explore svg {
-    flex-shrink: 0;
-  }
   .featured-explore:hover {
-    border-color: var(--line-strong);
-    background: var(--card-2);
+    filter: brightness(0.95);
   }
   .featured-caption > p {
     flex-basis: 100%;
     color: var(--muted);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     line-height: 1.4;
   }
-  .city-arrival {
-    margin: 1rem 0;
-  }
-  @media (max-width: 1100px) {
+  @media (max-width: 1000px) {
     .landing {
-      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     }
     .arrival-heading {
-      padding: 2rem;
+      padding: 2rem 1.5rem 1.5rem;
     }
-    .featured-city {
-      padding: 1.25rem;
+    .landing .landing-editor {
+      padding: 0 1.5rem 1.5rem;
     }
   }
-  @media (max-width: 800px) {
+  @media (max-width: 700px) {
     .landing {
       grid-template-columns: minmax(0, 1fr);
-      gap: 1.25rem;
+      grid-template-areas: 'heading' 'editor' 'photo';
+      border-radius: 1.25rem;
     }
     .arrival-heading {
-      padding: 1.5rem;
-      border-right: 1px solid var(--line);
-      border-radius: 0.5rem;
+      padding: 1.5rem 1.25rem;
     }
     .arrival-heading h1 {
-      font-size: clamp(2.375rem, 6vw, 3rem);
+      font-size: clamp(2rem, 8.7vw, 3.5rem);
+    }
+    .arrival-heading p {
+      margin-top: 1rem;
+    }
+    .landing .landing-editor {
+      padding: 0 1.25rem 1.25rem;
     }
     .featured-city {
-      grid-column: 1;
-      grid-row: 3;
-      border-left: 1px solid var(--line);
-      border-radius: 0.5rem;
+      min-height: 22rem;
     }
     .featured-photo {
-      min-height: 12rem;
+      min-height: 16rem;
     }
-    .featured-credit {
-      font-size: 0.6875rem;
+    .featured-meta {
+      left: 1.25rem;
+      bottom: 1.25rem;
+    }
+    .featured-location {
+      font-size: 1rem;
+    }
+    .featured-caption {
+      padding: 1rem;
+      gap: 0.625rem;
+    }
+    .featured-rent strong {
+      font-size: 1.75rem;
     }
   }
 </style>

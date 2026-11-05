@@ -23,7 +23,7 @@
   onclick={toggleTheme}
   aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
   title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-  class="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-3 py-2 text-meta text-muted transition-colors duration-200 hover:border-line-strong hover:text-ink active:scale-98"
+  class="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-line bg-card px-3 py-2 text-meta text-muted transition-colors duration-200 hover:border-line-strong hover:text-ink active:scale-98"
 >
   <svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none">
     {#if theme === 'light'}<path
@@ -36,5 +36,5 @@
         stroke-width="1.5"
       />{/if}
   </svg>
-  {theme === 'light' ? 'Dark' : 'Light'}
+  <span class="hidden sm:inline">{theme === 'light' ? 'Dark' : 'Light'}</span>
 </button>

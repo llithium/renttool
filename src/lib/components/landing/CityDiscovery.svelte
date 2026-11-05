@@ -4,8 +4,6 @@
   import { computeBudget } from '$lib/budget';
   import { haversineMiles } from '$lib/geo';
   import { SEED_CITIES, RENT_DATA_META } from '$lib/data/cities';
-  import { findCityImage } from '$lib/data/city-images';
-  import ImageCredit from '$lib/components/city/ImageCredit.svelte';
   import type { CitySuggestion } from '$lib/types';
   import { money } from '$lib/format';
   import {
@@ -55,9 +53,9 @@
       ((filters.sort === 'spending' || filters.sort === 'target') && presentation.salary == null) ||
       (filters.sort === 'distance' && !reference)
     )
-      filters.sort = 'rent';
+      filters.sort = DEFAULT_DISCOVERY_FILTERS.sort;
   });
-  let limit = $state(12);
+  let limit = $state(6);
   let status = $state('');
   let cities = $derived(
     discoverCities({
@@ -79,7 +77,7 @@
     void filters.population;
     void filters.sort;
     void filters.reference;
-    limit = 12;
+    limit = 6;
   });
 </script>
 
@@ -92,7 +90,9 @@
         {cities.length} cities · current ceiling {money(presentation.rentTarget)}/mo for {housingShortLabel(
           presentation.options.housing
         )}
-      </p>{:else}<p class="text-sm text-muted">{cities.length} cities to explore</p>{/if}
+      </p>{:else}<p class="text-sm text-muted">
+        Showing {visible.length} of {cities.length} cities
+      </p>{/if}
   </div>
   <div class="discovery-filters">
     <Select
@@ -122,6 +122,7 @@
       label="Sort by"
       value={filters.sort}
       options={[
+        { value: 'population', label: 'Largest cities' },
         { value: 'rent', label: 'Lowest rent' },
         { value: 'spending', label: 'Most spending room', disabled: presentation.salary == null },
         {
@@ -143,7 +144,10 @@
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((city) => ({ value: city.name, label: city.name }))
       ]}
-      onchange={(value) => (filters.reference = value)}
+      onchange={(value) => {
+        filters.reference = value;
+        filters.sort = value ? 'distance' : DEFAULT_DISCOVERY_FILTERS.sort;
+      }}
     />
   </div>
   <p class="mt-3 mb-5 text-meta text-muted">
@@ -156,7 +160,6 @@
     </p>{/if}
   <div class="city-gallery">
     {#each visible as city (city.name)}
-      {@const image = findCityImage(city.city, city.state)}
       {@const rent = housingRent(city, presentation.options.housing)}
       {@const available =
         presentation.salary != null
@@ -171,60 +174,50 @@
           ? haversineMiles(reference.lat, reference.lng, city.lat, city.lng)
           : null}
       <article class="destination">
-        <a
-          href={hrefForCity(city.name)}
-          onclick={(event) => {
-            if (
-              event.button !== 0 ||
-              event.metaKey ||
-              event.ctrlKey ||
-              event.shiftKey ||
-              event.altKey
-            )
-              return;
-            event.preventDefault();
-            onchoose({
-              label: city.name,
-              city: city.city,
-              state: city.state,
-              lat: city.lat,
-              lng: city.lng
-            });
-          }}
-          class="destination-link"
-          aria-label={`Explore ${city.name}`}
-        >
-          <div class="destination-photo">
-            {#if image}
-              <img
-                src={image.url}
-                style:object-position={image.focusY == null ? undefined : `50% ${image.focusY}%`}
-                alt={image.alt}
-                loading="lazy"
-                onerror={(event) => {
-                  if (event.currentTarget instanceof HTMLImageElement)
-                    event.currentTarget.style.visibility = 'hidden';
-                }}
-              />
-            {/if}
-            <span class="destination-name">{city.city}<small>{city.state}</small></span>
-          </div>
-          <div class="destination-rent">
-            <span>{housingShortLabel(presentation.options.housing)} estimate</span>
-            <strong>{rent == null ? 'Unavailable' : `${money(rent)}/mo`}</strong>
-          </div>
-        </a>
-        {#if filters.sort === 'spending' && available != null}<p class="mt-2 text-sm text-muted">
-            {money(available)}/mo after rent, expenses &amp; savings
-          </p>{/if}
-        {#if filters.sort === 'distance' && miles != null}<p class="mt-2 text-sm text-muted">
-            {Math.round(miles)} mi from {reference?.name}
-          </p>{/if}
-        {#if image}
-          <p class="photo-credit">
-            <ImageCredit {image} />
-          </p>
-        {/if}
+        <div class="destination-content">
+          <a
+            href={hrefForCity(city.name)}
+            onclick={(event) => {
+              if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
+              event.preventDefault();
+              onchoose({
+                label: city.name,
+                city: city.city,
+                state: city.state,
+                lat: city.lat,
+                lng: city.lng
+              });
+            }}
+            class="destination-link"
+            aria-label={`Explore ${city.name}`}
+          >
+            <div class="destination-top">
+              <span class="destination-name"
+                ><span data-city-name>{city.city}</span><small
+                  >{STATE_NAME[city.state] ?? city.state}</small
+                ></span
+              >
+            </div>
+            <div class="destination-rent">
+              <span>{housingShortLabel(presentation.options.housing)} estimate</span>
+              <strong>{rent == null ? 'Unavailable' : `${money(rent)}/mo`}</strong>
+            </div>
+          </a>
+          {#if filters.sort === 'spending' && available != null}<p class="mt-2 text-sm text-muted">
+              {money(available)}/mo after rent, expenses &amp; savings
+            </p>{/if}
+          {#if filters.sort === 'distance' && miles != null}<p class="mt-2 text-sm text-muted">
+              {Math.round(miles)} mi from {reference?.name}
+            </p>{/if}
+        </div>
+
         <button
           type="button"
           disabled={!presentation.isComparing(city.name) && presentation.comparisonFull}
@@ -241,6 +234,12 @@
             }
           }}
           class="destination-compare"
+          aria-label={presentation.isComparing(city.name)
+            ? 'Remove comparison'
+            : presentation.comparisonFull
+              ? 'Comparison full'
+              : 'Add to comparison'}
+          aria-pressed={presentation.isComparing(city.name)}
           ><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none">
             <path
               d={presentation.isComparing(city.name) ? 'M5 10h10' : 'M5 10h10m-5-5v10'}
@@ -248,11 +247,19 @@
               stroke-width="1.5"
               stroke-linecap="round"
             />
-          </svg>{presentation.isComparing(city.name)
-            ? 'Remove comparison'
-            : presentation.comparisonFull
-              ? 'Comparison full'
-              : 'Add to comparison'}</button
+          </svg><span data-compare-long aria-hidden="true"
+            >{presentation.isComparing(city.name)
+              ? 'Remove comparison'
+              : presentation.comparisonFull
+                ? 'Comparison full'
+                : 'Add to comparison'}</span
+          ><span data-compare-short aria-hidden="true"
+            >{presentation.isComparing(city.name)
+              ? 'Remove'
+              : presentation.comparisonFull
+                ? 'Full'
+                : 'Compare'}</span
+          ></button
         >
       </article>
     {/each}
@@ -270,138 +277,131 @@
 
 <style>
   .discovery {
-    margin-top: 2.5rem;
-    padding-top: 0;
+    margin-top: 3rem;
   }
   .discovery-heading {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 1.5rem;
     flex-wrap: wrap;
+    margin-bottom: 1.5rem;
   }
   .discovery-filters {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
-    padding: 1.25rem;
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    background: var(--card);
   }
   .city-gallery {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.75rem 1.5rem;
+    border-top: 2px solid var(--ink);
   }
   .destination {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid var(--line);
+    padding: 1rem 0;
+  }
+  .destination-content {
     min-width: 0;
   }
   .destination-link {
-    display: block;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.45fr);
+    align-items: center;
+    gap: 1rem;
     color: var(--ink);
     text-decoration: none;
-    border-radius: 0.5rem;
   }
-  .destination-photo {
-    position: relative;
-    overflow: hidden;
-    border-radius: 0.5rem;
-    background: #27272a;
-    aspect-ratio: 1.7;
-  }
-  .destination-photo::after {
-    content: '';
-    position: absolute;
-    inset: 25% 0 0;
-    background: linear-gradient(transparent, rgb(0 0 0 / 88%));
-  }
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 220ms;
-  }
-  .destination-link:hover img {
-    transform: scale(1.035);
+  [data-city-name] {
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: 1px;
   }
   .destination-name {
-    position: absolute;
-    z-index: 1;
-    bottom: 1rem;
-    left: 1rem;
-    color: white;
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 600;
+    line-height: 1.15;
   }
   small {
     display: block;
+    margin-top: 0.25rem;
     font-family: var(--font-sans);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 400;
+    color: var(--muted);
   }
   .destination-rent {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 1rem 0 0.35rem;
-    font-size: 0.875rem;
-  }
-  .destination-rent strong {
-    font-size: 1rem;
+    text-align: right;
     font-variant-numeric: tabular-nums;
   }
   .destination-rent span {
+    display: block;
     color: var(--muted);
+    font-size: 0.75rem;
   }
-  .photo-credit {
-    font-size: 0.7rem;
-    color: var(--muted);
+  .destination-rent strong {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .destination-link:hover .destination-name {
+    color: var(--accent);
   }
   .destination-compare {
     display: inline-flex;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0.375rem;
-    min-height: 2.75rem;
-    margin-top: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    border: 1px solid var(--line);
-    border-radius: 0.625rem;
+    padding: 0.5rem;
     color: var(--accent);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
   }
-  .destination-compare:hover:not(:disabled) {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  .destination-compare svg {
+    flex-shrink: 0;
+  }
+  [data-compare-short] {
+    display: none;
+  }
+  .destination-compare[aria-pressed='true'] {
+    color: var(--ink);
   }
   .destination-compare:disabled {
-    color: var(--faint);
+    color: var(--muted);
     cursor: not-allowed;
   }
-  @media (max-width: 800px) {
-    .discovery {
-      margin-top: 2.5rem;
-      padding-top: 2rem;
-    }
+  @media (max-width: 640px) {
     .discovery-filters {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .city-gallery {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1.5rem 1rem;
+    .destination {
+      gap: 0.5rem;
     }
-  }
-  @media (max-width: 440px) {
-    .discovery-filters {
-      gap: 1rem 0.75rem;
-      padding: 1rem;
+    .destination-link {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.5rem;
     }
-    .city-gallery {
-      grid-template-columns: 1fr;
+    .destination-name {
+      font-size: 1.375rem;
+    }
+    .destination-rent strong {
+      font-size: 1rem;
+    }
+    .destination-compare {
+      justify-content: flex-end;
+      padding: 0.5rem 0;
+      font-size: 0.8125rem;
+    }
+    [data-compare-long] {
+      display: none;
+    }
+    [data-compare-short] {
+      display: inline;
     }
   }
 </style>

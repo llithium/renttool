@@ -34,7 +34,7 @@
 <div>
   <label for={id} class="mb-2 block text-label text-muted">{label}</label>
   <div
-    class="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-card px-3 focus-within:border-accent"
+    class="flex min-h-11 items-center gap-2 rounded-lg border border-line-strong bg-card px-3 focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"
   >
     <span aria-hidden="true" class="text-muted">$</span>
     <input
@@ -49,7 +49,7 @@
       oninput={input}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-      class="min-w-0 flex-1 bg-transparent py-2 text-sm text-ink tabular-nums outline-none"
+      class="min-w-0 flex-1 bg-transparent py-2 text-base text-ink tabular-nums outline-none"
     />
     {#if monthly}<span class="text-meta text-muted">/mo</span>{/if}
   </div>

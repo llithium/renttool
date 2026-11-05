@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/state';
   import { analyzeComparison } from '$lib/compare/decision';
   import { analyzeSalaryEquivalence } from '$lib/compare/salaryEquivalence';
@@ -15,11 +15,13 @@
   import CitySearch from '$lib/components/ui/CitySearch.svelte';
   import ScenarioCard from '$lib/components/compare/ScenarioCard.svelte';
   import CompareHighlights from '$lib/components/compare/CompareHighlights.svelte';
+  import ComparisonSummary from '$lib/components/compare/ComparisonSummary.svelte';
   import SalaryEquivalence from '$lib/components/compare/SalaryEquivalence.svelte';
   import CompareMetricsTable from '$lib/components/compare/CompareMetricsTable.svelte';
   import SharePlan from '$lib/components/ui/SharePlan.svelte';
   import HousingSelector from '$lib/components/ui/HousingSelector.svelte';
   import PersonalCosts from '$lib/components/ui/PersonalCosts.svelte';
+  import PlanAssumptions from '$lib/components/ui/PlanAssumptions.svelte';
 
   const salaries = createCompareSalaries((name, salary) => plan.setComparisonSalary(name, salary));
   const urlSync = createUrlSync(plan);
@@ -28,6 +30,13 @@
   let cityMessage = $state('');
   let commute = $state<CommuteFilterResult | null>(null);
   let commuteLoading = $state(false);
+  let commuteOpen = $state(false);
+  let breakdownOpen = $state(false);
+  let costsOpen = $state(false);
+  let activeSection = $state('#decision-heading');
+  $effect(() => {
+    if (plan.commute.destination) commuteOpen = true;
+  });
   // Rent or salary updates must not re-request unchanged routes.
   let commuteOriginKey = $derived(
     JSON.stringify(
@@ -101,7 +110,16 @@
       void plan.addComparison(plan.activeCity.name);
     salaries.sync(plan.comparisonEntries);
     hydrated = true;
-    return teardown;
+    function revealLinkedSection() {
+      activeSection = window.location.hash || '#decision-heading';
+      if (window.location.hash === '#comparison-breakdown') breakdownOpen = true;
+    }
+    revealLinkedSection();
+    window.addEventListener('hashchange', revealLinkedSection);
+    return () => {
+      teardown();
+      window.removeEventListener('hashchange', revealLinkedSection);
+    };
   });
 </script>
 
@@ -115,8 +133,9 @@
 
 <main
   id="main-content"
+  tabindex="-1"
   data-hydrated={hydrated ? 'true' : 'false'}
-  class="mx-auto w-full max-w-7xl px-4 pt-4 pb-20 md:px-6 md:pt-6 md:pb-24"
+  class="mx-auto w-full max-w-[120rem] px-4 pt-4 pb-12 md:px-6 md:pt-6 md:pb-16"
 >
   <AppHeader
     planHref={cityViewHref}
@@ -128,109 +147,131 @@
   <div class="mt-6 flex min-w-0 flex-col">
     <section>
       <h1 class="mt-3 max-w-4xl text-display text-ink">Compare cities and salaries</h1>
+      <PlanAssumptions
+        options={plan.options}
+        defaults
+        onedit={async () => {
+          costsOpen = true;
+          await tick();
+          document.getElementById('compare-expenses')?.focus();
+        }}
+      />
     </section>
 
-    <aside class="mt-8 min-w-0 border-y border-line py-6 md:py-7">
-      <section
-        class="grid gap-6 md:gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,0.65fr)]"
+    {#if analysis.entries.length > 1}
+      <nav
+        aria-label="Comparison sections"
+        data-section-nav="comparison"
+        class="sticky top-0 z-30 mt-3 flex flex-wrap gap-1 border-b border-line bg-canvas/95 py-1 [&>a]:shrink-0"
       >
-        <div>
-          <p class="text-title text-ink">Your comparison</p>
-          <p class="mt-2 text-sm/relaxed text-muted">
-            Add up to five cities. Set a different salary for each offer in the results.
-          </p>
-        </div>
-        <div class="lg:border-l lg:border-line lg:pl-8">
+        <a
+          href="#decision-heading"
+          aria-current={activeSection === '#decision-heading' ? 'location' : undefined}
+          class="inline-flex min-h-11 items-center px-1 text-label text-accent underline underline-offset-4 hover:bg-card-2 hover:text-ink"
+          >Decision</a
+        >
+        <a
+          href="#comparison-offers"
+          aria-current={activeSection === '#comparison-offers' ? 'location' : undefined}
+          class="inline-flex min-h-11 items-center px-1 text-label text-accent underline underline-offset-4 hover:bg-card-2 hover:text-ink"
+          >Salaries</a
+        >
+        <a
+          href="#salary-equivalence-heading"
+          aria-current={activeSection === '#salary-equivalence-heading' ? 'location' : undefined}
+          class="inline-flex min-h-11 items-center px-1 text-label text-accent underline underline-offset-4 hover:bg-card-2 hover:text-ink"
+          >Equivalent pay</a
+        >
+        <a
+          href="#comparison-breakdown"
+          aria-current={activeSection === '#comparison-breakdown' ? 'location' : undefined}
+          onclick={() => (breakdownOpen = true)}
+          class="inline-flex min-h-11 items-center px-1 text-label text-accent underline underline-offset-4 hover:bg-card-2 hover:text-ink"
+          >Breakdown</a
+        >
+      </nav>
+    {/if}
+
+    {#if analysis.entries.length > 1}
+      <CompareHighlights {analysis} {hrefForCity} />
+    {/if}
+
+    {#if analysis.entries.length}
+      <ComparisonSummary
+        {analysis}
+        {hrefForCity}
+        {salaries}
+        onremove={(name) => {
+          plan.removeComparison(name);
+          salaries.sync(plan.comparisonEntries);
+        }}
+      >
+        {#snippet editor(entry)}
+          <ScenarioCard
+            {entry}
+            {commute}
+            {commuteLoading}
+            commuteDestination={plan.commute.destination?.label}
+            commuteMaximum={plan.commute.maximum}
+            href={hrefForCity(entry.city)}
+            housing={plan.options.housing}
+            defaultExpenses={plan.options.monthlyExpenses}
+            onexpenses={(value) => plan.setComparisonExpenses(entry.city.name, value)}
+            ontakehome={(value) => plan.setComparisonActualTakeHome(entry.city.name, value)}
+          />
+        {/snippet}
+      </ComparisonSummary>
+    {/if}
+
+    <aside data-comparison-controls aria-label="Comparison controls">
+      <div
+        class="grid grid-cols-1 items-start gap-4 min-[360px]:grid-cols-2 md:grid-cols-[1fr_0.7fr_auto]"
+      >
+        <div class="min-[360px]:col-span-2 md:col-span-1">
           {#if atCapacity}
-            <div class="border-l-2 border-accent pl-4">
-              <p class="text-label text-ink">Five cities are ready.</p>
-              <p class="mt-1 text-meta text-muted">Remove one from the results to add another.</p>
-            </div>
+            <p class="text-label text-ink">Five cities added</p>
+            <p class="mt-2 text-sm text-muted">Remove a city to add another.</p>
           {:else}
             <CitySearch onselect={addCity} housing={plan.options.housing} />
           {/if}
-        </div>
-        <div class="lg:border-l lg:border-line lg:pl-8">
-          <p aria-live="polite" class="min-h-5 text-meta text-muted">
-            {cityMessage || `${plan.comparisonNames.length} of 5 cities added`}
+          <p aria-live="polite" class="mt-2 text-meta text-muted">
+            {cityMessage || plan.comparisonNames.length + ' of 5 cities added'}
           </p>
+        </div>
+        <HousingSelector
+          value={plan.options.housing}
+          onchange={(housing) => plan.setOptions({ ...plan.options, housing })}
+          id="compare-housing"
+        />
+        <div class="flex flex-wrap items-start gap-2 min-[360px]:pt-4">
           <SharePlan presentation={plan} pathname="/compare" />
           {#if analysis.entries.length}
             <button
               type="button"
+              aria-label="Clear comparison"
               onclick={clearComparison}
-              class="mt-5 cursor-pointer text-sm font-semibold text-accent underline-offset-4 hover:text-accent-deep hover:underline"
+              class="min-h-11 cursor-pointer text-sm font-semibold text-muted underline-offset-4 hover:text-red hover:underline"
+              >Clear</button
             >
-              Clear comparison
-            </button>
           {/if}
         </div>
-      </section>
-      <div class="mt-6 max-w-2xl border-t border-line pt-5">
-        <div class="max-w-sm">
-          <HousingSelector
-            value={plan.options.housing}
-            onchange={(housing) => plan.setOptions({ ...plan.options, housing })}
-            id="compare-housing"
-          />
-        </div>
-        <PersonalCosts
-          options={plan.options}
-          onoptions={(options) => plan.setOptions(options)}
-          id="compare"
-        />
       </div>
+      <PersonalCosts
+        bind:open={costsOpen}
+        options={plan.options}
+        onoptions={(options) => plan.setOptions(options)}
+        id="compare"
+      />
     </aside>
-
-    {#if hydrated}
-      <section
-        aria-label="Commute times"
-        class="mt-6 rounded-lg border border-line bg-card p-5 md:p-7"
-      >
-        <CommuteFilter
-          presentation={plan}
-          places={commuteOrigins}
-          mode="comparison"
-          onloading={(loading) => (commuteLoading = loading)}
-          onfilter={(result) => (commute = result)}
-        />
-      </section>
-    {/if}
 
     <div class="flex min-w-0 flex-col">
       {#if analysis.entries.length}
         {#if analysis.entries.length > 1}
-          <CompareHighlights {analysis} {hrefForCity} />
           <SalaryEquivalence
             analysis={salaryEquivalence}
             onreferencechange={(name) => (equivalenceReference = name)}
           />
         {/if}
-
-        <section
-          class="mt-7 grid grid-flow-dense grid-cols-1 gap-5 md:grid-cols-2"
-          aria-label="Comparison entries"
-        >
-          {#each analysis.entries as entry (entry.city.name)}
-            <ScenarioCard
-              {entry}
-              {commute}
-              {commuteLoading}
-              commuteDestination={plan.commute.destination?.label}
-              commuteMaximum={plan.commute.maximum}
-              href={hrefForCity(entry.city)}
-              {salaries}
-              housing={plan.options.housing}
-              defaultExpenses={plan.options.monthlyExpenses}
-              onexpenses={(value) => plan.setComparisonExpenses(entry.city.name, value)}
-              ontakehome={(value) => plan.setComparisonActualTakeHome(entry.city.name, value)}
-              onremove={() => {
-                plan.removeComparison(entry.city.name);
-                salaries.sync(plan.comparisonEntries);
-              }}
-            />
-          {/each}
-        </section>
 
         {#if analysis.entries.length === 1}
           <p class="mt-5 border-t border-line pt-4 text-sm text-muted">
@@ -238,13 +279,30 @@
           </p>
         {/if}
 
-        <section class="mt-8 border-t border-line pt-6">
-          <div class="mb-5 flex items-end justify-between gap-5 max-md:flex-col max-md:items-start">
-            <h2 class="text-title">Full breakdown</h2>
-            <p class="max-w-85 text-right text-meta text-muted max-md:text-left">
-              Taxes estimate a single filer taking the standard deduction.
-            </p>
-          </div>
+        <section aria-label="Commute times" class="mt-6 border-y border-line py-1">
+          <details bind:open={commuteOpen}>
+            <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold"
+              >Check commute times</summary
+            >
+            <CommuteFilter
+              presentation={plan}
+              places={commuteOrigins}
+              mode="comparison"
+              onloading={(loading) => (commuteLoading = loading)}
+              onfilter={(result) => (commute = result)}
+            />
+          </details>
+        </section>
+
+        <details
+          id="comparison-breakdown"
+          bind:open={breakdownOpen}
+          class="mt-6 scroll-mt-24 border-y border-line"
+        >
+          <summary class="min-h-11 cursor-pointer py-4 text-title">Full breakdown</summary>
+          <p class="mb-5 text-meta text-muted">
+            Taxes estimate a single filer taking the standard deduction.
+          </p>
           <CompareMetricsTable
             {analysis}
             {hrefForCity}
@@ -252,7 +310,7 @@
             {commuteLoading}
             commuteDestination={plan.commute.destination?.label}
           />
-        </section>
+        </details>
       {:else if hydrated}
         <section class="border-b border-line py-16 md:py-20" aria-labelledby="empty-heading">
           <div class="max-w-2xl">
@@ -265,10 +323,19 @@
         </section>
       {/if}
 
-      <footer class="mt-12 border-t border-line pt-6 text-meta text-muted">
+      <footer class="mt-8 border-t border-line pt-5 text-meta text-muted">
         Figures are estimates for planning, not tax or financial advice. Rent sources and
         methodology are shown for each city.
       </footer>
     </div>
   </div>
 </main>
+
+<style>
+  [data-comparison-controls] {
+    margin-top: 1.5rem;
+    padding: 1.25rem 0 0.25rem;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+</style>

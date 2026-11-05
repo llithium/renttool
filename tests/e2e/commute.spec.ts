@@ -55,6 +55,10 @@ test('filters nearby cities, adjusts the limit, clears safely, and recovers from
     )
   );
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   const region = page.getByRole('region', { name: 'Nearby rent options', exact: true });
   const address = region.getByRole('searchbox', { name: 'Commute destination' });
   await address.fill('Willis Tower');
@@ -115,6 +119,10 @@ test('ignores stale address results after editing the destination', async ({ pag
     });
   });
   await page.goto('/?salary=80000&city=Chicago%2C+IL');
+  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    ''
+  );
   await page.getByRole('searchbox', { name: 'Commute destination' }).fill('Old address');
   const request = page.waitForRequest('**/api/commute-address');
   await page.getByRole('button', { name: 'Find', exact: true }).click();
@@ -146,6 +154,9 @@ for (const view of ['reload', 'compare'] as const) {
       });
     });
     await page.goto('/?salary=80000&city=Chicago%2C+IL&compare=Tampa%2C+FL');
+    await expect(
+      page.getByText('Map & nearby rents', { exact: true }).locator('..')
+    ).toHaveAttribute('open', '');
     await page.getByRole('searchbox', { name: 'Commute destination' }).fill('Willis Tower');
     await page.getByRole('button', { name: 'Find', exact: true }).click();
     await page
@@ -169,11 +180,13 @@ for (const view of ['reload', 'compare'] as const) {
       'Willis Tower, Chicago, Illinois'
     );
     if (view === 'compare') {
+      await page.getByRole('button', { name: 'Edit details for Tampa, FL', exact: true }).click();
       await expect(page.getByTestId('scenario').filter({ hasText: 'Tampa, FL' })).toContainText(
         '45 min drive'
       );
       const controls = page.getByRole('region', { name: 'Commute times', exact: true });
       await expect(controls).toContainText('within 45 minutes');
+      await page.getByText('Full breakdown', { exact: true }).click();
       const breakdown = page.getByRole('region', {
         name: 'Full city comparison; scroll horizontally for more'
       });
@@ -188,6 +201,7 @@ for (const view of ['reload', 'compare'] as const) {
       await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue(
         'Willis Tower, Chicago, Illinois'
       );
+      await page.getByRole('button', { name: 'Edit details for Tampa, FL', exact: true }).click();
       await expect(page.getByTestId('scenario')).toContainText('Over 15-minute limit');
       expect(
         (await new AxeBuilder({ page }).analyze()).violations.filter(
@@ -208,6 +222,7 @@ for (const view of ['reload', 'compare'] as const) {
       );
       await page.getByRole('button', { name: 'Clear', exact: true }).click();
       await page.reload();
+      await page.getByText('Check commute times', { exact: true }).click();
       await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue('');
     } else
       await expect(

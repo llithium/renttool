@@ -32,16 +32,16 @@
 </script>
 
 <div class={className}>
-  <div class="mb-2 flex items-baseline justify-between gap-3 text-muted">
+  <div class="mb-2 flex min-h-5 items-baseline justify-between gap-3 text-muted">
     <label for={id} class="text-label">{label}</label>
-    {#if detail}<span class="text-meta tabular-nums">{detail}</span>{/if}
+    {#if detail}<span class="hidden text-meta tabular-nums @3xl:inline">{detail}</span>{/if}
   </div>
   <div
-    class="flex items-baseline gap-0.5 border-b-2 focus-within:border-accent {error
+    class="flex min-h-12 items-center gap-1 rounded-lg border bg-card px-3 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent {error
       ? 'border-red'
       : 'border-line-strong'}"
   >
-    <span class="text-muted {size === 'lg' ? 'text-3xl' : 'text-lg'}">$</span>
+    <span class="text-base text-muted">$</span>
     <input
       {id}
       type="text"
@@ -53,11 +53,11 @@
       {oninput}
       {onblur}
       {onkeydown}
-      class="w-full min-w-0 flex-1 border-0 bg-transparent py-0.5 font-semibold tracking-tight text-ink tabular-nums outline-none placeholder:text-faint {size ===
-      'lg'
-        ? 'text-[clamp(2rem,3vw,2.75rem)]'
-        : 'text-2xl'}"
-      placeholder="e.g. 65,000"
+      class="w-full min-w-0 flex-1 border-0 bg-transparent py-1 font-semibold tracking-tight text-ink tabular-nums outline-none placeholder:text-faint {size ===
+        'lg' && value.length > 7
+        ? 'text-xl'
+        : 'text-2xl'} placeholder:text-base placeholder:font-normal placeholder:tracking-normal"
+      placeholder="Enter salary"
     />
   </div>
   {#if error}

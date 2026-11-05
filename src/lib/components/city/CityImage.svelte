@@ -9,10 +9,7 @@
 </script>
 
 {#if image && !hidden}
-  <figure
-    data-testid="city-image"
-    class="overflow-hidden border border-line-strong bg-card-2 {className}"
-  >
+  <figure data-testid="city-image" class="overflow-hidden {className}">
     <a
       href={image.photoUrl}
       target="_blank"
@@ -26,7 +23,7 @@
         alt={image.alt}
         loading="lazy"
         decoding="async"
-        class="aspect-4/1 max-h-48 w-full object-cover"
+        class="aspect-video max-h-48 w-full object-cover"
         onerror={() => (hidden = true)}
       />
       <span
@@ -35,7 +32,7 @@
         View photo ↗
       </span>
     </a>
-    <figcaption class="px-3 py-2 text-meta text-muted">
+    <figcaption class="py-2 text-meta text-muted">
       <ImageCredit {image} />
     </figcaption>
   </figure>
