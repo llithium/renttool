@@ -14,13 +14,6 @@
     class: className = ''
   }: { presentation: RentPlanPresentation; city: City; class?: string } = $props();
 
-  /** Compact population label: 1.2M / 15k / 850. */
-  function fmtPop(n: number): string {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-    return String(n);
-  }
-
   let places = $state<NearbyPlace[]>([]);
   let loading = $state(false);
   let expanded = $state(false);
@@ -101,8 +94,7 @@
       <span class="text-meta text-muted">SimpleMaps</span>
     </SectionHeading>
     <p class="mb-3.5 max-w-[66ch] text-sm/relaxed text-muted">
-      Keep {city.city} as your active plan while you add a nearby place to compare. Distances are straight-line,
-      within roughly 25 miles. Other cities use estimated take-home pay for your current salary and goals.
+      Compare rents within roughly 25 miles of {city.city}, using your salary and housing setup.
     </p>
     {#key city.name}
       <CommuteFilter
@@ -114,7 +106,7 @@
         }}
       />
     {/key}
-    <p aria-live="polite" class="mb-3 text-sm text-muted">{status}</p>
+    <p aria-live="polite" class={status ? 'mb-3 text-sm text-muted' : 'sr-only'}>{status}</p>
 
     {#if !places.length}
       <div class="flex items-center gap-3 text-sm text-muted" aria-live="polite">
@@ -139,36 +131,40 @@
               ? rent - activeRent
               : null}
           <li
-            class="grid gap-3 border-b border-line px-0 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-6"
+            class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-line py-3 last:border-b-0 sm:gap-6"
           >
             <div>
-              <p class="font-semibold tracking-tight text-ink">{p.city}, {p.state}</p>
-              <p class="mt-1 text-meta text-muted tabular-nums">
-                {#if p.pop != null}{fmtPop(p.pop)} population ·
-                {/if}{p.miles} mi away
+              <p class="font-semibold tracking-tight text-ink">
+                <span>{p.city}, {p.state}</span>
+                <span class="ml-1 text-meta font-normal text-muted">{p.miles} mi</span>
                 {#if commute && commute.minutes[p.label] != null}
-                  · <span class="font-semibold text-ink">{commute.minutes[p.label]} min drive</span>
+                  <span class="text-meta font-normal"> · {commute.minutes[p.label]} min drive</span>
                 {/if}
               </p>
               {#if rent != null && known}
-                <p class="mt-2 text-sm tabular-nums">
-                  <strong>{money(rent)}/mo</strong> · {housingRentLabel(
-                    known,
-                    presentation.options.housing
-                  )}
+                <p class="mt-1 text-sm tabular-nums">
+                  <strong title={housingRentLabel(known, presentation.options.housing)}
+                    >{money(rent)}/mo</strong
+                  >
+                  <span class="sr-only"
+                    >{housingRentLabel(known, presentation.options.housing)}</span
+                  >
+                  {#if difference != null}
+                    <span class="text-meta text-muted">
+                      · {difference === 0
+                        ? 'Same as'
+                        : `${money(Math.abs(difference))} ${difference < 0 ? 'less' : 'more'} than`}
+                      {city.city}
+                    </span>
+                  {:else}
+                    <span class="text-meta text-muted"> · {known.rentArea} · {known.rentYear}</span>
+                  {/if}
                 </p>
                 <p class="mt-1 text-meta text-muted">
                   {#if target != null}<span class={rent <= target ? 'text-green' : 'text-red'}
-                      >{rent <= target ? 'Within your rent target' : 'Above your rent target'} ({money(
-                        target
-                      )}/mo)</span
-                    > ·
+                      >{rent <= target ? 'Fits estimated budget' : 'Above estimated budget'}</span
+                    >
                   {/if}
-                  {#if difference != null}{difference === 0
-                      ? 'Same estimate as'
-                      : `${money(Math.abs(difference))}/mo ${difference < 0 ? 'less' : 'more'} than`}
-                    {city.city}
-                  {:else}{known.rentArea} · {known.rentYear}{/if}
                 </p>
               {:else}
                 <p class="mt-2 text-meta text-muted" aria-live="polite">
@@ -181,13 +177,13 @@
             <button
               disabled={pending || (!compared && compareFull)}
               onclick={() => toggleComparison(p)}
-              class="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-lg border px-3 py-2 text-sm font-semibold transition duration-200 sm:self-auto {pending
-                ? 'cursor-default border-accent bg-accent-soft text-accent'
+              class="inline-flex min-h-11 max-w-28 items-center justify-center gap-2 self-start rounded-md p-2 text-sm font-semibold transition duration-200 {pending
+                ? 'cursor-default text-accent'
                 : compared
-                  ? 'cursor-pointer border-line-strong bg-card-2 text-ink hover:border-red hover:text-red'
+                  ? 'cursor-pointer text-muted hover:bg-accent-soft hover:text-red'
                   : compareFull
-                    ? 'cursor-not-allowed border-line bg-card-2 text-faint'
-                    : 'cursor-pointer border-line-strong text-ink hover:border-accent hover:bg-accent-soft hover:text-accent'}"
+                    ? 'cursor-not-allowed text-faint'
+                    : 'cursor-pointer text-accent hover:bg-accent-soft hover:text-accent-deep'}"
             >
               {#if pending}
                 <span
@@ -214,6 +210,10 @@
           {expanded ? 'Show fewer places' : `Show ${filteredPlaces.length - 4} more places`}
         </button>
       {/if}
+      <p class="mt-3 text-meta text-muted">
+        Straight-line distances. Each nearby budget uses estimated pay at your current salary.
+        Entered pay applies only to your selected city.
+      </p>
     {/if}
   </section>
 {/if}

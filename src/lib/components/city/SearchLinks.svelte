@@ -24,8 +24,8 @@
       Review take-home pay, expenses, savings, or your buffer before searching listings.
     </p>
   {:else}
-    <div class="pb-5">
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
+    <div class="pb-3">
+      <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-8">
         <div>
           <h2 class="text-title text-ink">
             Search listings under {money(listingCap)}
@@ -44,7 +44,7 @@
             href={recommended.url}
             target="_blank"
             rel="noopener"
-            class="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-ink no-underline transition-opacity duration-200 hover:opacity-85"
+            class="group inline-flex min-h-12 items-center justify-center gap-3 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-ink no-underline transition-opacity duration-200 hover:opacity-85"
           >
             <span>Search Zillow under {money(listingCap)}</span>
             <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -63,28 +63,38 @@
     </div>
 
     {#if alternatives.length}
-      <div class="grid border-t border-line sm:grid-cols-3">
+      <div class="flex flex-wrap gap-x-6 gap-y-1 border-t border-line pt-2">
         {#each alternatives as link (link.provider)}
           <a
             href={link.url}
             target="_blank"
             rel="noopener"
-            class="group flex min-h-18 flex-col justify-between gap-2 border-line px-0 py-4 text-sm no-underline hover:text-accent sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0 sm:last:pr-0"
+            class="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent underline underline-offset-4 hover:text-accent-deep"
           >
-            <span class="font-semibold text-ink group-hover:text-accent">{link.providerName}</span>
-            <span class="text-meta text-muted group-hover:text-accent">
+            <span>{link.providerName}</span>
+            <svg class="size-3.5 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M3.25 12.75 12.75 3.25M6 3.25h6.75V10"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="sr-only">
               {#if link.prefiltered && link.capDescription}
-                Listings {link.capDescription} — set bedrooms
+                Listings {link.capDescription}; set bedrooms.
               {:else}
-                Set bedrooms and max rent
+                Set bedrooms and max rent.
               {/if}
+              (opens in a new tab)
             </span>
           </a>
         {/each}
       </div>
     {/if}
-    <p class="mt-3 max-w-[66ch] text-sm/relaxed text-muted">
-      Confirm the rent, fees, and availability before you apply.
+    <p class="mt-2 max-w-[66ch] text-sm/relaxed text-muted">
+      Check bedroom and rent filters on each site. Confirm fees and availability before you apply.
     </p>
   {/if}
 </section>

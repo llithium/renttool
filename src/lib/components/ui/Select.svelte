@@ -6,13 +6,15 @@
     label,
     value,
     options,
-    onchange
+    onchange,
+    hideLabel = false
   }: {
     id: string;
     label: string;
     value: Value;
     options: readonly { value: Value; label: string; disabled?: boolean }[];
     onchange: (value: Value) => void;
+    hideLabel?: boolean;
   } = $props();
 
   let trigger: HTMLButtonElement;
@@ -163,7 +165,11 @@
 <svelte:window onpointerdown={outside} onfocusin={outside} />
 
 <div bind:this={root} class="min-w-0">
-  <label id={`${id}-label`} for={id} class="mb-2 block text-label text-muted">{label}</label>
+  <label
+    id={`${id}-label`}
+    for={id}
+    class={hideLabel ? 'sr-only' : 'mb-2 block text-label text-muted'}>{label}</label
+  >
   <button
     bind:this={trigger}
     {id}
@@ -179,7 +185,7 @@
     onkeydown={keydown}
     class="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left text-sm font-semibold transition-colors {open
       ? 'border-accent bg-card text-ink'
-      : 'border-line-strong bg-card-2 text-ink hover:border-accent hover:bg-card'}"
+      : 'border-line-strong bg-card text-ink hover:border-accent hover:bg-accent-soft'}"
   >
     <span class="truncate">{selected?.label ?? 'Choose an option'}</span>
     <svg

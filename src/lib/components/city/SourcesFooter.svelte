@@ -5,38 +5,43 @@
   let { class: className = '' }: { class?: string } = $props();
 </script>
 
-<footer id="sources" class="text-sm/relaxed text-muted {className}">
-  <h2 class="mb-3 text-title text-ink">Data &amp; methods</h2>
-  <p class="max-w-[90ch]">
-    Rent estimates:
-    <a
-      href={RENT_DATA_META.dataUrl}
-      target="_blank"
-      rel="noopener"
-      class="text-accent underline hover:text-accent-deep">Apartment List Rent Estimates</a
-    >
-    ({RENT_DATA_META.label}), © Apartment List, Inc.. Off-list cities use
-    <a
-      href="https://www.huduser.gov/portal/datasets/fmr.html"
-      target="_blank"
-      rel="noopener"
-      class="text-accent underline">{fmrMeta.year} HUD Fair Market Rents</a
-    >, area-level 40th-percentile gross rents including standard utilities. Tax figures are 2026
-    estimates for a single filer taking the standard deduction. City facts:
-    <a
-      href={ACS_DATA_META.dataUrl}
-      target="_blank"
-      rel="noopener"
-      class="text-accent underline hover:text-accent-deep"
-      >U.S. Census Bureau {ACS_DATA_META.label}</a
-    >. Other city locations &amp; populations:
-    <a
-      href="https://simplemaps.com/data/us-cities"
-      target="_blank"
-      rel="noopener"
-      class="text-accent underline hover:text-accent-deep">SimpleMaps US Cities</a
-    > (CC BY 4.0). All numbers are estimates.
-  </p>
+<footer class="text-sm/relaxed text-muted {className}">
+  <details>
+    <summary class="min-h-11 cursor-pointer py-2 text-title text-ink">Data &amp; methods</summary>
+    <p id="sources" class="mt-3 max-w-[75ch]">
+      Rent estimates:
+      <a
+        href={RENT_DATA_META.dataUrl}
+        target="_blank"
+        rel="noopener"
+        class="text-accent underline hover:text-accent-deep">Apartment List Rent Estimates</a
+      >
+      ({RENT_DATA_META.label}), © Apartment List, Inc. Off-list cities use
+      <a
+        href="https://www.huduser.gov/portal/datasets/fmr.html"
+        target="_blank"
+        rel="noopener"
+        class="text-accent underline">{fmrMeta.year} HUD Fair Market Rents</a
+      >, area-level 40th-percentile gross rents including standard utilities.
+    </p>
+    <p class="mt-2 max-w-[75ch]">
+      City facts:
+      <a
+        href={ACS_DATA_META.dataUrl}
+        target="_blank"
+        rel="noopener"
+        class="text-accent underline hover:text-accent-deep"
+        >U.S. Census Bureau {ACS_DATA_META.label}</a
+      >. Other city locations &amp; populations:
+      <a
+        href="https://simplemaps.com/data/us-cities"
+        target="_blank"
+        rel="noopener"
+        class="text-accent underline hover:text-accent-deep">SimpleMaps US Cities</a
+      > (CC BY 4.0). Tax figures are 2026 estimates for a single filer taking the standard deduction.
+      All numbers are estimates.
+    </p>
+  </details>
   <div class="mt-5 flex flex-wrap gap-x-5 gap-y-3 text-meta">
     <a
       href="https://github.com/llithium/renttool"

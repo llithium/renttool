@@ -1,6 +1,8 @@
 import type { Locator } from '@playwright/test';
+import { openPlanEditor } from './plan';
 
 export async function chooseSelect(control: Locator, value: string) {
+  if (!(await control.isVisible())) await openPlanEditor(control.page());
   await control.click();
   const page = control.page();
   await page

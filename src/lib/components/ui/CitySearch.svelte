@@ -136,7 +136,7 @@
       bind:this={input}
       id="city-input"
       name="city-search"
-      class="w-full appearance-none rounded-md border border-line-strong bg-card-2 py-3 pr-20 pl-10 text-body font-semibold text-ink transition-colors duration-200 placeholder:text-faint hover:border-ink focus:border-transparent focus:outline-2 focus:outline-accent [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+      class="w-full appearance-none rounded-md border border-line-strong bg-card py-3 pr-20 pl-10 text-body font-medium text-ink transition-colors duration-200 placeholder:text-faint hover:border-ink focus:border-transparent focus:outline-2 focus:outline-accent [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
       type="search"
       role="combobox"
       aria-expanded={discoveryState.open}

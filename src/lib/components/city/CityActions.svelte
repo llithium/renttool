@@ -52,8 +52,9 @@
       presentation.exploreCities();
       document.getElementById('main-content')?.scrollIntoView({ behavior: 'instant' });
     }}
+    aria-label="Explore other cities"
     class="min-h-11 cursor-pointer rounded-md px-1 py-2 text-sm font-semibold text-accent"
-    >Explore other cities</button
+    >Explore cities</button
   >
   <SharePlan {presentation} />
   {#if presentation.comparisonNames.length}

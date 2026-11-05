@@ -178,7 +178,7 @@
   onDestroy(() => searchController?.abort());
 </script>
 
-<div class={mode === 'nearby' ? 'mb-5 border-b border-line pb-5' : ''}>
+<div class={mode === 'nearby' ? 'mb-3 border-b border-line pb-3' : ''}>
   <form onsubmit={search}>
     <label for="commute-address" class="mb-2 block text-sm font-semibold text-ink"
       >Commute time</label
@@ -224,7 +224,7 @@
       >
     </div>
   </form>
-  <p aria-live="polite" class="mt-2 text-sm text-muted">{message}</p>
+  <p aria-live="polite" class={message ? 'mt-2 text-sm text-muted' : 'sr-only'}>{message}</p>
   {#if suggestions.length}
     <ul
       aria-label="Commute destinations"
@@ -304,32 +304,37 @@
         </p>{/if}
     {/if}
   </div>
-  <p class="mt-2 text-meta text-muted">
-    City-center driving estimates, without live traffic.
-    {mode === 'nearby'
-      ? 'This filters only the nearby list, not the map or listing sites.'
-      : 'All comparison entries stay visible, including those over your time limit.'}
-    Saved in this browser.
-  </p>
-  <p class="mt-1 text-meta text-muted">
-    Address search: Photon. Routes: <a
-      href="https://routing.openstreetmap.de/about.html"
-      target="_blank"
-      rel="noreferrer"
-      class="underline">OSRM / FOSSGIS</a
-    >. ©
-    <a
-      href="https://www.openstreetmap.org/copyright"
-      target="_blank"
-      rel="noreferrer"
-      class="underline">OpenStreetMap contributors</a
+  <details class="mt-1">
+    <summary class="min-h-10 cursor-pointer py-2 text-meta text-muted"
+      >About commute estimates</summary
     >
-    ·
-    <a
-      href="https://www.openstreetmap.org/fixthemap"
-      target="_blank"
-      rel="noreferrer"
-      class="underline">Fix the map</a
-    >
-  </p>
+    <p class="text-meta text-muted">
+      City-center driving estimates, without live traffic.
+      {mode === 'nearby'
+        ? 'This filters only the nearby list, not the map or listing sites.'
+        : 'All comparison entries stay visible, including those over your time limit.'}
+      Saved in this browser.
+    </p>
+    <p class="mt-1 text-meta text-muted">
+      Address search: Photon. Routes: <a
+        href="https://routing.openstreetmap.de/about.html"
+        target="_blank"
+        rel="noreferrer"
+        class="underline">OSRM / FOSSGIS</a
+      >. ©
+      <a
+        href="https://www.openstreetmap.org/copyright"
+        target="_blank"
+        rel="noreferrer"
+        class="underline">OpenStreetMap contributors</a
+      >
+      ·
+      <a
+        href="https://www.openstreetmap.org/fixthemap"
+        target="_blank"
+        rel="noreferrer"
+        class="underline">Fix the map</a
+      >
+    </p>
+  </details>
 </div>

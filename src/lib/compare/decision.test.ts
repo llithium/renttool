@@ -7,6 +7,30 @@ function entry(name: string, salary: number, r1: number | null) {
 }
 
 describe('comparison decision', () => {
+  it('keeps different demographic values neutral while ranking affordability', () => {
+    const snapshot = {
+      population: 100000,
+      householdIncome: 60000,
+      commuteMinutes: 25,
+      renterShare: 40,
+      rentalVacancy: 5
+    };
+    const view = analyzeComparison([
+      { city: { ...city('Alpha, TX', 1000), citySnapshot: snapshot }, salary: 80000 },
+      {
+        city: {
+          ...city('Beta, TX', 1500),
+          citySnapshot: { ...snapshot, householdIncome: 90000, renterShare: 60 }
+        },
+        salary: 80000
+      }
+    ]);
+    for (const entry of view.entries) {
+      expect(entry.metrics.income.tone).toBeNull();
+      expect(entry.metrics.renters.tone).toBeNull();
+    }
+    expect(view.entries[0].metrics.rent1.tone).toBe('best');
+  });
   it('ranks selected housing using independent entered paychecks and personal goals', () => {
     const alpha = {
       city: { ...city('Alpha, TX', 1200), r2: 2000 },

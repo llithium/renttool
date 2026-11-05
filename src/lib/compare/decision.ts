@@ -315,6 +315,8 @@ function metricTone(
   entry: ComparisonEntryBase,
   definition: MetricDefinition
 ): MetricTone {
+  // City context describes a place; it does not rank its suitability for a person.
+  if (definition.group === 'city-context') return null;
   const values = entries
     .map((candidate) => definition.read(candidate))
     .filter((value): value is number => value != null);

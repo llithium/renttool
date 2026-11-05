@@ -25,6 +25,10 @@
     max={SLIDER_MAX}
     step="1000"
     value={clamped}
+    data-empty={value == null}
+    aria-valuetext={value == null
+      ? 'No salary entered. Adjust to set an annual salary.'
+      : undefined}
     aria-label="Annual salary slider"
     {oninput}
     class="relative z-10 w-full cursor-pointer appearance-none bg-transparent"
@@ -75,5 +79,15 @@
   input:hover::-moz-range-thumb,
   input:active::-moz-range-thumb {
     transform: scale(1.12);
+  }
+  input[data-empty='true']::-webkit-slider-thumb {
+    background: var(--card);
+    border: 2px solid var(--line-strong);
+    box-shadow: none;
+  }
+  input[data-empty='true']::-moz-range-thumb {
+    background: var(--card);
+    border: 2px solid var(--line-strong);
+    box-shadow: none;
   }
 </style>
