@@ -20,14 +20,12 @@
   <a
     href={planHref}
     class="flex shrink-0 items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-ink no-underline sm:text-2xl"
-    ><svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"
-      ><rect width="36" height="36" rx="11" fill="var(--primary)" />
+    ><svg width="36" height="36" viewBox="0 0 64 64" fill="none" aria-hidden="true"
+      ><rect width="64" height="64" rx="18" fill="var(--primary)" />
       <path
-        d="M10 27V9h16v12H10m8 0 8 6"
-        stroke="var(--primary-ink)"
-        stroke-width="2.25"
-        stroke-linecap="square"
-        stroke-linejoin="round"
+        fill="var(--primary-ink)"
+        fill-rule="evenodd"
+        d="M17 50V26l15-11 15 11v9l-9 5 11 10H38L27 40h-2v10h-8Zm8-21v4h14v-4l-7-5-7 5Z"
       />
     </svg><span class="max-[359px]:sr-only">Rent Tool</span></a
   >
