@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RentPlanWorkspace, type RentPlanAdapters } from './appState.svelte';
 import {
   COMPARISON_STORAGE_KEY,
-  DEFAULT_COMPARISON_SALARY
+  DEFAULT_COMPARISON_SALARY,
+  LEGACY_PLAN_STORAGE_KEY,
+  LEGACY_PLAN_V2_STORAGE_KEY
 } from '$lib/compare/comparisonSet.svelte';
 import { COMMUTE_STORAGE_KEY } from '$lib/commute';
 import type { CitySuggestion, LookupResult, NearbyPlace } from '$lib/types';
@@ -65,25 +67,99 @@ const hudRent: LookupResult = {
 };
 
 describe('RentPlanWorkspace', () => {
-  it('restores private commute settings independently of URL plan state', () => {
+  it('saves independent private commute settings for each city across navigation and reload', () => {
     const { dependency, storage } = trackedAdapters(unavailableRent);
     const plan = new RentPlanWorkspace(dependency);
-    const destination = { label: 'Work address', lat: 41.878, lng: -87.636 };
-    plan.setCommute({ destination, maximum: 45 });
+    plan.selectCity('Chicago, IL');
+    const chicago = { label: 'Chicago work address', lat: 41.878, lng: -87.636 };
+    const tampa = { label: 'Tampa work address', lat: 27.95, lng: -82.46 };
+    plan.setCommute({ destination: chicago, maximum: 45 });
     const previous = plan.commute.destination;
     plan.setCommute({ ...plan.commute, maximum: 60 });
     expect(plan.commute.destination).toBe(previous);
+    plan.setCommute({ destination: tampa, maximum: 15 }, 'Tampa, FL');
+    expect(plan.commute.destination).toEqual(chicago);
+    plan.addComparison('Chicago, IL');
+    plan.addComparison('Tampa, FL');
     const restored = new RentPlanWorkspace(dependency);
     restored.hydrateFromSearch(new URLSearchParams('city=Tampa%2C+FL&salary=80000'));
-    expect(restored.commute).toEqual({ destination, maximum: 60 });
-    expect(restored.buildSearch()).not.toContain('Work');
-    expect(storage.get(COMMUTE_STORAGE_KEY)).toContain('Work address');
+    expect(restored.commute).toEqual({ destination: tampa, maximum: 15 });
+    expect(restored.buildSearch()).not.toContain('work');
+    expect(storage.get(COMMUTE_STORAGE_KEY)).toContain('Chicago work address');
     restored.selectCity('Chicago, IL');
-    expect(restored.commute.destination).toEqual(destination);
+    expect(restored.commute).toEqual({ destination: chicago, maximum: 60 });
     restored.setCommute({ ...restored.commute, destination: null });
     const cleared = new RentPlanWorkspace(dependency);
     cleared.restoreSession();
-    expect(cleared.commute).toEqual({ destination: null, maximum: 60 });
+    expect(cleared.commuteForCity('Chicago, IL')).toEqual({ destination: null, maximum: 60 });
+    expect(cleared.commuteForCity('Tampa, FL')).toEqual({ destination: tampa, maximum: 15 });
+    cleared.selectCity('Boston, MA');
+    expect(cleared.commute).toEqual({ destination: null, maximum: 30 });
+  });
+
+  it('migrates the previous shared destination only to the first active city', () => {
+    const destination = { label: 'Existing work address', lat: 41.878, lng: -87.636 };
+    const dependency = adapters(unavailableRent, {
+      [COMMUTE_STORAGE_KEY]: JSON.stringify({ destination, maximum: 45 })
+    });
+    const plan = new RentPlanWorkspace(dependency);
+    plan.hydrateFromSearch(new URLSearchParams('city=Chicago%2C+IL'));
+    expect(plan.commute).toEqual({ destination, maximum: 45 });
+    plan.selectCity('Tampa, FL');
+    expect(plan.commute.destination).toBeNull();
+    const restored = new RentPlanWorkspace(dependency);
+    restored.hydrateFromSearch(new URLSearchParams('city=Chicago%2C+IL'));
+    expect(restored.commute.destination).toEqual(destination);
+    restored.selectCity('Tampa, FL');
+    expect(restored.commute.destination).toBeNull();
+  });
+
+  it.each([LEGACY_PLAN_STORAGE_KEY, LEGACY_PLAN_V2_STORAGE_KEY])(
+    'migrates the commute to the saved active city when restoring %s without a URL',
+    (planStorageKey) => {
+      const destination = { label: 'Existing Chicago office', lat: 41.878, lng: -87.636 };
+      const dependency = adapters(unavailableRent, {
+        [COMMUTE_STORAGE_KEY]: JSON.stringify({ destination, maximum: 45 }),
+        [planStorageKey]: JSON.stringify({
+          selected: 'Chicago, IL',
+          salary: 80000,
+          actualTakeHomeMonthly: 4500
+        })
+      });
+      const plan = new RentPlanWorkspace(dependency);
+      plan.restoreSession();
+      expect(plan.selectedName).toBe('Chicago, IL');
+      expect(plan.commute).toEqual({ destination, maximum: 45 });
+      expect(plan.actualTakeHomeMonthly).toBe(4500);
+      expect(JSON.parse(dependency.readStorage(COMMUTE_STORAGE_KEY)!)).toEqual({
+        cities: { 'chicago il': { destination, maximum: 45 } }
+      });
+      // Editing the limit must retain the migrated address, even before navigating.
+      plan.setCommute({ ...plan.commute, maximum: 60 });
+      plan.selectCity('Tampa, FL');
+      expect(plan.commute.destination).toBeNull();
+      const restored = new RentPlanWorkspace(dependency);
+      restored.restoreSession();
+      expect(restored.selectedName).toBe('Tampa, FL');
+      expect(restored.commute.destination).toBeNull();
+      expect(restored.commuteForCity('Chicago, IL')).toEqual({ destination, maximum: 60 });
+    }
+  );
+
+  it('normalizes stored city identities and rejects malformed city settings', () => {
+    const destination = { label: 'Office', lat: 40.7, lng: -74 };
+    const dependency = adapters(unavailableRent, {
+      [COMMUTE_STORAGE_KEY]: JSON.stringify({
+        cities: {
+          'New York City, NY': { destination, maximum: 45 },
+          'Tampa, FL': { destination: { label: 'Broken', lat: 100, lng: 0 }, maximum: -1 }
+        }
+      })
+    });
+    const plan = new RentPlanWorkspace(dependency);
+    plan.restoreSession();
+    expect(plan.commuteForCity('New York, NY')).toEqual({ destination, maximum: 45 });
+    expect(plan.commuteForCity('Tampa, FL')).toEqual({ destination: null, maximum: 30 });
   });
 
   it.each(['invalid json', '{"destination":{"label":"Broken","lat":100,"lng":0},"maximum":-1}'])(

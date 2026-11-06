@@ -1,20 +1,20 @@
 <script lang="ts">
-  import type { CommuteFilterResult } from '$lib/commute';
+  import type { CommuteFilterResult, CommuteSettings } from '$lib/commute';
   import type { ComparisonView, MetricCell } from '$lib/compare/decision';
   import type { ComparisonCity } from '$lib/compare/comparisonModel';
 
   let {
     analysis,
     hrefForCity,
-    commute,
+    commutes,
     commuteLoading,
-    commuteDestination
+    commuteSettings
   }: {
     analysis: ComparisonView;
     hrefForCity: (city: ComparisonCity) => string;
-    commute: CommuteFilterResult | null;
-    commuteLoading: boolean;
-    commuteDestination?: string;
+    commutes: Record<string, CommuteFilterResult | null>;
+    commuteLoading: Record<string, boolean>;
+    commuteSettings: Record<string, CommuteSettings>;
   } = $props();
 
   let scroller: HTMLDivElement | undefined = $state();
@@ -153,17 +153,28 @@
             {/each}
           </tr>
         {/each}
-        {#if commuteDestination}
+        {#if Object.values(commuteSettings).some((settings) => settings.destination)}
           <tr>
             <th
               class="sticky left-0 z-10 min-w-28 bg-canvas text-left font-semibold text-muted min-[360px]:min-w-36 sm:min-w-46"
             >
-              Drive to {commuteDestination}
+              Drive to saved destination
             </th>
             {#each analysis.entries as entry (entry.city.name)}
+              {@const settings = commuteSettings[entry.city.name]}
+              {@const commute = commutes[entry.city.name]}
               {@const minutes = commute?.minutes[entry.city.name]}
               <td class="min-w-40 text-right tabular-nums min-[360px]:min-w-44">
-                {minutes != null ? `${minutes} min` : commuteLoading ? 'Checking…' : 'Unavailable'}
+                {minutes != null
+                  ? `${minutes} min`
+                  : !settings?.destination
+                    ? 'No destination'
+                    : commuteLoading[entry.city.name]
+                      ? 'Checking…'
+                      : 'Unavailable'}
+                {#if settings?.destination}<span class="mt-1 block text-meta text-muted"
+                    >{settings.destination.label}</span
+                  >{/if}
                 {#if minutes != null && commute}
                   <span
                     class="mt-1 block text-meta {minutes <= commute.maximum

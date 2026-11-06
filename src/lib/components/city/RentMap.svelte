@@ -2,7 +2,7 @@
   import 'leaflet/dist/leaflet.css';
   import { onMount, untrack } from 'svelte';
   import type { City } from '$lib/types';
-  import type { Map as LMap, LayerGroup, CircleMarker } from 'leaflet';
+  import type { Map as LMap, LayerGroup, CircleMarker, Marker } from 'leaflet';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import SectionHeading from '$lib/components/ui/SectionHeading.svelte';
   import { markerPresentation, reconcileMarkerKeys, type MarkerPalette } from './rentMapMarkers';
@@ -20,12 +20,14 @@
   let selectedName = $derived(presentation.selectedName);
   let focusRequest = $derived(presentation.mapFocusRequest);
   let housing = $derived(presentation.options.housing);
+  let destination = $derived(presentation.commute.destination);
 
   let el: HTMLDivElement;
   let map: LMap | undefined;
   let group: LayerGroup | undefined;
   let L: typeof import('leaflet');
   let ready = $state(false);
+  let destinationMarker: Marker | undefined;
   let centeredName: string | null = null;
   let handledFocusRequest = 0;
   let disposed = false;
@@ -65,7 +67,17 @@
     }
 
     centeredName = selectedCity.name;
-    map.setView([selectedCity.lat, selectedCity.lng], 8, { animate: false });
+    if (destination) {
+      map.fitBounds(
+        [
+          [selectedCity.lat, selectedCity.lng],
+          [destination.lat, destination.lng]
+        ],
+        { padding: [40, 40], maxZoom: 10, animate: false }
+      );
+    } else {
+      map.setView([selectedCity.lat, selectedCity.lng], 8, { animate: false });
+    }
   }
 
   type LocatedCity = City & { lat: number; lng: number };
@@ -338,6 +350,35 @@
     recenterOnSelectedCity(true);
   });
 
+  $effect(() => {
+    if (!ready || !map) return;
+    const target = destination;
+    destinationMarker?.remove();
+    destinationMarker = undefined;
+    if (target) {
+      const label = document.createElement('span');
+      label.textContent = `Commute destination: ${target.label}`;
+      destinationMarker = L.marker([target.lat, target.lng], {
+        title: `Commute destination: ${target.label}`,
+        alt: `Commute destination: ${target.label}`,
+        zIndexOffset: 1000,
+        icon: L.divIcon({
+          className: 'commute-destination-pin',
+          html: '<svg aria-hidden="true" viewBox="0 0 28 36" width="28" height="36"><path d="M14 35S1 22 1 14a13 13 0 0 1 26 0c0 8-13 21-13 21Z" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="var(--card)"/></svg>',
+          iconSize: [28, 36],
+          iconAnchor: [14, 35],
+          tooltipAnchor: [0, -32]
+        })
+      })
+        .bindTooltip(label, { direction: 'top' })
+        .addTo(map);
+      destinationMarker
+        .getElement()
+        ?.setAttribute('aria-label', `Commute destination: ${target.label}`);
+    }
+    untrack(() => recenterOnSelectedCity(true));
+  });
+
   // Check visible markers after initial centering and when new cities arrive.
   $effect(() => {
     void ready;
@@ -355,6 +396,14 @@
             <i class="inline-block size-2.5 rounded-full border-2 border-accent bg-card"></i>
             Current city:
             {selectedName}
+          </span>
+        {/if}
+        {#if destination}
+          <span class="inline-flex items-center gap-1.5 text-accent">
+            <svg aria-hidden="true" viewBox="0 0 16 20" class="h-4 w-3" fill="currentColor"
+              ><path d="M8 20S0 12 0 8a8 8 0 0 1 16 0c0 4-8 12-8 12Z" /></svg
+            >
+            Commute destination
           </span>
         {/if}
         {#if maxRent != null}

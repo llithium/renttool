@@ -25,8 +25,12 @@ export class RentPlanPresentation {
     return this.workspace.commute;
   }
 
-  setCommute(settings: CommuteSettings): void {
-    this.workspace.setCommute(settings);
+  commuteForCity(name: string | null): CommuteSettings {
+    return this.workspace.commuteForCity(name);
+  }
+
+  setCommute(settings: CommuteSettings, name: string | null = this.selectedName): void {
+    this.workspace.setCommute(settings, name);
   }
 
   get salary(): number | null {
