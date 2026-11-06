@@ -92,7 +92,8 @@ const browserAdapters: RentPlanAdapters = {
  * coordinate the workflow themselves.
  */
 export class RentPlanWorkspace {
-  private commuteValue = $state<CommuteSettings>(normalizeCommuteSettings(null));
+  private commuteByCity = $state<Record<string, CommuteSettings>>({});
+  private legacyCommute: CommuteSettings | null = null;
   private commuteRestored = false;
   private salaryValue = $state<number | null>(null);
   private optionsValue = $state<PlanningOptions>(normalizePlanningOptions(null));
@@ -139,12 +140,19 @@ export class RentPlanWorkspace {
   }
 
   get commute(): CommuteSettings {
-    return this.commuteValue;
+    return this.commuteForCity(this.selectedName);
   }
 
-  setCommute(settings: CommuteSettings): void {
+  commuteForCity(name: string | null): CommuteSettings {
+    return (name && this.commuteByCity[cityIdentity(name)]) || normalizeCommuteSettings(null);
+  }
+
+  setCommute(settings: CommuteSettings, name: string | null = this.selectedName): void {
+    if (!name) return;
+    this.restoreCommute();
+    this.legacyCommute = null;
     const next = normalizeCommuteSettings(settings);
-    const previous = this.commuteValue.destination;
+    const previous = this.commuteForCity(name).destination;
     if (
       previous &&
       next.destination &&
@@ -154,10 +162,16 @@ export class RentPlanWorkspace {
     ) {
       next.destination = previous;
     }
-    this.commuteValue = next;
-    this.commuteRestored = true;
+    this.commuteByCity = { ...this.commuteByCity, [cityIdentity(name)]: next };
+    this.persistCommute();
+  }
+
+  private persistCommute(): void {
     try {
-      this.adapters.writeStorage(COMMUTE_STORAGE_KEY, JSON.stringify(this.commuteValue));
+      this.adapters.writeStorage(
+        COMMUTE_STORAGE_KEY,
+        JSON.stringify({ cities: this.commuteByCity })
+      );
     } catch {
       // Keep the current settings usable when browser storage is unavailable.
     }
@@ -168,7 +182,20 @@ export class RentPlanWorkspace {
     this.commuteRestored = true;
     try {
       const raw = this.adapters.readStorage(COMMUTE_STORAGE_KEY);
-      if (raw) this.commuteValue = normalizeCommuteSettings(JSON.parse(raw));
+      const stored: unknown = raw ? JSON.parse(raw) : null;
+      if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return;
+      if ('cities' in stored) {
+        if (!stored.cities || typeof stored.cities !== 'object' || Array.isArray(stored.cities))
+          return;
+        this.commuteByCity = Object.fromEntries(
+          Object.entries(stored.cities)
+            .filter(([name]) => cityIdentity(name))
+            .map(([name, settings]) => [cityIdentity(name), normalizeCommuteSettings(settings)])
+        );
+      } else {
+        // The previous single destination belongs to the first restored active city.
+        this.legacyCommute = normalizeCommuteSettings(stored);
+      }
     } catch {
       // Malformed or unavailable storage leaves the default commute settings.
     }
@@ -393,6 +420,11 @@ export class RentPlanWorkspace {
     if (!this.cityByName(name)) return false;
     if (this.actualTakeHomeValue?.cityName !== name) this.actualTakeHomeValue = null;
     this.selectedNameValue = name;
+    if (this.legacyCommute) {
+      const legacy = this.legacyCommute;
+      this.legacyCommute = null;
+      this.setCommute(legacy, name);
+    }
     this.persistImmediately();
     void this.ensureCoordinates(name);
     void this.ensurePopulation(name);

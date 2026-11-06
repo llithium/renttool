@@ -3,6 +3,7 @@
   import Select from '$lib/components/ui/Select.svelte';
   import type { CitySuggestion } from '$lib/types';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
+  import { requestCommute } from '$lib/commuteRouting';
   import { fetchCoordinates } from '$lib/api';
   import {
     isLocation,
@@ -16,23 +17,27 @@
     places,
     presentation,
     mode = 'nearby',
+    cityName = presentation.selectedName,
     onfilter,
     onloading
   }: {
     places: CitySuggestion[];
     presentation: RentPlanPresentation;
     mode?: 'nearby' | 'comparison';
+    cityName?: string | null;
     onfilter: (result: CommuteFilterResult | null) => void;
     onloading?: (loading: boolean) => void;
   } = $props();
+  const id = $props.id();
   let query = $state('');
-  let destination = $derived(presentation.commute.destination);
+  let settings = $derived(presentation.commuteForCity(cityName));
+  let destination = $derived(settings.destination);
   let suggestions = $state<CommuteDestination[]>([]);
   let searching = $state(false);
   let routing = $state(false);
   let message = $state('');
   let routeError = $state('');
-  let maximum = $derived(String(presentation.commute.maximum));
+  let maximum = $derived(String(settings.maximum));
   let minutes = $state<Record<string, number | null> | null>(null);
   let retry = $state(0);
   let searchController: AbortController | undefined;
@@ -53,7 +58,7 @@
   function reset() {
     searchController?.abort();
     searching = false;
-    if (destination) presentation.setCommute({ ...presentation.commute, destination: null });
+    if (destination) presentation.setCommute({ ...settings, destination: null }, cityName);
     suggestions = [];
     minutes = null;
     message = '';
@@ -120,31 +125,11 @@
           minutes = Object.fromEntries(origins.map((place) => [place.label, null]));
           return;
         }
-        const requestTimes = () =>
-          fetch('/api/commute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              destination: target,
-              origins: located.map(({ lat, lng }) => ({ lat, lng }))
-            }),
-            signal: controller.signal
-          });
-        let response = await requestTimes();
-        // Switching views can follow a previous route request immediately.
-        if (response.status === 429) {
-          await new Promise<void>((resolve) => {
-            const timer = setTimeout(finish, 1200);
-            function finish() {
-              clearTimeout(timer);
-              controller.signal.removeEventListener('abort', finish);
-              resolve();
-            }
-            controller.signal.addEventListener('abort', finish, { once: true });
-          });
-          controller.signal.throwIfAborted();
-          response = await requestTimes();
-        }
+        const response = await requestCommute(
+          target,
+          located.map(({ lat, lng }) => ({ lat, lng })),
+          controller.signal
+        );
         if (!response.ok)
           throw new Error(
             response.status === 429
@@ -180,13 +165,13 @@
 
 <div class={mode === 'nearby' ? 'mb-3 border-b border-line pb-3' : ''}>
   <form onsubmit={search}>
-    <label for="commute-address" class="mb-2 block text-sm font-semibold text-ink"
-      >Commute time</label
+    <label for={`${id}-address`} class="mb-2 block text-sm font-semibold text-ink"
+      >Commute destination</label
     >
     <div class="flex gap-2">
       <div class="relative min-w-0 flex-1">
         <input
-          id="commute-address"
+          id={`${id}-address`}
           type="search"
           value={displayedQuery}
           oninput={(event) => {
@@ -236,7 +221,7 @@
             type="button"
             class="min-h-11 w-full cursor-pointer p-3 text-left text-sm hover:bg-card-2"
             onclick={() => {
-              presentation.setCommute({ ...presentation.commute, destination: suggestion });
+              presentation.setCommute({ ...settings, destination: suggestion }, cityName);
               query = suggestion.label;
               suggestions = [];
               message = '';
@@ -254,12 +239,12 @@
     >
     <div class="mt-2 max-w-xs">
       <Select
-        id="commute-maximum"
+        id={`${id}-maximum`}
         label="Maximum drive time"
         value={maximum}
         {options}
         onchange={(value) =>
-          presentation.setCommute({ ...presentation.commute, maximum: Number(value) })}
+          presentation.setCommute({ ...settings, maximum: Number(value) }, cityName)}
       />
     </div>
   </details>
@@ -290,6 +275,17 @@
         class="min-h-10 cursor-pointer rounded-md px-2 font-semibold text-accent hover:bg-accent-soft"
         >Retry driving times</button
       >
+    {:else if filter && mode === 'comparison'}
+      {@const duration = minutes?.[places[0]?.label]}
+      <p class="mt-2 font-semibold text-ink">
+        {#if duration != null}
+          {duration} min drive ·
+          <span class={duration <= Number(maximum) ? 'text-green' : 'text-red'}>
+            {duration <= Number(maximum) ? 'Within' : 'Over'}
+            {maximum}-minute limit
+          </span>
+        {:else}Driving time unavailable{/if}
+      </p>
     {:else if filter}
       <p class="mt-2">
         {matchCount} of {places.length}
@@ -313,7 +309,7 @@
       {mode === 'nearby'
         ? 'This filters only the nearby list, not the map or listing sites.'
         : 'All comparison entries stay visible, including those over your time limit.'}
-      Saved in this browser.
+      Saved for this city in this browser.
     </p>
     <p class="mt-1 text-meta text-muted">
       Address search: Photon. Routes: <a

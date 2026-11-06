@@ -133,100 +133,124 @@ test('ignores stale address results after editing the destination', async ({ pag
   await expect(page.getByRole('button', { name: 'Find', exact: true })).toBeEnabled();
 });
 
-for (const view of ['reload', 'compare'] as const) {
-  test(`retains the commute destination and time limit after ${view}`, async ({ page }) => {
-    await page.route('https://images.unsplash.com/**', (route) => route.abort());
-    await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
-    await page.route('**/api/nearby**', (route) => route.fulfill({ json: { nearby } }));
-    await page.route('**/api/commute-address', (route) =>
-      route.fulfill({
-        json: {
-          destinations: [{ label: 'Willis Tower, Chicago, Illinois', lat: 41.878, lng: -87.636 }]
-        }
-      })
-    );
-    await page.route('**/api/commute', (route) => {
-      const body = route.request().postDataJSON();
-      return route.fulfill({
-        json: {
-          minutes: body.origins.map((origin: { lat: number }) => (origin.lat > 42 ? 25 : 45))
-        }
-      });
-    });
-    await page.goto('/?salary=80000&city=Chicago%2C+IL&compare=Tampa%2C+FL');
-    await expect(
-      page.getByText('Map & nearby rents', { exact: true }).locator('..')
-    ).toHaveAttribute('open', '');
-    await page.getByRole('searchbox', { name: 'Commute destination' }).fill('Willis Tower');
-    await page.getByRole('button', { name: 'Find', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Willis Tower, Chicago, Illinois', exact: true })
-      .click();
-    await page.getByText('Show commute filters', { exact: true }).click();
-    await chooseSelect(page.getByLabel('Maximum drive time'), '45');
-    await expect(
-      page.getByRole('region', { name: 'Nearby rent options', exact: true })
-    ).toContainText('3 of 3 nearby cities within 45 minutes');
-    expect(
-      await page.evaluate(() => JSON.parse(localStorage.getItem('rent-tool-commute-v1') ?? '{}'))
-    ).toMatchObject({ destination: { label: 'Willis Tower, Chicago, Illinois' }, maximum: 45 });
-    if (view === 'reload') await page.reload();
-    else
-      await page
-        .getByRole('link', { name: /^Compare/ })
-        .first()
-        .click();
-    await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue(
-      'Willis Tower, Chicago, Illinois'
-    );
-    if (view === 'compare') {
-      await page.getByRole('button', { name: 'Edit details for Tampa, FL', exact: true }).click();
-      await expect(page.getByTestId('scenario').filter({ hasText: 'Tampa, FL' })).toContainText(
-        '45 min drive'
-      );
-      const controls = page.getByRole('region', { name: 'Commute times', exact: true });
-      await expect(controls).toContainText('within 45 minutes');
-      await page.getByText('Full breakdown', { exact: true }).click();
-      const breakdown = page.getByRole('region', {
-        name: 'Full city comparison; scroll horizontally for more'
-      });
-      await expect(breakdown.getByRole('row').filter({ hasText: 'Drive to Willis' })).toContainText(
-        '45 min'
-      );
-      await controls.getByText('Show commute filters', { exact: true }).click();
-      await chooseSelect(controls.getByLabel('Maximum drive time'), '15');
-      await expect(page.getByTestId('scenario')).toHaveCount(1);
-      await expect(page.getByTestId('scenario')).toContainText('Over 15-minute limit');
-      await page.reload();
-      await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue(
-        'Willis Tower, Chicago, Illinois'
-      );
-      await page.getByRole('button', { name: 'Edit details for Tampa, FL', exact: true }).click();
-      await expect(page.getByTestId('scenario')).toContainText('Over 15-minute limit');
-      expect(
-        (await new AxeBuilder({ page }).analyze()).violations.filter(
-          (violation) => violation.impact === 'critical' || violation.impact === 'serious'
+test('saves different destinations and limits for comparison cities and shows their map pins', async ({
+  page
+}) => {
+  await page.route('https://images.unsplash.com/**', (route) => route.abort());
+  await page.route('https://tile.openstreetmap.org/**', (route) => route.abort());
+  await page.route('**/api/nearby**', (route) => route.fulfill({ json: { nearby } }));
+  const chicagoDestination = {
+    label: 'Willis Tower, Chicago, Illinois',
+    lat: 41.878,
+    lng: -87.636
+  };
+  const tampaDestination = { label: 'Tampa office, Florida', lat: 27.95, lng: -82.46 };
+  await page.route('**/api/commute-address', (route) =>
+    route.fulfill({
+      json: {
+        destinations: [
+          route.request().postDataJSON().query.includes('Tampa')
+            ? tampaDestination
+            : chicagoDestination
+        ]
+      }
+    })
+  );
+  const routedDestinations: string[] = [];
+  await page.route('**/api/commute', (route) => {
+    const body = route.request().postDataJSON();
+    routedDestinations.push(body.destination.label);
+    return route.fulfill({
+      json: {
+        minutes: body.origins.map(() =>
+          body.destination.label === chicagoDestination.label ? 25 : 45
         )
-      ).toEqual([]);
-      await page.setViewportSize({ width: 390, height: 844 });
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-      ).toBe(true);
-      await page.screenshot({ path: '/tmp/renttool-commute-compare.png', fullPage: true });
-      await page
-        .getByTestId('scenario')
-        .getByRole('link', { name: 'Tampa, FL', exact: true })
-        .click();
-      await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue(
-        'Willis Tower, Chicago, Illinois'
-      );
-      await page.getByRole('button', { name: 'Clear', exact: true }).click();
-      await page.reload();
-      await page.getByText('Check commute times', { exact: true }).click();
-      await expect(page.getByRole('searchbox', { name: 'Commute destination' })).toHaveValue('');
-    } else
-      await expect(
-        page.getByRole('region', { name: 'Nearby rent options', exact: true })
-      ).toContainText('within 45 minutes');
+      }
+    });
   });
-}
+  await page.goto('/?salary=80000&city=Chicago%2C+IL&compare=Chicago%2C+IL&compare=Tampa%2C+FL');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
+  const address = page.getByRole('searchbox', { name: 'Commute destination' });
+  await address.fill('Willis Tower');
+  await page.getByRole('button', { name: 'Find', exact: true }).click();
+  await page.getByRole('button', { name: chicagoDestination.label, exact: true }).click();
+  const pin = page.getByRole('button', {
+    name: `Commute destination: ${chicagoDestination.label}`,
+    exact: true
+  });
+  await expect(pin).toBeVisible();
+  await pin.focus();
+  await expect(page.getByRole('tooltip')).toContainText(chicagoDestination.label);
+  const nearbyRegion = page.getByRole('region', { name: 'Nearby rent options', exact: true });
+  await nearbyRegion.getByText('Show commute filters', { exact: true }).click();
+  await chooseSelect(nearbyRegion.getByLabel('Maximum drive time'), '30');
+  await page.reload();
+  await expect(address).toHaveValue(chicagoDestination.label);
+  await expect(pin).toBeVisible();
+  await page
+    .getByRole('link', { name: /^Compare/ })
+    .first()
+    .click();
+  const chicago = page.getByRole('region', { name: 'Commute for Chicago, IL', exact: true });
+  const tampa = page.getByRole('region', { name: 'Commute for Tampa, FL', exact: true });
+  await expect(chicago.getByRole('searchbox')).toHaveValue(chicagoDestination.label);
+  await expect(tampa.getByRole('searchbox')).toHaveValue('');
+  await expect(chicago).toContainText('25 min drive');
+  await tampa.getByRole('searchbox').fill('Tampa office');
+  await tampa.getByRole('button', { name: 'Find', exact: true }).click();
+  await tampa.getByRole('button', { name: tampaDestination.label, exact: true }).click();
+  await tampa.getByText('Show commute filters', { exact: true }).click();
+  await chooseSelect(tampa.getByLabel('Maximum drive time'), '15');
+  await expect(tampa).toContainText('45 min drive');
+  await expect(tampa).toContainText('Over 15-minute limit');
+  await expect(chicago).toContainText('Within 30-minute limit');
+  await page.getByText('Full breakdown', { exact: true }).click();
+  const row = page.getByRole('row').filter({ hasText: 'Drive to saved destination' });
+  await expect(row).toContainText(chicagoDestination.label);
+  await expect(row).toContainText(tampaDestination.label);
+  await expect(row).toContainText('25 min');
+  await expect(row).toContainText('45 min');
+  await page.getByRole('button', { name: 'Edit details for Tampa, FL', exact: true }).click();
+  await expect(page.getByTestId('scenario')).toContainText('Over 15-minute limit');
+  expect(page.url()).not.toContain('office');
+  expect(page.url()).not.toContain('Willis');
+  const beforeSalaryChange = routedDestinations.length;
+  await page.getByLabel('Annual salary in Tampa, FL').fill('90000');
+  await expect(tampa).toContainText('45 min drive');
+  expect(routedDestinations.length).toBe(beforeSalaryChange);
+  await page.reload();
+  await expect(chicago.getByRole('searchbox')).toHaveValue(chicagoDestination.label);
+  await expect(tampa.getByRole('searchbox')).toHaveValue(tampaDestination.label);
+  await expect(tampa).toContainText('Over 15-minute limit');
+  expect(
+    (await new AxeBuilder({ page }).analyze()).violations.filter(
+      (violation) => violation.impact === 'critical' || violation.impact === 'serious'
+    )
+  ).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+  await page.screenshot({ path: '/tmp/renttool-commute-compare.png', fullPage: true });
+  await tampa.getByRole('link', { name: 'View map', exact: true }).click();
+  await expect(page).toHaveURL(/\/\?.*#rent-map$/);
+  await expect(address).toHaveValue(tampaDestination.label);
+  await expect(
+    page.getByRole('button', {
+      name: `Commute destination: ${tampaDestination.label}`,
+      exact: true
+    })
+  ).toBeVisible();
+  await expect(pin).toHaveCount(0);
+  await page
+    .getByRole('region', { name: 'Nearby rent options', exact: true })
+    .getByRole('button', { name: 'Clear', exact: true })
+    .click();
+  await expect(page.locator('.commute-destination-pin')).toHaveCount(0);
+  await page
+    .getByRole('link', { name: /^Compare/ })
+    .first()
+    .click();
+  await expect(chicago.getByRole('searchbox')).toHaveValue(chicagoDestination.label);
+  await expect(tampa.getByRole('searchbox')).toHaveValue('');
+});

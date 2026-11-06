@@ -28,20 +28,23 @@
 
   let hydrated = $state(false);
   let cityMessage = $state('');
-  let commute = $state<CommuteFilterResult | null>(null);
-  let commuteLoading = $state(false);
+  let commutes = $state<Record<string, CommuteFilterResult | null>>({});
+  let commuteLoading = $state<Record<string, boolean>>({});
   let commuteOpen = $state(false);
   let breakdownOpen = $state(false);
   let costsOpen = $state(false);
   let activeSection = $state('#decision-heading');
   $effect(() => {
-    if (plan.commute.destination) commuteOpen = true;
+    if (plan.comparisonCities.some((city) => plan.commuteForCity(city.name).destination))
+      commuteOpen = true;
   });
   // Rent or salary updates must not re-request unchanged routes.
   let commuteOriginKey = $derived(
     JSON.stringify(
       plan.comparisonCities.map((city) => ({
         label: city.name,
+        name: city.name,
+        source: city.source,
         city: city.city,
         state: city.state,
         lat: city.lat,
@@ -49,7 +52,7 @@
       }))
     )
   );
-  let commuteOrigins: CitySuggestion[] = $derived(JSON.parse(commuteOriginKey));
+  let commuteOrigins: (CitySuggestion & ComparisonCity)[] = $derived(JSON.parse(commuteOriginKey));
 
   let cityViewHref = $derived.by(() => {
     return plan.buildHref('/');
@@ -209,10 +212,10 @@
         {#snippet editor(entry)}
           <ScenarioCard
             {entry}
-            {commute}
-            {commuteLoading}
-            commuteDestination={plan.commute.destination?.label}
-            commuteMaximum={plan.commute.maximum}
+            commute={commutes[entry.city.name] ?? null}
+            commuteLoading={commuteLoading[entry.city.name] ?? false}
+            commuteDestination={plan.commuteForCity(entry.city.name).destination?.label}
+            commuteMaximum={plan.commuteForCity(entry.city.name).maximum}
             href={hrefForCity(entry.city)}
             housing={plan.options.housing}
             defaultExpenses={plan.options.monthlyExpenses}
@@ -284,13 +287,35 @@
             <summary class="min-h-11 cursor-pointer py-3 text-sm font-semibold"
               >Check commute times</summary
             >
-            <CommuteFilter
-              presentation={plan}
-              places={commuteOrigins}
-              mode="comparison"
-              onloading={(loading) => (commuteLoading = loading)}
-              onfilter={(result) => (commute = result)}
-            />
+            <div
+              class="grid gap-x-8 {commuteOrigins.length > 1
+                ? 'md:grid-cols-2'
+                : ''} {commuteOrigins.length > 2 ? 'xl:grid-cols-3' : ''}"
+            >
+              {#each commuteOrigins as city (city.label)}
+                <section
+                  aria-label={`Commute for ${city.label}`}
+                  class="min-w-0 border-t border-line py-4"
+                >
+                  <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="text-title">{city.label}</h2>
+                    <a
+                      href={`${hrefForCity(city)}#rent-map`}
+                      class="shrink-0 text-sm font-semibold text-accent underline underline-offset-4"
+                      >View map</a
+                    >
+                  </div>
+                  <CommuteFilter
+                    presentation={plan}
+                    cityName={city.label}
+                    places={[city]}
+                    mode="comparison"
+                    onloading={(loading) => (commuteLoading[city.label] = loading)}
+                    onfilter={(result) => (commutes[city.label] = result)}
+                  />
+                </section>
+              {/each}
+            </div>
           </details>
         </section>
 
@@ -306,9 +331,11 @@
           <CompareMetricsTable
             {analysis}
             {hrefForCity}
-            {commute}
+            {commutes}
             {commuteLoading}
-            commuteDestination={plan.commute.destination?.label}
+            commuteSettings={Object.fromEntries(
+              plan.comparisonCities.map((city) => [city.name, plan.commuteForCity(city.name)])
+            )}
           />
         </details>
       {:else if hydrated}
