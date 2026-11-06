@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RentPlanWorkspace, type RentPlanAdapters } from './appState.svelte';
 import {
   COMPARISON_STORAGE_KEY,
-  DEFAULT_COMPARISON_SALARY
+  DEFAULT_COMPARISON_SALARY,
+  LEGACY_PLAN_STORAGE_KEY,
+  LEGACY_PLAN_V2_STORAGE_KEY
 } from '$lib/compare/comparisonSet.svelte';
 import { COMMUTE_STORAGE_KEY } from '$lib/commute';
 import type { CitySuggestion, LookupResult, NearbyPlace } from '$lib/types';
@@ -111,6 +113,38 @@ describe('RentPlanWorkspace', () => {
     restored.selectCity('Tampa, FL');
     expect(restored.commute.destination).toBeNull();
   });
+
+  it.each([LEGACY_PLAN_STORAGE_KEY, LEGACY_PLAN_V2_STORAGE_KEY])(
+    'migrates the commute to the saved active city when restoring %s without a URL',
+    (planStorageKey) => {
+      const destination = { label: 'Existing Chicago office', lat: 41.878, lng: -87.636 };
+      const dependency = adapters(unavailableRent, {
+        [COMMUTE_STORAGE_KEY]: JSON.stringify({ destination, maximum: 45 }),
+        [planStorageKey]: JSON.stringify({
+          selected: 'Chicago, IL',
+          salary: 80000,
+          actualTakeHomeMonthly: 4500
+        })
+      });
+      const plan = new RentPlanWorkspace(dependency);
+      plan.restoreSession();
+      expect(plan.selectedName).toBe('Chicago, IL');
+      expect(plan.commute).toEqual({ destination, maximum: 45 });
+      expect(plan.actualTakeHomeMonthly).toBe(4500);
+      expect(JSON.parse(dependency.readStorage(COMMUTE_STORAGE_KEY)!)).toEqual({
+        cities: { 'chicago il': { destination, maximum: 45 } }
+      });
+      // Editing the limit must retain the migrated address, even before navigating.
+      plan.setCommute({ ...plan.commute, maximum: 60 });
+      plan.selectCity('Tampa, FL');
+      expect(plan.commute.destination).toBeNull();
+      const restored = new RentPlanWorkspace(dependency);
+      restored.restoreSession();
+      expect(restored.selectedName).toBe('Tampa, FL');
+      expect(restored.commute.destination).toBeNull();
+      expect(restored.commuteForCity('Chicago, IL')).toEqual({ destination, maximum: 60 });
+    }
+  );
 
   it('normalizes stored city identities and rejects malformed city settings', () => {
     const destination = { label: 'Office', lat: 40.7, lng: -74 };

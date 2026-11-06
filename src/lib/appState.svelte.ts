@@ -177,6 +177,13 @@ export class RentPlanWorkspace {
     }
   }
 
+  private migrateLegacyCommute(name: string): void {
+    if (!this.legacyCommute) return;
+    const legacy = this.legacyCommute;
+    this.legacyCommute = null;
+    this.setCommute(legacy, name);
+  }
+
   private restoreCommute(): void {
     if (this.commuteRestored) return;
     this.commuteRestored = true;
@@ -420,11 +427,7 @@ export class RentPlanWorkspace {
     if (!this.cityByName(name)) return false;
     if (this.actualTakeHomeValue?.cityName !== name) this.actualTakeHomeValue = null;
     this.selectedNameValue = name;
-    if (this.legacyCommute) {
-      const legacy = this.legacyCommute;
-      this.legacyCommute = null;
-      this.setCommute(legacy, name);
-    }
+    this.migrateLegacyCommute(name);
     this.persistImmediately();
     void this.ensureCoordinates(name);
     void this.ensurePopulation(name);
@@ -957,6 +960,7 @@ export class RentPlanWorkspace {
         }
         if (typeof restoredPlan.selected === 'string' && this.cityByName(restoredPlan.selected)) {
           this.selectedNameValue = restoredPlan.selected;
+          this.migrateLegacyCommute(restoredPlan.selected);
           void this.ensureCoordinates(restoredPlan.selected);
           void this.ensurePopulation(restoredPlan.selected);
           const monthly = normalizeMonthlyAmount(restoredPlan.actualTakeHomeMonthly);
