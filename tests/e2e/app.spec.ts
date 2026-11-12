@@ -309,70 +309,31 @@ test('opens the featured city with the current salary and housing setup', async 
   );
 });
 
-test('crossfades between photographed cities and holds the city while it is being explored', async ({
-  page
-}) => {
-  await page.clock.install();
-  // Restart the page so the carousel interval belongs to the controlled clock.
-  await page.reload();
-  await waitForHydration(page);
-  const featured = page.getByRole('figure', { name: 'Featured cities' });
-  const explore = featured.getByRole('link', { name: /^Explore / });
-  const firstHref = await explore.getAttribute('href');
-  await page.clock.fastForward(8_000);
-  await expect(explore).not.toHaveAttribute('href', firstHref!);
-  const incomingImage = featured.locator('.featured-photo img').last();
-  await expect
-    .poll(() => incomingImage.evaluate((image) => image.getAnimations().length))
-    .toBeGreaterThan(0);
-  // Native image animations use the document timeline independently of the timer clock.
-  const opacity = await incomingImage.evaluate((image) => {
-    const animation = image.getAnimations()[0];
-    const duration = Number(animation.effect?.getTiming().duration);
-    animation.pause();
-    animation.currentTime = duration / 2;
-    return Number.parseFloat(getComputedStyle(image).opacity);
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  test(`keeps the featured city still with ${reducedMotion} motion`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion });
+    await page.clock.install();
+    await page.reload();
+    await waitForHydration(page);
+    const featured = page.getByRole('figure', { name: 'Featured city', exact: true });
+    const explore = featured.getByRole('link', { name: /^Explore / });
+    const href = (await explore.getAttribute('href'))!;
+    const cityName = new URL(href, 'http://localhost').searchParams.get('city')!;
+    const imageUrl = await featured.getByRole('img').getAttribute('src');
+    const image = Object.values(imageData).find((image) => image.url === imageUrl);
+    expect(image).toBeDefined();
+    await expect(featured).toContainText(image!.photographerName);
+    await expect(featured).toContainText(dollars(oneBedroomRent(cityName)));
+    await page.clock.fastForward(24_000);
+    await expect(explore).toHaveAttribute('href', href);
+    await expect(featured.getByRole('img')).toHaveAttribute('src', imageUrl!);
+    await explore.focus();
+    await page.clock.fastForward(16_000);
+    await expect(explore).toHaveAttribute('href', href);
+    await explore.press('Enter');
+    await expect(page.getByRole('heading', { name: cityName, exact: true })).toBeVisible();
   });
-  expect(opacity).toBeGreaterThan(0);
-  expect(opacity).toBeLessThan(1);
-  await featured.locator('.featured-photo img').evaluateAll((images) => {
-    for (const image of images) for (const animation of image.getAnimations()) animation.finish();
-  });
-  const secondHref = (await explore.getAttribute('href'))!;
-  const cityName = new URL(secondHref, 'http://localhost').searchParams.get('city')!;
-  const imageUrl = await featured.getByRole('img').getAttribute('src');
-  const image = Object.values(imageData).find((image) => image.url === imageUrl);
-  expect(image).toBeDefined();
-  await expect(featured).toContainText(image!.photographerName);
-  await expect(featured).toContainText(dollars(oneBedroomRent(cityName)));
-
-  await featured.hover();
-  await page.clock.fastForward(16_000);
-  await expect(explore).toHaveAttribute('href', secondHref);
-  await page.getByRole('heading', { name: 'Find your city. Know your rent.' }).hover();
-  await page.clock.fastForward(8_000);
-  await expect(explore).not.toHaveAttribute('href', secondHref);
-
-  await explore.focus();
-  const focusedHref = (await explore.getAttribute('href'))!;
-  await page.clock.fastForward(16_000);
-  await expect(explore).toHaveAttribute('href', focusedHref);
-  await explore.press('Enter');
-  const focusedCity = new URL(focusedHref, 'http://localhost').searchParams.get('city')!;
-  await expect(page.getByRole('heading', { name: focusedCity, exact: true })).toBeVisible();
-});
-
-test('starts featured cities paused when reduced motion is requested', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.clock.install();
-  await page.reload();
-  await waitForHydration(page);
-  const featured = page.getByRole('figure', { name: 'Featured cities' });
-  const explore = featured.getByRole('link', { name: /^Explore / });
-  const firstHref = (await explore.getAttribute('href'))!;
-  await page.clock.fastForward(24_000);
-  await expect(explore).toHaveAttribute('href', firstHref);
-});
+}
 
 test('supports keyboard city selection and salary results', async ({ page }) => {
   const city = page.getByRole('combobox', { name: 'City', exact: true });
@@ -1181,7 +1142,10 @@ test('filters discovered cities by salary, state, and population and adds a comp
   );
   expect(expected.length).toBeGreaterThan(0);
   await expect(gallery.getByRole('link', { name: /^Explore / })).toHaveCount(expected.length);
-  await gallery.getByRole('button', { name: 'Add to comparison', exact: true }).first().click();
+  await gallery
+    .getByRole('button', { name: /^Add .+ to comparison$/ })
+    .first()
+    .click();
   await expect.poll(() => new URL(page.url()).searchParams.getAll('compare').length).toBe(1);
   await chooseSelect(gallery.getByLabel('State', { exact: true }), 'AK');
   await expect(

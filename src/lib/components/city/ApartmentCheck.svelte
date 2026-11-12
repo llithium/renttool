@@ -26,6 +26,7 @@
         )
       : null
   );
+  let ceiling = $derived(presentation.rentTarget ?? 0);
   const fields = [
     { key: 'rent', label: 'Quoted monthly rent' },
     { key: 'utilities', label: 'Monthly utilities' },
@@ -101,10 +102,25 @@
               ? 'text-green'
               : 'text-red'}"
           >
-            {result.withinCeiling && result.afterBuffer >= 0
-              ? 'Fits your rent ceiling and buffer'
-              : 'Exceeds your rent ceiling or buffer'}
+            {#if !result.withinCeiling}
+              {money(result.monthly - ceiling)}/mo above your {money(ceiling)} rent ceiling
+            {:else if result.afterBuffer < 0}
+              {money(-result.afterBuffer)}/mo short of your monthly {(presentation.options
+                .monthlyBuffer ?? 0) > 0
+                ? 'buffer'
+                : 'budget'}
+            {:else}
+              Fits your rent ceiling and buffer
+            {/if}
           </p>
+          {#if !result.withinCeiling && result.afterBuffer < 0}
+            <p class="mt-1 text-sm text-red">
+              Also {money(-result.afterBuffer)}/mo short of your monthly {(presentation.options
+                .monthlyBuffer ?? 0) > 0
+                ? 'buffer'
+                : 'budget'}.
+            </p>
+          {/if}
           <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1">
             <div>
               <dt class="text-meta text-muted">Total monthly housing</dt>
@@ -116,9 +132,13 @@
               <dt class="text-meta text-muted">After housing, expenses &amp; savings</dt>
               <dd class="mt-1 text-data tabular-nums {result.available < 0 ? 'text-red' : ''}">
                 {money(result.available)}
-                <p class="mt-1 text-meta text-muted">
-                  {money(result.afterBuffer)} after your buffer
-                </p>
+                {#if (presentation.options.monthlyBuffer ?? 0) > 0}
+                  <p class="mt-1 text-meta text-muted">
+                    {money(result.afterBuffer)} after your {money(
+                      presentation.options.monthlyBuffer
+                    )} buffer
+                  </p>
+                {/if}
               </dd>
             </div>
             <div class="border-line lg:border-t lg:pt-4">

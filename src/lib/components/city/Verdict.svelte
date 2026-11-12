@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Budget, City } from '$lib/types';
   import { money } from '$lib/format';
-  import { housingRent, type HousingChoice } from '$lib/planning';
+  import { housingRent, rentTargetFit, type HousingChoice } from '$lib/planning';
 
   let {
     budget,
@@ -18,13 +18,15 @@
   } = $props();
   let rent = $derived(housingRent(city, housing));
   let gap = $derived(rent != null ? target - rent : null);
+  let fit = $derived(rentTargetFit(rent, target));
+  let tone = $derived(fit === 'near' ? 'text-ink' : fit === 'within' ? 'text-green' : 'text-red');
 </script>
 
 {#if gap != null}
   <section aria-labelledby="affordability-heading" class="flex items-start gap-3">
-    <span aria-hidden="true" class="mt-0.5 shrink-0 {gap >= 0 ? 'text-green' : 'text-red'}">
+    <span aria-hidden="true" class="mt-0.5 shrink-0 {tone}">
       <svg class="size-5" viewBox="0 0 24 24" fill="none">
-        {#if gap >= 0}
+        {#if fit === 'within'}
           <path
             d="m5 12.5 4.5 4.5L19 7"
             stroke="currentColor"
@@ -44,17 +46,16 @@
       </svg>
     </span>
     <div>
-      <h2
-        id="affordability-heading"
-        class="text-base font-semibold lg:text-title {gap >= 0 ? 'text-green' : 'text-red'}"
-      >
-        {gap >= 0
-          ? personal
-            ? 'Fits your personal rent ceiling'
-            : 'Fits your 30% gross-income target'
-          : personal
-            ? 'Above your personal rent ceiling'
-            : 'Above your gross-income target'}
+      <h2 id="affordability-heading" class="text-base font-semibold lg:text-title {tone}">
+        {fit === 'near'
+          ? 'Near your rent ceiling'
+          : gap >= 0
+            ? personal
+              ? 'Fits your personal rent ceiling'
+              : 'Fits your 30% gross-income target'
+            : personal
+              ? 'Above your personal rent ceiling'
+              : 'Above your gross-income target'}
       </h2>
       <p class="mt-1 max-w-[68ch] text-sm text-muted">
         Typical {housing === 'shared-2br'
@@ -63,8 +64,11 @@
             ? '2BR rent'
             : '1BR rent'} is
         <strong class="font-semibold text-ink"
-          >{money(Math.abs(gap))}/mo {gap >= 0 ? 'below' : 'above'} your ceiling.</strong
+          >{gap === 0
+            ? 'at your ceiling.'
+            : `${money(Math.abs(gap))}/mo ${gap >= 0 ? 'below' : 'above'} your ceiling.`}</strong
         >
+        {#if fit === 'near'}Allow room for utilities and fees.{/if}
         {#if gap < 0}Try nearby places, a roommate, or a lower-rent apartment.{/if}
       </p>
     </div>

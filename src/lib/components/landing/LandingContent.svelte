@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { onMount, type Snippet } from 'svelte';
-  import { fade } from 'svelte/transition';
+  import type { Snippet } from 'svelte';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import { RENT_DATA_META, SEED_CITIES } from '$lib/data/cities';
   import { findCityImage } from '$lib/data/city-images';
@@ -25,16 +24,10 @@
     const image = findCityImage(city.city, city.state);
     return image ? [{ city, image }] : [];
   });
-  const initialIndex = Math.floor(Math.random() * featuredCities.length);
-  let featuredIndex = $state(initialIndex);
-  let nextIndex = $state(pickNextCity(initialIndex));
-  let reducedMotion = $state(false);
-  let hovered = $state(false);
-  let focused = $state(false);
-  let visible = $state(true);
-  let featuredCity = $derived(featuredCities[featuredIndex]?.city);
-  let featuredImage = $derived(featuredCities[featuredIndex]?.image);
-  let nextImage = $derived(featuredCities[nextIndex]?.image);
+  // Pick once per visit so the destination stays still while someone reads or navigates.
+  const featured = featuredCities[Math.floor(Math.random() * featuredCities.length)];
+  const featuredCity = featured?.city;
+  const featuredImage = featured?.image;
   let featuredRent = $derived(
     featuredCity ? housingRent(featuredCity, presentation.options.housing) : null
   );
@@ -43,47 +36,7 @@
     if (featuredCity) params.set('city', featuredCity.name);
     return `/?${params}`;
   });
-
-  function pickNextCity(current: number) {
-    const offset = 1 + Math.floor(Math.random() * (featuredCities.length - 1));
-    return (current + offset) % featuredCities.length;
-  }
-
-  onMount(() => {
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    reducedMotion = preference.matches;
-    visible = !document.hidden;
-    const respectReducedMotion = (event: MediaQueryListEvent) => {
-      reducedMotion = event.matches;
-    };
-    preference.addEventListener('change', respectReducedMotion);
-    return () => preference.removeEventListener('change', respectReducedMotion);
-  });
-
-  $effect(() => {
-    // Leave the featured city still while someone reads, tabs through it, or edits a plan.
-    if (city) {
-      hovered = false;
-      focused = false;
-      return;
-    }
-    if (reducedMotion || hovered || focused || !visible || featuredCities.length < 2) return;
-    const timer = setInterval(() => {
-      featuredIndex = nextIndex;
-      nextIndex = pickNextCity(nextIndex);
-    }, 8_000);
-    return () => clearInterval(timer);
-  });
 </script>
-
-<svelte:document onvisibilitychange={() => (visible = !document.hidden)} />
-
-<svelte:head>
-  {#if !city && !reducedMotion && nextImage}
-    <!-- Load the next photo before fading out the current one. -->
-    <link rel="preload" as="image" href={nextImage.url} fetchpriority="low" />
-  {/if}
-</svelte:head>
 
 <article aria-label="Rent plan" class="min-w-0" class:landing={!city}>
   {#if !city}
@@ -101,35 +54,20 @@
   </div>
 
   {#if !city && featuredCity && featuredImage}
-    <figure
-      class="featured-city"
-      aria-label="Featured cities"
-      aria-roledescription="carousel"
-      onpointerenter={() => (hovered = true)}
-      onpointerleave={() => (hovered = false)}
-      onfocusin={() => (focused = true)}
-      onfocusout={(event) => {
-        focused =
-          event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget);
-      }}
-    >
+    <figure class="featured-city" aria-label="Featured city">
       <div class="featured-photo">
-        {#key featuredCity.name}
-          <img
-            src={featuredImage.url}
-            style:object-position={featuredImage.focusY == null
-              ? undefined
-              : `50% ${featuredImage.focusY}%`}
-            alt={featuredImage.alt}
-            fetchpriority="high"
-            transition:fade={{ duration: reducedMotion ? 0 : 700 }}
-            onoutrostart={(event) => event.currentTarget.setAttribute('aria-hidden', 'true')}
-            onerror={(event) => {
-              if (event.currentTarget instanceof HTMLImageElement)
-                event.currentTarget.style.visibility = 'hidden';
-            }}
-          />
-        {/key}
+        <img
+          src={featuredImage.url}
+          style:object-position={featuredImage.focusY == null
+            ? undefined
+            : `50% ${featuredImage.focusY}%`}
+          alt={featuredImage.alt}
+          fetchpriority="high"
+          onerror={(event) => {
+            if (event.currentTarget instanceof HTMLImageElement)
+              event.currentTarget.style.visibility = 'hidden';
+          }}
+        />
         <div class="featured-meta">
           <div class="featured-location">
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">

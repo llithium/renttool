@@ -67,6 +67,13 @@ export function optionsForExpenses(
   return monthlyExpenses == null ? options : { ...options, monthlyExpenses };
 }
 
+/** Treat rent within 5% below the ceiling as a narrow margin, not a comfortable fit. */
+export function rentTargetFit(rent: number | null, target: number) {
+  if (rent == null) return 'unknown';
+  if (rent > target) return 'above';
+  return target - rent <= target * 0.05 ? 'near' : 'within';
+}
+
 export interface ApartmentCosts {
   rent: number | null;
   utilities: number | null;
