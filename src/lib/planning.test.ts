@@ -4,6 +4,7 @@ import { computeBudget } from './budget';
 import {
   comparisonQualification,
   rentCeiling,
+  rentTargetFit,
   checkApartment,
   computeSpendingRoom,
   housingRent,
@@ -49,6 +50,15 @@ describe('housing and personal spending room', () => {
 });
 
 describe('personal ceilings and apartment checks', () => {
+  it('distinguishes a narrow margin from comfortably fitting or exceeding the ceiling', () => {
+    expect(rentTargetFit(null, 2000)).toBe('unknown');
+    expect(rentTargetFit(2001, 2000)).toBe('above');
+    expect(rentTargetFit(2000, 2000)).toBe('near');
+    expect(rentTargetFit(1900, 2000)).toBe('near');
+    expect(rentTargetFit(1899, 2000)).toBe('within');
+    expect(rentTargetFit(1745, 1750)).toBe('near');
+    expect(rentTargetFit(1, 0)).toBe('above');
+  });
   it('reserves personal goals and buffer, caps the ceiling, and preserves a zero paycheck', () => {
     const budget = computeBudget(80000, 'TX');
     const options = {

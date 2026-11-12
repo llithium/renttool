@@ -11,7 +11,7 @@
   import BudgetCard from './BudgetCard.svelte';
   import RentTrendChart from './RentTrendChart.svelte';
   import { money } from '$lib/format';
-  import { housingShortLabel } from '$lib/planning';
+  import { housingRent, housingShortLabel } from '$lib/planning';
   import HousingSelector from '$lib/components/ui/HousingSelector.svelte';
   import PersonalCosts from '$lib/components/ui/PersonalCosts.svelte';
   import PlanAssumptions from '$lib/components/ui/PlanAssumptions.svelte';
@@ -27,6 +27,14 @@
   } = $props();
   let activeCity = $derived(presentation.activeCity);
   let budget = $derived(presentation.budget);
+  let localRent = $derived(
+    activeCity ? housingRent(activeCity, presentation.options.housing) : null
+  );
+  let rentGap = $derived(
+    localRent != null && presentation.rentTarget != null
+      ? presentation.rentTarget - localRent
+      : null
+  );
   let costsOpen = $state(false);
   // A saved plan opens with its answer. A new plan keeps the editor in place
   // as results appear, so typing and an in-progress salary drag never jump.
@@ -155,6 +163,32 @@
               onchange={(housing) => presentation.setOptions({ ...presentation.options, housing })}
             />
           </div>
+          {#if activeCity && budget && presentation.rentTarget != null}
+            <div
+              class="mt-4 rounded-lg bg-card-2 p-3 text-sm lg:hidden"
+              data-testid="editor-budget"
+            >
+              <div role="status" aria-atomic="true">
+                <p>
+                  Rent ceiling <strong class="tabular-nums"
+                    >{money(presentation.rentTarget)}/mo</strong
+                  >
+                </p>
+                {#if rentGap != null}
+                  <p class="mt-1 text-muted">
+                    Local rent is {rentGap === 0
+                      ? 'at your ceiling.'
+                      : `${money(Math.abs(rentGap))}/mo ${rentGap > 0 ? 'below' : 'above'} your ceiling.`}
+                  </p>
+                {/if}
+              </div>
+              <a
+                href="#plan-summary"
+                class="mt-1 inline-flex min-h-11 items-center font-semibold text-accent underline underline-offset-2"
+                >View updated budget</a
+              >
+            </div>
+          {/if}
           <div
             class="mt-4 flex flex-col items-stretch justify-between gap-2 border-t border-line pt-1 @3xl:flex-row @3xl:items-start @3xl:gap-6"
           >

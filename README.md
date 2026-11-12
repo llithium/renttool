@@ -4,11 +4,15 @@ A SvelteKit web app: pick a city, enter an offered salary, and get your 30%-rule
 budget, current rent estimates, city facts, an affordability map, take-home charts, and
 pre-filtered apartment searches. The `/compare` view compares up to five cities with an
 independent salary and optional entered take-home pay for each comparison entry.
+The plan shows the salary saved in Compare and offers an explicit update when it differs.
+Updating a comparison salary clears that entry’s entered paycheck, while retaining its expense override.
 
 Choose a one-bedroom, two-bedroom, or shared two-bedroom (an equal split between two
 people). The housing choice applies to rent decisions, the map, comparisons, equivalent
 salaries, and listing searches. Shared housing searches use the whole apartment ceiling,
 twice your personal rent target; Zillow also carries the selected bedroom count.
+Rent estimates within 5% below the ceiling use a neutral “Near your rent ceiling” message.
+On phones, the plan editor includes a live ceiling summary and a shortcut back to the full budget.
 Optional recurring expenses and a savings target show the money left after rent and goals.
 They apply across the comparison set. Entered take-home pay belongs to its city and salary
 and clears when either changes; estimated tax figures remain visible separately.
@@ -25,10 +29,12 @@ The apartment check accepts your share of quoted rent, utilities, parking, recur
 fees, deposit, and moving costs. It shows total monthly housing, remaining spending
 room, and first-month move-in cash. Inputs are temporary, reset with city/housing changes,
 and are excluded from links. Avoid also entering the same costs under recurring expenses.
+Warnings identify the rent-ceiling overage and any monthly buffer or budget shortfall separately.
 
 Discovery supports lowest rent, most spending room, rent closest to ceiling, and
 straight-line distance from a bundled reference city. Filters persist in session storage
 when returning from a city page or reloading the same browser tab.
+The featured city stays still during a visit; city discovery remains available through the filters.
 
 Nearby options include a **Commute time** destination search and a maximum driving-time
 filter (15–90 minutes). Select an address result to calculate routes from the existing

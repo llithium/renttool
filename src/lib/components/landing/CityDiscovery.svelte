@@ -136,7 +136,7 @@
     />
     <Select
       id="discovery-reference"
-      label="Reference city"
+      label="Reference city for distance"
       value={filters.reference}
       options={[
         { value: '', label: 'Choose a city' },
@@ -235,10 +235,10 @@
           }}
           class="destination-compare"
           aria-label={presentation.isComparing(city.name)
-            ? 'Remove comparison'
+            ? `Remove ${city.name} from comparison`
             : presentation.comparisonFull
-              ? 'Comparison full'
-              : 'Add to comparison'}
+              ? `Comparison full; cannot add ${city.name}`
+              : `Add ${city.name} to comparison`}
           aria-pressed={presentation.isComparing(city.name)}
           ><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none">
             <path

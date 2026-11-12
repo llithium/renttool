@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
-  import { housingRent, housingShortLabel } from '$lib/planning';
+  import { housingRent, housingShortLabel, rentTargetFit } from '$lib/planning';
   import { money } from '$lib/format';
   import Verdict from './Verdict.svelte';
   let {
@@ -31,9 +31,11 @@
 
 {#if city}
   <section
+    id="plan-summary"
+    tabindex="-1"
     aria-label="Plan summary"
     data-plan-summary
-    class="@container"
+    class="@container scroll-mt-28"
     data-testid="plan-summary"
   >
     {#if budget}
@@ -44,10 +46,7 @@
           {usesGrossTarget ? '30% of gross income' : 'Based on your take-home pay, costs and goals'}
         </p>
       </div>
-      <div
-        id="rent-decision"
-        data-rent-fit={rentGap == null ? 'unknown' : rentGap >= 0 ? 'yes' : 'no'}
-      >
+      <div id="rent-decision" data-rent-fit={rentTargetFit(rent, ceiling ?? 0)}>
         <Verdict
           {budget}
           {city}
@@ -216,10 +215,10 @@
     border-radius: 0.75rem;
     background: var(--card-2);
   }
-  [data-rent-fit='yes'] {
+  [data-rent-fit='within'] {
     background: var(--green-soft);
   }
-  [data-rent-fit='no'] {
+  [data-rent-fit='above'] {
     background: var(--red-soft);
   }
   [data-supporting-metrics] {
@@ -383,10 +382,10 @@
       border-radius: 0.75rem;
       background: var(--card-2);
     }
-    [data-rent-fit='yes'] {
+    [data-rent-fit='within'] {
       background: var(--green-soft);
     }
-    [data-rent-fit='no'] {
+    [data-rent-fit='above'] {
       background: var(--red-soft);
     }
     [data-supporting-metrics] {

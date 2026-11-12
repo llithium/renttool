@@ -116,7 +116,7 @@ test('uses a personal ceiling in the summary, map, listing search, and apartment
   expect(apartmentAccessibility.violations).toEqual([]);
   await page.getByLabel('Quoted monthly rent').fill('2500');
   await expect(apartment).toContainText('-$875');
-  await expect(apartment).toContainText('Exceeds your rent ceiling or buffer');
+  await expect(apartment).toContainText('$1,275/mo above your $1,400 rent ceiling');
   await openPlanEditor(page);
   await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
   await chooseSelect(page.getByLabel('Rent ceiling', { exact: true }), 'gross');
@@ -189,7 +189,10 @@ test('retains discovery filters after exploring a city and on reload', async ({ 
   await page.goto('/?salary=80000');
   await chooseSelect(page.getByLabel('State', { exact: true }), 'IL');
   await chooseSelect(page.getByLabel('Population', { exact: true }), '500k+');
-  await chooseSelect(page.getByLabel('Reference city', { exact: true }), 'Chicago, IL');
+  await chooseSelect(
+    page.getByLabel('Reference city for distance', { exact: true }),
+    'Chicago, IL'
+  );
   await chooseSelect(page.getByLabel('Sort by', { exact: true }), 'distance');
   await page.getByRole('link', { name: 'Explore Chicago, IL', exact: true }).click();
   await page.getByRole('button', { name: 'Explore other cities', exact: true }).click();
@@ -198,7 +201,7 @@ test('retains discovery filters after exploring a city and on reload', async ({ 
     'data-value',
     'distance'
   );
-  await expect(page.getByLabel('Reference city', { exact: true })).toHaveAttribute(
+  await expect(page.getByLabel('Reference city for distance', { exact: true })).toHaveAttribute(
     'data-value',
     'Chicago, IL'
   );
@@ -221,9 +224,7 @@ test('names the rule that actually sets the ceiling and omits empty personal cos
   await expect(summary.getByText('30% of gross income', { exact: true })).toBeVisible();
   await expect(summary.getByText('After rent, before expenses', { exact: true })).toBeVisible();
   await expect(summary).not.toContainText('buffer target');
-  await expect(
-    page.getByRole('heading', { name: 'Fits your 30% gross-income target' })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Near your rent ceiling' })).toBeVisible();
   await openPlanEditor(page);
   await page.getByText('Personal expenses & savings (optional)', { exact: true }).click();
   await expect(
