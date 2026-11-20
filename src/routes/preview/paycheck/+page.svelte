@@ -81,7 +81,7 @@
         onchange={pickCity}
         aria-label="City"
         spellcheck="false"
-        style="width:{Math.max(state.city.length, 6) * 0.56}em"
+        style="width:{Math.max(state.city.length, 6) + 0.5}ch"
       />
       on
       <input

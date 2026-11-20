@@ -10,7 +10,7 @@
   let v = $derived(state.view);
   let hue = $derived(v ? cityHue(v.name) : 200);
   let letterSize = $derived(
-    v ? `min(19cqi, ${(124 / Math.max(v.city.length, 5)).toFixed(2)}cqi)` : '10cqi'
+    v ? `min(19cqi, ${(100 / Math.max(v.city.length, 5)).toFixed(2)}cqi)` : '10cqi'
   );
   let salaryText = $derived(money(state.salary));
 
