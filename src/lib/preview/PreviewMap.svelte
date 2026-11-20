@@ -28,18 +28,15 @@
     onpick?: (name: string) => void;
   } = $props();
 
-  const TILE_URL: Record<Tiles, string> = {
-    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    voyager: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    'light-nolabels': 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    'dark-nolabels': 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
-  };
+  // OpenStreetMap's standard tiles (already allowed by the app's CSP), restyled per design
+  // with CSS filters so each preview keeps its own map tone without a keyed tile service.
+  const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   let el: HTMLDivElement;
   let map: LMap | undefined;
   let group: LayerGroup | undefined;
   let L: typeof import('leaflet') | undefined;
+  let ro: ResizeObserver | undefined;
 
   function draw() {
     if (!map || !group || !L) return;
@@ -75,17 +72,21 @@
         scrollWheelZoom: false
       }).setView([view.lat, view.lng], zoom);
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-      L.tileLayer(TILE_URL[tiles], {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
+      L.tileLayer(OSM_URL, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 18
       }).addTo(map);
       group = L.layerGroup().addTo(map);
       draw();
+      ro = new ResizeObserver(() => {
+        map?.invalidateSize({ animate: false });
+        draw();
+      });
+      ro.observe(el);
     });
     return () => {
       cancelled = true;
+      ro?.disconnect();
       map?.remove();
     };
   });
@@ -96,7 +97,7 @@
   });
 </script>
 
-<div bind:this={el} class="pm {klass}" role="region" aria-label={label}></div>
+<div bind:this={el} class="pm tiles-{tiles} {klass}" role="region" aria-label={label}></div>
 
 <style>
   .pm {
@@ -109,6 +110,19 @@
     background: none;
     border: 0;
     overflow: visible;
+  }
+  .tiles-light :global(.leaflet-tile-pane) {
+    filter: grayscale(1) contrast(0.9) brightness(1.05);
+  }
+  .tiles-light-nolabels :global(.leaflet-tile-pane) {
+    filter: grayscale(1) contrast(0.8) brightness(1.08);
+  }
+  .tiles-voyager :global(.leaflet-tile-pane) {
+    filter: saturate(0.55) contrast(0.95) brightness(1.03);
+  }
+  .tiles-dark :global(.leaflet-tile-pane),
+  .tiles-dark-nolabels :global(.leaflet-tile-pane) {
+    filter: invert(1) hue-rotate(180deg) grayscale(0.85) brightness(0.8) contrast(0.95);
   }
   .pm :global(.leaflet-control-attribution) {
     font-size: 10px;
