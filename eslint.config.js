@@ -80,5 +80,13 @@ export default ts.config(
       // intentionally off: prettier-plugin-tailwindcss owns class ordering and
       // Prettier owns line wrapping, and the two would fight.
     }
+  },
+  {
+    // Design previews (/preview/*) use plain scoped CSS rather than Tailwind utilities.
+    files: ['src/routes/preview/**', 'src/lib/preview/**'],
+    rules: {
+      'better-tailwindcss/no-unknown-classes': 'off',
+      'better-tailwindcss/no-concatenated-classes': 'off'
+    }
   }
 );

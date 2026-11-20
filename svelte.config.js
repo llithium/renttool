@@ -18,6 +18,7 @@ const config = {
           'self',
           'data:',
           'https://tile.openstreetmap.org',
+          'https://*.basemaps.cartocdn.com',
           'https://images.unsplash.com',
           'https://upload.wikimedia.org',
           'https://thumb.wikimedia.org'
