@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-  <title>{page.status === 404 ? 'Page not found' : 'Page unavailable'} · Rent Tool</title>
+  <title>{page.status === 404 ? 'Page not found' : 'Page unavailable'} · Renttool</title>
 </svelte:head>
 
 <main id="main-content" class="grid min-h-dvh place-items-center px-4 py-20">
@@ -21,7 +21,7 @@
       class="mt-8 inline-flex rounded-xl bg-accent px-3 py-2 text-base font-semibold text-accent-ink transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5 hover:bg-accent-deep active:translate-y-px active:scale-98"
       href="/"
     >
-      Back to Rent Tool
+      Back to Renttool
     </a>
   </section>
 </main>

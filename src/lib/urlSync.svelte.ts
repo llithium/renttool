@@ -101,6 +101,7 @@ export function createUrlSync(plan: UrlSyncPlan, registerEffect?: EffectRegistra
      */
     start(initialSearch: URLSearchParams, onStateApplied: () => void) {
       stopped = false;
+      const pathname = location.pathname;
       // A URL with plan state wins. A stateful client-side visit keeps the
       // in-memory plan; otherwise restore the last session and then reapply a
       // salary-only URL value.
@@ -142,6 +143,9 @@ export function createUrlSync(plan: UrlSyncPlan, registerEffect?: EffectRegistra
         clearTimeout(salaryTimer);
         salaryTimer = undefined;
         salaryWritePending = false;
+        // Back to another page (such as home) is the router's to handle. Its
+        // empty query must not clear the plan on the way out.
+        if (location.pathname !== pathname) return;
         const params = new URLSearchParams(location.search);
         const search = canonicalizeRentPlanSearch(params);
         if (!hydrated || search === lastWritten) return;

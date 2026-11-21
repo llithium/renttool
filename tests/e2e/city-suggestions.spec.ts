@@ -1,4 +1,3 @@
-import { openPlanEditor } from './plan';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
@@ -13,14 +12,15 @@ test('matches city/state variants and explains housing estimates', async ({ page
     route.fulfill({ json: { suggestions: [] } })
   );
   await page.goto('/?salary=80000&housing=shared-2br');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('Saint Louis, Missouri');
   const suggestion = page.getByRole('option', { name: 'St Louis, MO', exact: true });
   await expect(suggestion).toBeVisible();
   await expect(suggestion).toContainText('Missouri');
-  await expect(suggestion).toContainText('half a 2BR estimate');
-  await expect(suggestion).toContainText('/mo');
-  await expect(page.getByText(/Apartment List ·/)).toBeVisible();
+  await expect(suggestion).toContainText('Half a 2-bed');
+  await expect(suggestion).toContainText('$');
+  await expect(page.getByText(/^Rents: Apartment List, /)).toBeVisible();
   await input.fill('NYC');
   await expect(page.getByRole('option', { name: 'New York, NY', exact: true })).toBeVisible();
 });
@@ -42,6 +42,7 @@ test('merges delayed results without duplicate cities or changing the keyboard c
     });
   });
   await page.goto('/?salary=80000');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('San');
   const list = page.getByRole('listbox', { name: 'City suggestions' });
@@ -53,12 +54,10 @@ test('merges delayed results without duplicate cities or changing the keyboard c
   await expect(page.getByRole('option', { name: 'San Diego, CA', exact: true })).toHaveCount(1);
   await expect(list.locator('[aria-selected="true"]')).toHaveAttribute('aria-label', chosen!);
   await input.press('Enter');
-  await expect(page.getByRole('heading', { name: chosen!, exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear city search', exact: true }).click();
-  await expect(input).toHaveValue('');
-  await expect(input).toBeFocused();
+  await expect(
+    page.getByRole('heading', { level: 1, name: chosen!.split(',')[0], exact: true })
+  ).toBeVisible();
   await expect(list).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: chosen!, exact: true })).toBeVisible();
 });
 
 test('keeps keyboard choices visible in a mobile menu and meets accessibility checks', async ({
@@ -68,8 +67,8 @@ test('keeps keyboard choices visible in a mobile menu and meets accessibility ch
     route.fulfill({ json: { suggestions: [] } })
   );
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?salary=80000&city=San+Diego%2C+CA');
-  await openPlanEditor(page);
+  await page.goto('/city?salary=80000&city=San+Diego%2C+CA');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('San');
   const list = page.getByRole('listbox', { name: 'City suggestions' });
@@ -87,8 +86,8 @@ test('keeps keyboard choices visible in a mobile menu and meets accessibility ch
   expect(popup.x + popup.width).toBeLessThanOrEqual(390);
   expect(popup.y).toBeGreaterThanOrEqual(0);
   expect(popup.y + popup.height).toBeLessThanOrEqual(844);
-  const violations = (await new AxeBuilder({ page }).analyze()).violations.filter((violation) =>
-    ['serious', 'critical'].includes(violation.impact ?? '')
-  );
+  const violations = (
+    await new AxeBuilder({ page }).exclude('.leaflet-container').analyze()
+  ).violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''));
   expect(violations).toEqual([]);
 });

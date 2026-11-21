@@ -1,80 +1,54 @@
 @import 'tailwindcss';
 
-/* Nothing uses `dark:` today — both themes come from the tokens below, which the
-   [data-theme] block re-points. This redefinition is here so that the first
-   `dark:` utility someone reaches for is correct by default: the theme is a
-   manual toggle (see static/theme-init.js + ThemeToggle.svelte), so Tailwind's
-   stock prefers-color-scheme variant would follow the OS rather than what the
-   user actually picked. Delete it only alongside the toggle. */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
-
-/* A city-led planning identity: midnight ink, cobalt actions, paper surfaces. */
+/* Postcard identity: navy ink on a cool paper ground, pink for "fits",
+   white for "tight", slate for "over". One light theme; the postcard art is
+   drawn for it. */
 :root {
   color-scheme: light;
-  --primary: #304fe0;
+  --navy: #17263b;
+  --navy-2: #22385a;
+  --navy-3: #2b4469;
+  --navy-hover: #2e4566;
+  --pink: #f4a6b4;
+  --pink-soft: #fde7eb;
+  --sage: #a9c5a4;
+  --slate: #aeb7c2;
+  --slate-ink: #5e6e80;
+  --mist: #c8d3e0;
+  --primary: var(--navy);
   --primary-ink: #ffffff;
-  --primary-soft: #eaf0ff;
-  --accent: #304bc9;
+  --primary-soft: #f2f4f5;
+  --accent: var(--navy);
   --accent-ink: #ffffff;
-  --accent-soft: #eaf0ff;
-  --accent-deep: #2138a5;
-  --green: #217047;
-  --green-soft: #e9f5ee;
-  --red: #ad343e;
-  --red-soft: #fff0f1;
-  --amber: #a66b12;
+  --accent-soft: #fde7eb;
+  --accent-deep: var(--navy-hover);
+  --green: #2c6a3d;
+  --green-soft: #e8f1e6;
+  --red: #a3323c;
+  --red-soft: #fbecee;
+  --amber: #8a5a10;
   --amber-ink: #ffffff;
-  --canvas: #f7f8fc;
+  --canvas: #e7ebee;
   --card: #ffffff;
-  --card-2: #f0f3fb;
-  --ink: #17243c;
-  --muted: #536178;
-  --faint: #5d6c84;
-  --line: #dce2ee;
-  --line-strong: #7b89a3;
-  --elevation-card: 0 8px 28px rgb(23 36 60 / 5%);
-  --elevation-pop: 0 16px 40px rgb(23 36 60 / 16%);
-  --decision-bg: #263faa;
+  --card-2: #f2f4f5;
+  --ink: var(--navy);
+  --muted: #4d5b6e;
+  --faint: #5e6e80;
+  --line: #e1e6ea;
+  --line-strong: #8a97a6;
+  --elevation-card: 0 2px 0 #cbd3d9, 0 24px 48px -28px rgb(23 38 59 / 45%);
+  --elevation-pop: 0 16px 40px rgb(23 38 59 / 18%);
+  --decision-bg: var(--navy);
   --decision-ink: #ffffff;
-  --decision-muted: #e0e7ff;
-}
-
-[data-theme='dark'] {
-  color-scheme: dark;
-  --primary: #a9bdff;
-  --primary-ink: #132454;
-  --primary-soft: #233459;
-  --accent: #b1c3ff;
-  --accent-ink: #132454;
-  --accent-soft: #233459;
-  --accent-deep: #d0dcff;
-  --green: #91d6ae;
-  --green-soft: #1a382e;
-  --red: #ffb0b6;
-  --red-soft: #43262f;
-  --amber: #e8c17d;
-  --amber-ink: #17243c;
-  --canvas: #101727;
-  --card: #182239;
-  --card-2: #202e49;
-  --ink: #f1f5ff;
-  --muted: #b6c1d6;
-  --faint: #a3b1cc;
-  --line: #33415e;
-  --line-strong: #7d8aa9;
-  --elevation-card: 0 8px 28px rgb(0 0 0 / 12%);
-  --elevation-pop: 0 16px 40px rgb(0 0 0 / 28%);
-  --decision-bg: #263faa;
-  --decision-ink: #ffffff;
-  --decision-muted: #e0e7ff;
+  --decision-muted: var(--mist);
 }
 
 /* `inline` matters: it makes each utility resolve straight through to the raw
    variable above, so flipping [data-theme] re-colors the page at runtime. A
    non-inline @theme would freeze today's light values into the utilities. */
 @theme inline {
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
 
   /* Typography roles keep the planning hierarchy stable across the city,
      comparison, and supporting-content surfaces. The display ramp is fluid;
@@ -302,54 +276,180 @@
   }
 }
 
-/* Section links share one treatment across planning and comparison. */
-[data-section-nav] {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.5rem 0;
-  border: 0;
-  scrollbar-width: thin;
-}
-[data-section-nav] > a {
-  display: inline-flex;
-  min-height: 2.75rem;
-  flex-shrink: 0;
-  align-items: center;
-  padding: 0.5rem 0.875rem;
-  border: 1px solid var(--line);
-  border-radius: 0.625rem;
-  background: var(--card);
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-[data-section-nav] > a:hover,
-[data-section-nav] > a[aria-current='location'] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+/* ── Postcard building blocks ────────────────────────────────────────────
+   Shared by the home, city, and compare pages. Component-specific layout
+   lives in each component's scoped <style>; these are the pieces that must
+   look identical everywhere. */
+@layer components {
+  .pc-wrap {
+    width: 100%;
+    max-width: 82rem;
+    margin: 0 auto;
+    padding: 0 3rem;
+  }
+
+  .pc-display {
+    font-family: var(--font-display);
+    font-variation-settings: 'wdth' 80;
+    letter-spacing: -0.02em;
+  }
+
+  .pc-h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 2.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variation-settings: 'wdth' 85;
+  }
+
+  .pc-lede {
+    margin: 0.75rem 0 0;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+  }
+
+  .pc-section {
+    padding-top: 4.5rem;
+  }
+
+  .pc-panel {
+    margin-top: 1.5rem;
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  .pc-card {
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: var(--elevation-card);
+  }
+
+  .pc-btn {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    border: 1.5px solid var(--navy);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--navy);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pc-btn:hover {
+    background: var(--card-2);
+  }
+  .pc-btn[disabled] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .pc-btn-dark {
+    background: var(--navy);
+    color: #fff;
+  }
+  .pc-btn-dark:hover {
+    background: var(--navy-hover);
+  }
+  .pc-btn-quiet {
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border-color: #c5cdd5;
+    font-size: 0.8125rem;
+  }
+  .pc-btn-lg {
+    min-height: 3.25rem;
+    padding: 0 1.25rem;
+    font-size: 1rem;
+  }
+
+  .pc-seg {
+    display: inline-flex;
+    min-height: 2.75rem;
+    overflow: hidden;
+    border: 1.5px solid var(--navy);
+    border-radius: 999px;
+    background: var(--card);
+  }
+  .pc-seg button {
+    padding: 0 0.875rem;
+    border: 0;
+    background: transparent;
+    color: var(--navy);
+    font-size: 0.875rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pc-seg button + button {
+    border-left: 1px solid #c5cdd5;
+  }
+  .pc-seg button[aria-pressed='true'] {
+    background: var(--navy);
+    color: #fff;
+  }
+  .pc-seg button:focus-visible {
+    outline-offset: -4px;
+    outline-color: var(--pink);
+  }
+
+  .pc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+  .pc-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .pc-key {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    flex: none;
+    border-radius: 50%;
+  }
+  .pc-key-fits {
+    border: 2px solid var(--navy);
+    background: var(--pink);
+  }
+  .pc-key-tight {
+    border: 3px solid var(--navy);
+    background: #fff;
+  }
+  .pc-key-over {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--slate-ink);
+    border-radius: 1px;
+    background: var(--slate);
+    transform: rotate(45deg);
+  }
+  .pc-key-unknown {
+    border: 2px dashed var(--slate-ink);
+    background: #fff;
+  }
 }
 
-@media (max-width: 639px) {
-  [data-section-nav='comparison'],
-  [data-section-nav='plan'] {
-    display: grid;
-    gap: 0.375rem;
-    overflow: visible;
+@media (max-width: 600px) {
+  .pc-wrap {
+    padding: 0 1rem;
   }
-  [data-section-nav='comparison'] {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .pc-h2 {
+    font-size: 2rem;
   }
-  [data-section-nav='plan'] {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  [data-section-nav] > a {
-    justify-content: center;
-    padding: 0.5rem 0.25rem;
-    font-size: 0.75rem;
-    text-align: center;
+  .pc-section {
+    padding-top: 3.5rem;
   }
 }
