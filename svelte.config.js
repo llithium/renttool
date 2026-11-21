@@ -22,7 +22,7 @@ const config = {
           'https://upload.wikimedia.org',
           'https://thumb.wikimedia.org'
         ],
-        'connect-src': ['self', 'ws:', 'wss:', ...__impeccableLiveDev],
+        'connect-src': ['self', 'ws:', 'wss:', 'https://en.wikipedia.org', ...__impeccableLiveDev],
         'font-src': ['self', 'https://fonts.gstatic.com'],
         'object-src': ['none'],
         'base-uri': ['self'],

@@ -43,15 +43,11 @@ test('map does not initialize after navigation during Leaflet import', async ({ 
 
   await page.goto('/?salary=80000&city=Tampa%2C%20FL');
   await waitForHydration(page);
-  await expect(page.getByText('Map & nearby rents', { exact: true }).locator('..')).toHaveAttribute(
-    'open',
-    ''
-  );
-  await expect(page.getByRole('heading', { name: 'Affordability map' })).toBeVisible();
+  await expect(page.getByTestId('rent-map')).toBeVisible();
   await leaflet.waitUntilRequested();
-  const mapElement = await page.locator('.leaflet-theme').elementHandle();
+  const mapElement = await page.getByTestId('rent-map').elementHandle();
 
-  await page.getByRole('link', { name: 'Compare' }).click();
+  await page.getByRole('link', { name: /^Compare/ }).click();
   await expect(page).toHaveURL(/\/compare/);
   leaflet.release();
   await leaflet.complete();

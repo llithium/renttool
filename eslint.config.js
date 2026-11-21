@@ -66,14 +66,9 @@ export default ts.config(
       'better-tailwindcss/no-unknown-classes': [
         'error',
         {
-          // The map container is tagged so RentMap's scoped <style> can reach
-          // Leaflet's own DOM, which never passes through our markup.
-          // Discovery uses scoped CSS for its photographic layout.
-          ignore: [
-            '^leaflet-',
-            '^motion-',
-            '^(landing|landing-.*|featured-.*|discovery|discovery-.*|city-gallery|destination|destination-.*|photo-credit|city-arrival|arrival-photo|arrival-heading)$'
-          ]
+          // Postcard pieces (`pc-*`) are styled with shared and scoped CSS rather
+          // than utilities, and Leaflet's own DOM is reached through `leaflet-*`.
+          ignore: ['^leaflet-', '^motion-', '^pc-']
         }
       ]
       // enforce-consistent-class-order / enforce-consistent-line-wrapping are

@@ -1,8 +1,11 @@
-# Rent Tool
+# Renttool
 
-A SvelteKit web app: pick a city, enter an offered salary, and get your 30%-rule rent
-budget, current rent estimates, city facts, an affordability map, take-home charts, and
-pre-filtered apartment searches. The `/compare` view compares up to five cities with an
+A SvelteKit web app for gauging what a move would be like. Put in a salary offer and a city,
+and the city shows up as a two-sided postcard: a photo on the front (or drawn ridgeline art
+when a city has no photo), and on the back the rent there, your rent ceiling as a stamp,
+what you'd keep each month, and a map of nearby towns coloured by whether rent fits. Below
+the card: where the money goes, nearby towns against your ceiling, a short Wikipedia lead,
+city facts, and pre-filtered searches on Zillow, Apartments.com, Zumper, and HotPads. The `/compare` view compares up to five cities with an
 independent salary and optional entered take-home pay for each comparison entry.
 The plan shows the salary saved in Compare and offers an explicit update when it differs.
 Updating a comparison salary clears that entry’s entered paycheck, while retaining its expense override.
@@ -12,7 +15,6 @@ people). The housing choice applies to rent decisions, the map, comparisons, equ
 salaries, and listing searches. Shared housing searches use the whole apartment ceiling,
 twice your personal rent target; Zillow also carries the selected bedroom count.
 Rent estimates within 5% below the ceiling use a neutral “Near your rent ceiling” message.
-On phones, the plan editor includes a live ceiling summary and a shortcut back to the full budget.
 Optional recurring expenses and a savings target show the money left after rent and goals.
 They apply across the comparison set. Entered take-home pay belongs to its city and salary
 and clears when either changes; estimated tax figures remain visible separately.
@@ -111,13 +113,11 @@ are installed before the browser tests.
 
 ## Styling
 
-Tailwind CSS v4 through `@tailwindcss/vite`, with utilities written directly in the markup.
-`src/app.css` holds only what utilities cannot express: the light/dark design tokens (raw
-custom properties, republished as Tailwind theme tokens via `@theme inline` so a
-`[data-theme]` flip re-colors the page at runtime), the entrance keyframes, and the
-reduced-motion and focus-ring base rules. Two components keep a scoped `<style>` block for
-the same reason — `SalarySlider` (range-input vendor pseudo-elements) and `RentMap`
-(Leaflet's own DOM).
+Tailwind CSS v4 through `@tailwindcss/vite`. `src/app.css` holds the postcard palette (navy,
+pink, sage, slate) as custom properties republished as Tailwind tokens via `@theme inline`,
+plus a small set of shared `pc-` component classes (panels, cards, buttons, segmented
+controls, legend keys). The postcard components in `src/lib/components/postcard/` keep their
+own scoped `<style>` blocks; the stamp, pins, and fallback art are drawn in SVG and CSS.
 
 `eslint-plugin-better-tailwindcss` enforces class hygiene: no duplicate, conflicting,
 unknown, deprecated, or non-canonical classes. Class ordering is left to
@@ -131,6 +131,7 @@ unknown, deprecated, or non-canonical classes. Class ordering is left to
 | **Apartment List Rent Estimates** (bundled) | none                | none       | Monthly city 1BR/2BR estimates                   |
 | **Census ACS 5-year** (bundled)             | none                | none       | Structured facts for 606 Census places           |
 | **Unsplash / Wikimedia Commons**            | bundled             | none       | One credited photo per city                      |
+| **Wikipedia REST summary**                  | browser request     | none       | Lead paragraph for the city, when one exists     |
 | **FCC Area API**                            | `/api/geocode`      | none       | Coords → county FIPS                             |
 | **HUD FMR** (bundled)                       | `/api/fmr`          | none       | FY2027 Fair Market Rents for **every US county** |
 | **SimpleMaps places** (bundled)             | `/api/nearby`       | none       | Nearby towns/suburbs around a point              |
