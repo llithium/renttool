@@ -65,7 +65,7 @@ test('keeps keyboard choices visible in a mobile menu and meets accessibility ch
     route.fulfill({ json: { suggestions: [] } })
   );
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?salary=80000&city=San+Diego%2C+CA');
+  await page.goto('/city?salary=80000&city=San+Diego%2C+CA');
   await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('San');

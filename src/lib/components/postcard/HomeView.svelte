@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import type { RentPlanPresentation } from '$lib/rentPlanPresentation.svelte';
   import type { SalaryField as SalaryFieldState } from '$lib/salaryField.svelte';
   import type { City, CitySuggestion } from '$lib/types';
@@ -38,6 +39,7 @@
   let sort = $state<DiscoverySort>('distance');
   let loaded = $state(false);
   let message = $state('');
+  let openError = $state('');
 
   const states = [...new Set(SEED_CITIES.map((city) => city.state))].sort((a, b) =>
     (STATE_NAME[a] ?? a).localeCompare(STATE_NAME[b] ?? b)
@@ -112,10 +114,10 @@
   let featuredRent = $derived(housingRent(featured, housing));
 
   function hrefFor(city: City) {
-    const params = new URLSearchParams(presentation.buildHref('/').split('?')[1]);
+    const params = new URLSearchParams(presentation.buildHref('/city').split('?')[1]);
     params.set('city', city.name);
     if (presentation.salary) params.set('salary', String(presentation.salary));
-    return `/?${params}`;
+    return `/city?${params}`;
   }
 
   function open(city: City) {
@@ -133,8 +135,15 @@
     };
   }
 
-  function choose(suggestion: CitySuggestion) {
-    void presentation.chooseCity(suggestion);
+  // Settle the city here, then open its page with the whole plan in the link.
+  async function choose(suggestion: CitySuggestion) {
+    openError = '';
+    const name = await presentation.chooseCity(suggestion);
+    if (presentation.selectedName !== name || !presentation.activeCity) {
+      openError = `Couldn't open ${suggestion.label}. Try another spelling or a nearby city.`;
+      return;
+    }
+    await goto(presentation.buildHref('/city'));
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
@@ -155,6 +164,11 @@
 <div class="pc-wrap">
   <TopBar homeHref="/">
     {#snippet end()}
+      {#if presentation.activeCity}
+        <a class="pc-btn pc-btn-quiet" href={presentation.buildHref('/city')}
+          >Back to {presentation.activeCity.city}</a
+        >
+      {/if}
       <a class="pc-btn" href={presentation.buildHref('/compare')}
         >Compare cities{#if presentation.comparisonNames.length}<span class="pc-home-count"
             >{presentation.comparisonNames.length}</span
@@ -213,6 +227,7 @@
           <button type="submit" class="pc-btn pc-btn-dark pc-btn-lg">See the city</button>
           <span>or browse what fits below</span>
         </div>
+        <p class={openError ? 'pc-home-error' : 'sr-only'} role="status">{openError}</p>
       </div>
 
       <i class="pc-home-rule" aria-hidden="true"></i>
@@ -387,6 +402,11 @@
 </div>
 
 <style>
+  .pc-home-error {
+    margin: 0.75rem 0 0;
+    color: var(--red);
+    font-size: 0.875rem;
+  }
   .pc-home-count {
     display: inline-flex;
     min-width: 1.375rem;

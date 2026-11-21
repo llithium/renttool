@@ -1,41 +1,46 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import { replaceState } from '$app/navigation';
   import { rentPlanPresentation as plan } from '$lib/rentPlanPresentation.svelte';
   import { createSalaryField } from '$lib/salaryField.svelte';
-  import { createUrlSync } from '$lib/urlSync.svelte';
-  import CityView from '$lib/components/postcard/CityView.svelte';
   import HomeView from '$lib/components/postcard/HomeView.svelte';
 
-  const urlSync = createUrlSync(plan);
+  // Home always shows the start page. The last session still fills in the
+  // salary, housing, and comparison, and the city page lives at /city.
+  let hydrated = $state(false);
+  let salaryTimer: ReturnType<typeof setTimeout> | undefined;
+
   const salary = createSalaryField((value) => {
     plan.setSalary(value);
-    urlSync.scheduleSalary(value);
+    clearTimeout(salaryTimer);
+    salaryTimer = setTimeout(() => {
+      const search = new URLSearchParams(location.search);
+      if (value != null) search.set('salary', String(value));
+      else search.delete('salary');
+      const query = search.toString();
+      replaceState(query ? `?${query}` : location.pathname, history.state ?? {});
+    }, 350);
   });
 
-  let selected = $derived(plan.activeCity);
-  let apartmentOpen = $state(false);
-
-  function revealLinkedSection() {
-    if (window.location.hash === '#apartment-check') apartmentOpen = true;
-  }
-
   onMount(() => {
-    revealLinkedSection();
-    const teardown = urlSync.start(page.url.searchParams, () => salary.reseed(plan.salary));
+    const hadUrlState = plan.hydrateFromSearch(page.url.searchParams);
+    if (!hadUrlState) {
+      const urlSalary = plan.salary;
+      if (!plan.activeCity && !plan.comparisonNames.length) plan.restoreSession();
+      if (urlSalary != null) plan.setSalary(urlSalary);
+    }
+    salary.reseed(plan.salary);
+    hydrated = true;
     return () => {
+      clearTimeout(salaryTimer);
       plan.flushPersistence();
-      teardown();
     };
   });
 </script>
 
 <svelte:head>
-  <title
-    >{selected
-      ? `${selected.name} rent on a salary · Renttool`
-      : 'Renttool · Find your city. Know your rent.'}</title
-  >
+  <title>Renttool · Find your city. Know your rent.</title>
   <meta
     name="description"
     content="Put in a salary offer and a city. See the rent there, what you'd keep each month, and the towns around it."
@@ -49,28 +54,13 @@
   <meta property="og:image" content="/renttool-icon.png" />
 </svelte:head>
 
-<svelte:window onhashchange={revealLinkedSection} />
-
-<main id="main-content" tabindex="-1" data-hydrated={urlSync.hydrated ? 'true' : 'false'}>
-  {#if !urlSync.hydrated}
-    <div class="pc-wrap" aria-busy="true" aria-label="Loading your rent plan">
-      <div class="pc-loading pc-card"></div>
-    </div>
-  {:else if selected}
-    <CityView presentation={plan} city={selected} {salary} bind:apartmentOpen />
-  {:else}
-    <HomeView presentation={plan} {salary} />
-  {/if}
+<main id="main-content" tabindex="-1" data-hydrated={hydrated ? 'true' : 'false'}>
+  <HomeView presentation={plan} {salary} />
 </main>
 
 <style>
   main {
     min-height: 100vh;
     outline: none;
-  }
-  .pc-loading {
-    height: 40rem;
-    margin-top: 5.5rem;
-    background: linear-gradient(90deg, #fff 44%, #f2f4f5 44%);
   }
 </style>

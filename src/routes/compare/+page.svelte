@@ -167,9 +167,9 @@
 
 <main id="main-content" tabindex="-1" data-hydrated={hydrated ? 'true' : 'false'}>
   <div class="pc-wrap">
-    <TopBar homeHref={plan.activeCity ? plan.buildHref('/') : '/'}>
+    <TopBar>
       {#if plan.activeCity}
-        <a class="pc-btn" href={plan.buildHref('/')}>Back to {plan.activeCity.city}</a>
+        <a class="pc-btn" href={plan.buildHref('/city')}>Back to {plan.activeCity.city}</a>
       {/if}
       {#snippet end()}
         <HousingToggle

@@ -5,7 +5,9 @@ and the city shows up as a two-sided postcard: a photo on the front (or drawn ri
 when a city has no photo), and on the back the rent there, your rent ceiling as a stamp,
 what you'd keep each month, and a map of nearby towns coloured by whether rent fits. Below
 the card: where the money goes, nearby towns against your ceiling, a short Wikipedia lead,
-city facts, and pre-filtered searches on Zillow, Apartments.com, Zumper, and HotPads. The `/compare` view compares up to five cities with an
+city facts, and pre-filtered searches on Zillow, Apartments.com, Zumper, and HotPads.
+The home page at `/` always starts fresh, even with a saved plan, and keeps a link back to your last city. Each city
+opens at `/city`, and older `/?city=` links redirect there. The `/compare` view compares up to five cities with an
 independent salary and optional entered take-home pay for each comparison entry.
 The plan shows the salary saved in Compare and offers an explicit update when it differs.
 Updating a comparison salary clears that entry’s entered paycheck, while retaining its expense override.

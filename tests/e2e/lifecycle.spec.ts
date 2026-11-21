@@ -41,7 +41,7 @@ test('map does not initialize after navigation during Leaflet import', async ({ 
   page.on('pageerror', (error) => errors.push(error));
   const leaflet = await holdModule(page, 'leaflet');
 
-  await page.goto('/?salary=80000&city=Tampa%2C%20FL');
+  await page.goto('/city?salary=80000&city=Tampa%2C%20FL');
   await waitForHydration(page);
   await expect(page.getByTestId('rent-map')).toBeVisible();
   await leaflet.waitUntilRequested();

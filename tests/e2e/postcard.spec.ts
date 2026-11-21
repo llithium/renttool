@@ -9,7 +9,7 @@ const NO_PHOTO = Object.keys(RENTS).find((name) => !IMAGES[name])!;
 const dollars = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 
 const SLC = 'Salt Lake City, UT';
-const SLC_URL = `/?salary=58000&city=${encodeURIComponent(SLC)}`;
+const SLC_URL = `/city?salary=58000&city=${encodeURIComponent(SLC)}`;
 const nearby = [
   {
     label: 'Murray, UT',
@@ -77,7 +77,7 @@ test.beforeEach(async ({ page }) => {
 test('server-renders a loading card, not the home page, before a saved city hydrates', async ({
   request
 }) => {
-  const html = await (await request.get(`/?salary=80000&city=Tampa%2C+FL`)).text();
+  const html = await (await request.get(`/city?salary=80000&city=Tampa%2C+FL`)).text();
   expect(html).toContain('Loading your rent plan');
   expect(html).not.toContain('See the city');
 });
@@ -103,7 +103,7 @@ test('addresses the postcard on the home page and opens the city', async ({ page
   await expect(page.getByTestId('verdict')).toHaveText(
     `Fits, with ${dollars(1450 - rent)} to spare`
   );
-  await expect(page).toHaveURL(/city=Salt\+Lake\+City/);
+  await expect(page).toHaveURL(/\/city\?.*city=Salt\+Lake\+City/);
 });
 
 test('shows the city photo with credit, and draws a ridgeline when a city has none', async ({
@@ -115,7 +115,7 @@ test('shows the city photo with credit, and draws a ridgeline when a city has no
   await expect(card.getByRole('img', { name: IMAGES[SLC].alt })).toBeVisible();
   await expect(card.getByRole('link', { name: IMAGES[SLC].photographerName })).toBeVisible();
 
-  await page.goto(`/?salary=58000&city=${encodeURIComponent(NO_PHOTO)}`);
+  await page.goto(`/city?salary=58000&city=${encodeURIComponent(NO_PHOTO)}`);
   await hydrated(page);
   await expect(page.getByTestId('city-postcard').getByTestId('city-fallback-art')).toBeVisible();
   await expect(page.getByTestId('city-postcard')).toContainText('° N');
@@ -287,6 +287,45 @@ test('restores the city and salary after a reload', async ({ page }) => {
   await expect(page.getByLabel('Salary', { exact: true })).toHaveValue('64,000');
 });
 
+test('gets back to the home page from a city and returns to it', async ({ page }) => {
+  await page.goto(SLC_URL);
+  await hydrated(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'Salt Lake City' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Renttool home' }).click();
+  await expect(page).toHaveURL(/\/(\?salary=58000)?$/);
+  await hydrated(page);
+  await expect(page.getByRole('heading', { name: /Find your city/ })).toBeVisible();
+  await expect(page.getByLabel('Salary offer, per year')).toHaveValue('58,000');
+
+  // A reload keeps you on the start page even with a saved city.
+  await page.reload();
+  await hydrated(page);
+  await expect(page.getByRole('heading', { name: /Find your city/ })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Back to Salt Lake City' }).click();
+  await expect(page).toHaveURL(/\/city\?/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Salt Lake City' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Renttool home' }).click();
+  await expect(page.getByRole('heading', { name: /Find your city/ })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { level: 1, name: 'Salt Lake City' })).toBeVisible();
+});
+
+test('opens links shared before the city page had its own address', async ({ page }) => {
+  await page.goto(`/?salary=58000&city=${encodeURIComponent(SLC)}`);
+  await expect(page).toHaveURL(/\/city\?salary=58000&city=Salt/);
+  await hydrated(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'Salt Lake City' })).toBeVisible();
+});
+
+test('sends an empty city page to the start page', async ({ page }) => {
+  await page.goto('/city?salary=58000');
+  await expect(page).toHaveURL(/\/\?salary=58000$/);
+  await expect(page.getByRole('heading', { name: /Find your city/ })).toBeVisible();
+});
+
 test('canonicalizes a shared address once the router is ready', async ({ page }) => {
   const routerErrors: string[] = [];
   page.on('console', (message) => {
@@ -296,7 +335,7 @@ test('canonicalizes a shared address once the router is ready', async ({ page })
   page.on('pageerror', (error) => {
     if (/replaceState|pushState/.test(error.message)) routerErrors.push(error.message);
   });
-  await page.goto('/?salary=080000&city=Salt%20Lake%20City%2C%20UT&unused=1');
+  await page.goto('/city?salary=080000&city=Salt%20Lake%20City%2C%20UT&unused=1');
   await hydrated(page);
   await expect(page).toHaveURL(/salary=80000/);
   expect(routerErrors).toEqual([]);
