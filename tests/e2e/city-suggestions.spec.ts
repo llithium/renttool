@@ -12,6 +12,7 @@ test('matches city/state variants and explains housing estimates', async ({ page
     route.fulfill({ json: { suggestions: [] } })
   );
   await page.goto('/?salary=80000&housing=shared-2br');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('Saint Louis, Missouri');
   const suggestion = page.getByRole('option', { name: 'St Louis, MO', exact: true });
@@ -41,6 +42,7 @@ test('merges delayed results without duplicate cities or changing the keyboard c
     });
   });
   await page.goto('/?salary=80000');
+  await expect(page.locator('main')).toHaveAttribute('data-hydrated', 'true');
   const input = page.getByRole('combobox', { name: 'City', exact: true });
   await input.fill('San');
   const list = page.getByRole('listbox', { name: 'City suggestions' });
